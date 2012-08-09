@@ -1,0 +1,168 @@
+%%======================================================================
+%%
+%% Leo S3-Libs
+%%
+%% Copyright (c) 2012 Rakuten, Inc.
+%%
+%% This file is provided to you under the Apache License,
+%% Version 2.0 (the "License"); you may not use this file
+%% except in compliance with the License.  You may obtain
+%% a copy of the License at
+%%
+%%   http://www.apache.org/licenses/LICENSE-2.0
+%%
+%% Unless required by applicable law or agreed to in writing,
+%% software distributed under the License is distributed on an
+%% "AS IS" BASIS, WITHOUT WARRANTIES OR CONDITIONS OF ANY
+%% KIND, either express or implied.  See the License for the
+%% specific language governing permissions and limitations
+%% under the License.
+%%
+%% ---------------------------------------------------------------------
+%% Leo Libs - Auth API
+%% @doc
+%% @end
+%%======================================================================
+-module(leo_s3_endpoint).
+
+-author('Yosuke Hara').
+
+-include("leo_s3_endpoint.hrl").
+-include("leo_s3_libs.hrl").
+-include_lib("eunit/include/eunit.hrl").
+
+-export([start/2,  create_endpoint_table/2,
+         set_endpoint/1, get_endpoints/0, delete_endpoint/1
+        ]).
+
+-define(ENDPOINT_INFO,  leo_s3_libs_endpoint_info).
+-define(ENDPOINT_TABLE, leo_s3_libs_endpoints).
+
+
+%%--------------------------------------------------------------------
+%% APIF
+%%--------------------------------------------------------------------
+%% @doc Launch or create  Mnesia/ETS
+%%
+-spec(start(master | slave, list()) ->
+             ok).
+start(slave = Type, Provider) ->
+    ?ENDPOINT_TABLE = ets:new(?ENDPOINT_TABLE, [named_table, set, public, {read_concurrency, true}]),
+    ok = setup(Type, ets, Provider),
+    ok;
+
+start(master = Type,_Provider) ->
+    ok = setup(Type, mnesia, []),
+    ok.
+
+
+setup(Type, DB, Provider) ->
+    ?ENDPOINT_INFO = ets:new(?ENDPOINT_INFO, [named_table, ordered_set, public, {read_concurrency, true}]),
+    true = ets:insert(?ENDPOINT_INFO, {1, #endpoint_info{type = Type,
+                                                         db   = DB,
+                                                         provider = Provider}}),
+    ok.
+
+
+%% @doc Insert a End-Point into the Mnesia or ETS
+%%
+set_endpoint(EndPoint) ->
+    case get_endpoint_info() of
+        {ok, #endpoint_info{db = DB}} ->
+            true = leo_s3_libs_data_handler:insert(
+                     {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint   = EndPoint,
+                                                                 created_at = leo_utils:now()}}),
+            ok;
+        Error ->
+            Error
+    end.
+
+
+%% @doc Retrieve endpoint info from ETS
+%%
+get_endpoint_info() ->
+    case catch ets:lookup(?ENDPOINT_INFO, 1) of
+        [{_, EndPointInfo}|_] ->
+            {ok, EndPointInfo};
+        _ ->
+            not_found
+    end.
+
+
+%% @doc Retrieve a End-Point from the Mnesia or ETS
+%%
+get_endpoints() ->
+    case get_endpoint_info() of
+        {ok, #endpoint_info{db = DB,
+                            provider = Provider}} ->
+            get_endpoints_1(DB, Provider);
+        Error ->
+            Error
+    end.
+
+
+%% @doc Remove a End-Point from the Mnesia or ETS
+%%
+delete_endpoint(EndPoint) ->
+    case get_endpoint_info() of
+        {ok, #endpoint_info{db = DB}} ->
+            leo_s3_libs_data_handler:delete({DB, ?ENDPOINT_TABLE}, EndPoint);
+        Error ->
+            Error
+    end.
+
+
+%% @doc Create endpoint table(mnesia)
+%%
+create_endpoint_table(Mode, Nodes) ->
+    catch application:start(mnesia),
+    {atomic, ok} =
+        mnesia:create_table(
+          ?ENDPOINT_TABLE,
+          [{Mode, Nodes},
+           {type, set},
+           {record_name, endpoint},
+           {attributes, record_info(fields, endpoint)},
+           {user_properties,
+            [{endpoint,   {varchar, undefined}, false, primary,   undefined, identity,  varchar},
+             {created_at, {integer, undefined}, false, undefined, undefined, undefined, integer}
+            ]}
+          ]),
+    ok.
+
+
+%% @doc Retrieve EndPoints from Mnesia/ETS
+%% @private
+get_endpoints_1(DB, Provider) ->
+    case leo_s3_libs_data_handler:all({DB, ?ENDPOINT_TABLE}) of
+        {ok, EndPoints} ->
+            {ok, EndPoints};
+        not_found when DB == ets->
+            get_endpoints_2(DB, Provider);
+        Error ->
+            Error
+    end.
+
+%% @doc Retrieve EndPoints from Remote Node
+%% @private
+get_endpoints_2(DB, Provider) ->
+    case lists:foldl(
+           fun(Node, [] = Acc) ->
+                   RPCKey = rpc:async_call(Node, leo_s3_endpoint, get_endpoints, []),
+                   case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
+                       {value, {ok, Value}} -> Value;
+                       _ -> Acc
+                   end;
+              (_Node, Acc) ->
+                   Acc
+           end, [], Provider) of
+        [] ->
+            {error, not_found};
+        EndPoints ->
+            lists:foreach(fun(Item) ->
+                                  leo_s3_libs_data_handler:insert(
+                                    {DB, ?ENDPOINT_TABLE}, {Item#endpoint.endpoint, Item})
+                          end, EndPoints),
+            {ok, EndPoints}
+    end.
+

@@ -1,6 +1,6 @@
 leo_s3_libs
 ===========
-[![Build Status](https://secure.travis-ci.org/leo-project/leo_s3_lib.png?branch=master)](http://travis-ci.org/leo-project/leo_s3_lib)
+[![Build Status](https://secure.travis-ci.org/leo-project/leo_s3_libs.png?branch=master)](http://travis-ci.org/leo-project/leo_s3_libs)
 
 Overview
 --------

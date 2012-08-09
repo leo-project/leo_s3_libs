@@ -155,13 +155,11 @@ put(AccessKey, Bucket) ->
         {ok, #bucket_info{type = slave,
                           db   = DB,
                           provider = Provider}} ->
-            ?debugVal(Provider),
             case rpc_call(Provider, put, AccessKey, Bucket) of
                 true  -> put(AccessKey, Bucket, DB);
                 false -> {error, not_stored}
             end;
         {ok, #bucket_info{type = master, db = DB}} ->
-            ?debugVal(ok),
             put(AccessKey, Bucket, DB);
         Error ->
             Error

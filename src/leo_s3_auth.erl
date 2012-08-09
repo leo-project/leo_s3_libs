@@ -158,26 +158,18 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
     [AccWithAWS, Signature|_] = string:tokens(Authorization, ":"),
     AccessKeyId = string:sub_word(AccWithAWS, 2),
 
-    %% @TODO
-    "/" ++ NewBucket = auth_bucket(Bucket),
-
     Ret = case IsCreateBucketOp of
               true  -> ok;
               false ->
                   case leo_s3_bucket:head(AccessKeyId, Bucket) of
-                      ok -> ok;
+                      ok ->
+                          authenticate1(#auth_params{access_key_id = AccessKeyId,
+                                                     signature     = Signature,
+                                                     sign_params   = SignParams#sign_params{bucket = Bucket}});
                       _  -> {error, unmatch}
                   end
           end,
-
-    case Ret of
-        ok ->
-            authenticate1(#auth_params{access_key_id = AccessKeyId,
-                                       signature     = Signature,
-                                       sign_params   = SignParams#sign_params{bucket = NewBucket}});
-        Error ->
-            Error
-    end.
+    Ret.
 
 
 %% @doc Generate a signature.
@@ -332,36 +324,9 @@ auth_date(Date0, CannonocalizedResources) ->
 %% @doc Retrieve a bucket from string
 %% @private
 auth_bucket("/",_Bucket, []) -> [];
-auth_bucket("/", Bucket,  _) -> auth_bucket(Bucket);
+auth_bucket("/", Bucket,  _) -> "/" ++ Bucket;
 auth_bucket(_,   [],      _) -> [];
-auth_bucket(_,   Bucket,  _) -> auth_bucket(Bucket).
-
-auth_bucket(Bucket) ->
-    Ret = leo_s3_endpoint:get_endpoints(),
-    auth_bucket(Ret, Bucket).
-
-auth_bucket({ok, EndPoints}, Bucket0) ->
-    Fun = fun(#endpoint{endpoint = EP}, [] = Acc) ->
-                  case (string:str(Bucket0, EP) > 0) of
-                      true  -> lists:subtract(string:tokens(Bucket0, "."),
-                                              string:tokens(EP,      "."));
-                      false -> Acc
-                  end;
-             (_, Acc) ->
-                  Acc
-          end,
-
-    Bucket1 = case lists:foldl(Fun, [], EndPoints) of
-                  []  ->
-                      Bucket0;
-                  Ret ->
-                      lists:foldl(fun(Item, [])  -> Item;
-                                     (Item, Acc) -> Acc ++ "." ++ Item
-                                  end, [], Ret)
-              end,
-    "/" ++ Bucket1;
-auth_bucket(_, Bucket) ->
-    "/" ++ Bucket.
+auth_bucket(_,   Bucket,  _) -> "/" ++ Bucket.
 
 
 %% @doc Retrieve URI

@@ -49,7 +49,7 @@
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
-%% @doc
+%% @doc Launch a lib
 %%
 -spec(start(atom(), ets | mnesia) ->
              ok).
@@ -63,16 +63,10 @@ start(master = Type, _Options) ->
     ok.
 
 
-setup(Type, DB, Provider) ->
-    ?BUCKET_INFO  = ets:new(?BUCKET_INFO,  [named_table, set, public, {read_concurrency, true}]),
-    true = ets:insert(?BUCKET_INFO, {1, #bucket_info{type = Type,
-                                                     db   = DB,
-                                                     provider = Provider}}),
-    ok.
-
-
 %% Create bucket table(mnesia)
 %%
+-spec(create_bucket_table(ram_copies|disc|copies, list()) ->
+             ok).
 create_bucket_table(Mode, Nodes) ->
     _ = application:start(mnesia),
     {atomic, ok} =
@@ -244,6 +238,18 @@ head(AccessKey, Bucket, DB, Provider) ->
 %%--------------------------------------------------------------------
 %% INNER FUNCTIONS
 %%--------------------------------------------------------------------
+%% @doc Setup
+%% @private
+-spec(setup(master|slave, ets|mnesia, list()) ->
+             ok).
+setup(Type, DB, Provider) ->
+    ?BUCKET_INFO  = ets:new(?BUCKET_INFO,  [named_table, set, public, {read_concurrency, true}]),
+    true = ets:insert(?BUCKET_INFO, {1, #bucket_info{type = Type,
+                                                     db   = DB,
+                                                     provider = Provider}}),
+    ok.
+
+
 %% @doc Retrieve database-type.
 %% @private
 -spec(get_info() ->
@@ -270,6 +276,10 @@ put_all_values(DB, [H|T]) ->
     put_all_values(DB, T).
 
 
+%% @doc Retrieve buckets by id
+%% @private
+-spec(find_buckets_by_id_1(string(), ets|mnesia, list()) ->
+             {ok, list()} | {error, any()}).
 find_buckets_by_id_1(AccessKey, DB, Providers) ->
     {Value0, CRC} = case leo_s3_bucket_data_handler:lookup(
                            {DB, ?BUCKET_TABLE}, AccessKey) of
@@ -289,6 +299,8 @@ find_buckets_by_id_1(AccessKey, DB, Providers) ->
             end, [], Providers),
     Ret.
 
+-spec(find_buckets_by_id_2(string(), ets|mnesia, atom(), list(), integer()) ->
+             {ok, list()} | {error, any()}).
 find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
     RPCKey = rpc:async_call(Node, leo_s3_bucket, find_buckets_by_id,
                             [AccessKey, CRC]),
@@ -315,8 +327,8 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
     Ret.
 
 
-%% @doc
-%%
+%% @doc Communicate remote node(s)
+%% @private
 -spec(rpc_call(list(), atom(), string(), string()) ->
              true | false).
 rpc_call(Provider, Function, AccessKey, Bucket) ->

@@ -88,22 +88,32 @@ lookup({ets, Table}, Id) ->
 
 %% @doc Insert a record into the table.
 %%
+-spec(insert({mnesia|ets, atom}, {integer(), any()}) ->
+             ok | {error, any()}).
 insert({mnesia, Table}, {_Id, Value}) ->
     Fun = fun() -> mnesia:write(Table, Value, write) end,
-    leo_mnesia_utils:write(Fun),
-    true;
+    leo_mnesia_utils:write(Fun);
+
 insert({ets, Table}, {Id, Value}) ->
-    ets:insert(Table, {Id, Value}).
+    case ets:insert(Table, {Id, Value}) of
+        true ->
+            ok;
+        {'EXIT', Cause} ->
+            {error, Cause}
+    end.
+
 
 
 %% @doc Remove a record from the table.
 %%
+-spec(delete({mnesia|ets, atom}, integer()) ->
+             ok | {error, any()}).
 delete({mnesia, Table}, Id) ->
     case catch lookup({mnesia, Table}, Id) of
         {ok, Value} ->
             Fun = fun() ->
                           mnesia:delete_object(Table, Value, write)
-                   end,
+                  end,
             leo_mnesia_utils:delete(Fun);
         {'EXIT', Cause} ->
             {error, Cause};
@@ -121,6 +131,8 @@ delete({ets, Table}, Id) ->
 
 %% @doc Retrieve total of records.
 %%
+-spec(size({mnesia|ets, atom()}) ->
+             integer()).
 size({mnesia, Table}) ->
     mnesia:ets(fun ets:info/2, [Table, size]);
 size({ets, Table}) ->

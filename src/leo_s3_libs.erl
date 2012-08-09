@@ -53,7 +53,9 @@ start(master = Type, _Options) ->
     ok.
 
 
-
+%%--------------------------------------------------------------------
+%% INNER FUNCTION
+%%--------------------------------------------------------------------
 %% @doc Launch auth-lib, bucket-lib and endpoint-lib
 %% @private
 start_1(Type, Provider) ->

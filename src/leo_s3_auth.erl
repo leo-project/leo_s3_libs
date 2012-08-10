@@ -137,18 +137,18 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
     [AccWithAWS, Signature|_] = string:tokens(Authorization, ":"),
     AccessKeyId = string:sub_word(AccWithAWS, 2),
 
-    Ret = case IsCreateBucketOp of
-              true  -> ok;
-              false ->
-                  case leo_s3_bucket:head(AccessKeyId, Bucket) of
-                      ok ->
-                          authenticate1(#auth_params{access_key_id = AccessKeyId,
-                                                     signature     = Signature,
-                                                     sign_params   = SignParams#sign_params{bucket = Bucket}});
-                      _  -> {error, unmatch}
-                  end
-          end,
-    Ret.
+    case {leo_s3_bucket:head(AccessKeyId, Bucket), IsCreateBucketOp} of
+        {ok, false} ->
+            authenticate1(#auth_params{access_key_id = AccessKeyId,
+                                       signature     = Signature,
+                                       sign_params   = SignParams#sign_params{bucket = Bucket}});
+        {not_found, true} ->
+            authenticate1(#auth_params{access_key_id = AccessKeyId,
+                                       signature     = Signature,
+                                       sign_params   = SignParams#sign_params{bucket = Bucket}});
+        _Other ->
+            {error, unmatch}
+    end.
 
 
 %% @doc Generate a signature.

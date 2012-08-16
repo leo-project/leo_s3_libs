@@ -30,7 +30,7 @@
 -include("leo_s3_bucket.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([start/2, create_bucket_table/2,
+-export([start/2, create_bucket_table/2, is_valid_bucket/1,
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
          put/2, put/3, delete/2, head/2, head/4]).
 
@@ -162,12 +162,16 @@ put(AccessKey, Bucket) ->
 -spec(put(string(), string(), ets | mnesia) ->
              ok | {error, any()}).
 put(AccessKey, Bucket, DB) ->
-    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                      #bucket{name       = Bucket,
-                                              access_key = AccessKey,
-                                              created_at = ?NOW
-                                             }).
-
+    case is_valid_bucket(Bucket) of
+        ok ->
+            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
+                                              #bucket{name       = Bucket,
+                                                      access_key = AccessKey,
+                                                      created_at = ?NOW
+                                                     });
+        Error ->
+            Error
+    end.
 
 %% @doc delete a bucket.
 %%
@@ -344,3 +348,46 @@ rpc_call(Provider, Function, AccessKey, Bucket) ->
             end, false, Provider),
     Ret.
 
+%% @doc validate a string if which consits of digit chars
+%% @private
+is_only_digits(String) ->
+    [Char || Char <- String, Char < $0 orelse Char > $9] == [].
+
+%% @doc validate a bucket name
+%% @private
+-spec(is_valid_bucket(string()) ->
+             ok | {error, badarg}).
+is_valid_bucket(Bucket) when is_list(Bucket), length(Bucket) < 3 ->
+    {error, badarg};
+is_valid_bucket(Bucket) when is_list(Bucket), length(Bucket) > 62 ->
+    {error, badarg};
+is_valid_bucket([$.|_]) ->
+    {error, badarg};
+is_valid_bucket([H|T]) ->
+    is_valid_bucket(T, H, [], true).
+
+is_valid_bucket([], LastChar, _LastLabel, _OnlyDigit) when LastChar == $. ->
+    {error, badarg};
+is_valid_bucket([], _LastChar, LastLabel, true) ->
+    case is_only_digits(LastLabel) of
+        true  -> {error, badarg};
+        false -> ok
+    end;
+is_valid_bucket([], _LastChar, _LastLabel, _OnlyDigit) ->
+    ok;
+is_valid_bucket([$.|_], $., _LastLabel, _OnlyDigit) ->
+    {error, badarg};
+is_valid_bucket([$.|T], _LastChar, _LastLabel, false) ->
+    is_valid_bucket(T, $., [], false);
+is_valid_bucket([$.|T], _LastChar, LastLabel, true) ->
+    case is_only_digits(LastLabel) of
+        true  -> is_valid_bucket(T, $., [], true);
+        false -> is_valid_bucket(T, $., [], false)
+    end;
+is_valid_bucket([H|T], _LastChar, LastLabel, OnlyDigit) when (H >= $a andalso H =< $z) orelse
+                                                             (H >= $0 andalso H =< $9) orelse
+                                                              H == $- ->
+    is_valid_bucket(T, H, LastLabel ++ [H], OnlyDigit);
+is_valid_bucket([_|_], _LastChar, _LastLabel, _OnlyDigit) ->
+    {error, badarg}.
+    

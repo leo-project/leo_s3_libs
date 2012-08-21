@@ -31,8 +31,7 @@
 -include_lib("stdlib/include/qlc.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([lookup/2, find_by_name/3, find_all/1, insert/2, delete/2,
-         replace/2, size/1]).
+-export([lookup/2, find_by_name/3, find_all/1, insert/2, delete/2, size/1]).
 
 
 %% Retrieve a record by key from the table.
@@ -62,6 +61,10 @@ lookup({ets, Table}, AccessKey0) ->
     end.
 
 
+%% @doc Retrieve a record by name
+%%
+-spec(find_by_name({mnesia|ets, atom()}, string(), string()) ->
+             {ok, list()} | {error, any()}).
 find_by_name({mnesia, Table}, AccessKey0, Name) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table),
@@ -93,6 +96,8 @@ find_by_name({ets, Table}, AccessKey0, Name0) ->
 
 %% @doc Retrieve all buckets.
 %%
+-spec(find_all({mnesia|ets, atom()}) ->
+             {ok, list()} | {error, any()}).
 find_all({mnesia, Table}) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table)]),
@@ -104,9 +109,10 @@ find_all(_) ->
     {error, badarg}.
 
 
-
 %% @doc Insert a record into the table.
 %%
+-spec(insert({mnesia|ets, atom()}, #bucket{}) ->
+             ok | {error, any()}).
 insert({mnesia, Table}, Bucket) ->
     Fun = fun() -> mnesia:write(Table, Bucket, write) end,
     leo_mnesia_utils:write(Fun);
@@ -122,6 +128,8 @@ insert({ets, Table}, #bucket{name = Name} = Value) ->
 
 %% @doc Remove a record from the table.
 %%
+-spec(delete({mnesia|ets, atom()}, #bucket{}) ->
+             ok | {error, any()}).
 delete({mnesia, Table}, #bucket{name       = Name,
                                 access_key = AccessKey}) ->
     Fun1 = fun() ->
@@ -156,17 +164,11 @@ delete({ets, Table}, #bucket{name       = Name,
             Error
     end.
 
-replace(Table, Bucket) ->
-    case delete(Table, Bucket) of
-        ok ->
-            insert(Table, Bucket);
-        Error ->
-            Error
-    end.
-
 
 %% @doc Retrieve total of records.
 %%
+-spec(size({mnesia|ets, atom()}) ->
+             integer()).
 size({mnesia, Table}) ->
     mnesia:ets(fun ets:info/2, [Table, size]);
 size({ets, Table}) ->

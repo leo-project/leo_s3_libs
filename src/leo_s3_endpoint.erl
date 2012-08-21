@@ -19,7 +19,7 @@
 %% under the License.
 %%
 %% ---------------------------------------------------------------------
-%% Leo Libs - Auth API
+%% Leo Libs - EndPoint
 %% @doc
 %% @end
 %%======================================================================
@@ -40,7 +40,7 @@
 
 
 %%--------------------------------------------------------------------
-%% APIF
+%% API
 %%--------------------------------------------------------------------
 %% @doc Launch or create  Mnesia/ETS
 %%
@@ -54,62 +54,6 @@ start(slave = Type, Provider) ->
 start(master = Type,_Provider) ->
     ok = setup(Type, mnesia, []),
     ok.
-
-
-setup(Type, DB, Provider) ->
-    ?ENDPOINT_INFO = ets:new(?ENDPOINT_INFO, [named_table, ordered_set, public, {read_concurrency, true}]),
-    true = ets:insert(?ENDPOINT_INFO, {1, #endpoint_info{type = Type,
-                                                         db   = DB,
-                                                         provider = Provider}}),
-    ok.
-
-
-%% @doc Insert a End-Point into the Mnesia or ETS
-%%
-set_endpoint(EndPoint) ->
-    case get_endpoint_info() of
-        {ok, #endpoint_info{db = DB}} ->
-            true = leo_s3_libs_data_handler:insert(
-                     {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint   = EndPoint,
-                                                                 created_at = leo_utils:now()}}),
-            ok;
-        Error ->
-            Error
-    end.
-
-
-%% @doc Retrieve endpoint info from ETS
-%%
-get_endpoint_info() ->
-    case catch ets:lookup(?ENDPOINT_INFO, 1) of
-        [{_, EndPointInfo}|_] ->
-            {ok, EndPointInfo};
-        _ ->
-            not_found
-    end.
-
-
-%% @doc Retrieve a End-Point from the Mnesia or ETS
-%%
-get_endpoints() ->
-    case get_endpoint_info() of
-        {ok, #endpoint_info{db = DB,
-                            provider = Provider}} ->
-            get_endpoints_1(DB, Provider);
-        Error ->
-            Error
-    end.
-
-
-%% @doc Remove a End-Point from the Mnesia or ETS
-%%
-delete_endpoint(EndPoint) ->
-    case get_endpoint_info() of
-        {ok, #endpoint_info{db = DB}} ->
-            leo_s3_libs_data_handler:delete({DB, ?ENDPOINT_TABLE}, EndPoint);
-        Error ->
-            Error
-    end.
 
 
 %% @doc Create endpoint table(mnesia)
@@ -128,6 +72,62 @@ create_endpoint_table(Mode, Nodes) ->
              {created_at, {integer, undefined}, false, undefined, undefined, undefined, integer}
             ]}
           ]),
+    ok.
+
+
+%% @doc Insert a End-Point into the Mnesia or ETS
+%%
+-spec(set_endpoint(string) ->
+             ok | {error, any()}).
+set_endpoint(EndPoint) ->
+    case get_endpoint_info() of
+        {ok, #endpoint_info{db = DB}} ->
+            ok = leo_s3_libs_data_handler:insert(
+                   {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint   = EndPoint,
+                                                               created_at = leo_utils:now()}}),
+            ok;
+        Error ->
+            Error
+    end.
+
+
+%% @doc Retrieve a End-Point from the Mnesia or ETS
+%%
+-spec(get_endpoints() ->
+             {ok, list()} | {error, any()}).
+get_endpoints() ->
+    case get_endpoint_info() of
+        {ok, #endpoint_info{db = DB,
+                            provider = Provider}} ->
+            get_endpoints_1(DB, Provider);
+        Error ->
+            Error
+    end.
+
+
+%% @doc Remove a End-Point from the Mnesia or ETS
+%%
+-spec(delete_endpoint(string) ->
+             ok | {error, any()}).
+delete_endpoint(EndPoint) ->
+    case get_endpoint_info() of
+        {ok, #endpoint_info{db = DB}} ->
+            leo_s3_libs_data_handler:delete({DB, ?ENDPOINT_TABLE}, EndPoint);
+        Error ->
+            Error
+    end.
+
+
+%%--------------------------------------------------------------------
+%% INNER FUNCTION
+%%--------------------------------------------------------------------
+%% @doc Setup
+%% @private
+setup(Type, DB, Provider) ->
+    ?ENDPOINT_INFO = ets:new(?ENDPOINT_INFO, [named_table, ordered_set, public, {read_concurrency, true}]),
+    true = ets:insert(?ENDPOINT_INFO, {1, #endpoint_info{type = Type,
+                                                         db   = DB,
+                                                         provider = Provider}}),
     ok.
 
 
@@ -160,9 +160,21 @@ get_endpoints_2(DB, Provider) ->
             {error, not_found};
         EndPoints ->
             lists:foreach(fun(Item) ->
-                                  leo_s3_libs_data_handler:insert(
-                                    {DB, ?ENDPOINT_TABLE}, {Item#endpoint.endpoint, Item})
+                                  _ = leo_s3_libs_data_handler:insert(
+                                        {DB, ?ENDPOINT_TABLE}, {Item#endpoint.endpoint, Item})
                           end, EndPoints),
             {ok, EndPoints}
+    end.
+
+%% @doc Retrieve endpoint info from ETS
+%% @private
+-spec(get_endpoint_info() ->
+             {ok, list()} | not_fonund).
+get_endpoint_info() ->
+    case catch ets:lookup(?ENDPOINT_INFO, 1) of
+        [{_, EndPointInfo}|_] ->
+            {ok, EndPointInfo};
+        _ ->
+            not_found
     end.
 

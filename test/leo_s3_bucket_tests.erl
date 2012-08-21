@@ -48,6 +48,16 @@
 -define(Bucket6, "bucket6").
 -define(Bucket7, "bucket7").
 -define(Bucket8, "bucket8").
+-define(BucketTooShort, "sh").
+-define(BucketTooLong,       "012345678901234567890123456789012345678901234567890123456789012").
+-define(BucketInvalidStart,  ".myawsbucket").
+-define(BucketInvalidEnd,    "myawsbucket.").
+-define(BucketInvalidLabel,  "my..examplebucket").
+-define(BucketInvalidIPAddr, "192.168.1.1").
+-define(BucketInvalidChar1,  "hogeHoge").
+-define(BucketInvalidChar2,  "hoge_hoge").
+-define(BucketValid1,        "my.aws.bucket").
+-define(BucketValid2,        "wsbucket.1").
 
 bucket_test_() ->
     {foreach, fun setup/0, fun teardown/1,
@@ -101,6 +111,18 @@ mnesia_suite_(_) ->
 
     {error, forbidden} = leo_s3_bucket:head(?ACCESS_KEY_1, ?Bucket1),
     not_found = leo_s3_bucket:head(?ACCESS_KEY_1, ?Bucket5),
+
+    %% bucket name validations
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketTooShort),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketTooLong),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidStart),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidEnd),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidLabel),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidIPAddr),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidChar1),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidChar2),
+    ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid1),
+    ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid2),
 
     application:stop(mnesia),
     timer:sleep(250),

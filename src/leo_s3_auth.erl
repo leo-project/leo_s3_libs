@@ -36,8 +36,8 @@
          gen_key/1, get_credential/1, authenticate/3, get_signature/2
         ]).
 
--define(AUTH_INFO,       leo_s3_auth_info).
--define(AUTH_TABLE,      credentials).
+-define(AUTH_INFO,  leo_s3_auth_info).
+-define(AUTH_TABLE, credentials).
 
 -record(auth_params, {access_key_id     :: string(),
                       secret_access_key :: string(),
@@ -64,15 +64,10 @@ start(master, Provider) ->
     ok.
 
 
-setup(DB, Provider) ->
-    ?AUTH_INFO = ets:new(?AUTH_INFO, [named_table, set, public, {read_concurrency, true}]),
-    true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = DB,
-                                                 provider = Provider}}),
-    ok.
-
-
 %% @doc Create credential table(mnesia)
 %%
+-spec(create_credential_table(ram_copies|disc_copies, list()) ->
+             ok).
 create_credential_table(Mode, Nodes) ->
     catch application:start(mnesia),
     {atomic, ok} =
@@ -117,22 +112,6 @@ gen_key(UserId) ->
             {error, Cause}
     end.
 
-gen_key1(UserId, Digest0, Digest1) ->
-    case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, Digest0) of
-        {ok, _} ->
-            gen_key(UserId);
-        not_found ->
-            leo_s3_libs_data_handler:insert(
-              {mnesia, ?AUTH_TABLE}, {[], #credential{access_key_id     = Digest0,
-                                                      secret_access_key = Digest1,
-                                                      user_id           = UserId,
-                                                      created_at        = leo_utils:clock()}}),
-            {ok, [{access_key_id,     Digest0},
-                  {secret_access_key, Digest1}]};
-        _ ->
-            {error, not_initialized}
-    end.
-
 
 %% @doc Retrieve a credential from internal-db
 %%
@@ -143,7 +122,7 @@ get_credential(AccessKeyId) ->
 
 
 %% @doc Authenticate
-%% @private
+%%
 -spec(authenticate(string(), #sign_params{}, boolean()) ->
              {ok, string()} | {error, any()}).
 authenticate(Authorization, #sign_params{uri = "/"} = SignParams, _IsCreateBucketOp) ->
@@ -158,18 +137,18 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
     [AccWithAWS, Signature|_] = string:tokens(Authorization, ":"),
     AccessKeyId = string:sub_word(AccWithAWS, 2),
 
-    Ret = case IsCreateBucketOp of
-              true  -> ok;
-              false ->
-                  case leo_s3_bucket:head(AccessKeyId, Bucket) of
-                      ok ->
-                          authenticate1(#auth_params{access_key_id = AccessKeyId,
-                                                     signature     = Signature,
-                                                     sign_params   = SignParams#sign_params{bucket = Bucket}});
-                      _  -> {error, unmatch}
-                  end
-          end,
-    Ret.
+    case {leo_s3_bucket:head(AccessKeyId, Bucket), IsCreateBucketOp} of
+        {ok, false} ->
+            authenticate1(#auth_params{access_key_id = AccessKeyId,
+                                       signature     = Signature,
+                                       sign_params   = SignParams#sign_params{bucket = Bucket}});
+        {not_found, true} ->
+            authenticate1(#auth_params{access_key_id = AccessKeyId,
+                                       signature     = Signature,
+                                       sign_params   = SignParams#sign_params{bucket = Bucket}});
+        _Other ->
+            {error, unmatch}
+    end.
 
 
 %% @doc Generate a signature.
@@ -211,6 +190,38 @@ get_signature(SecretAccessKey, SignParams) ->
 %%--------------------------------------------------------------------
 %%% INTERNAL FUNCTIONS
 %%--------------------------------------------------------------------
+%% @doc Setup
+%% @private
+-spec(setup(ets|mnesia, list()) ->
+             ok).
+setup(DB, Provider) ->
+    ?AUTH_INFO = ets:new(?AUTH_INFO, [named_table, set, public, {read_concurrency, true}]),
+    true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = DB,
+                                                 provider = Provider}}),
+    ok.
+
+
+%% @doc Generate a credential
+%% @private
+-spec(gen_key1(string(), string(), string()) ->
+             {ok, list()} | {error, any()}).
+gen_key1(UserId, Digest0, Digest1) ->
+    case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, Digest0) of
+        {ok, _} ->
+            gen_key(UserId);
+        not_found ->
+            _ = leo_s3_libs_data_handler:insert(
+                  {mnesia, ?AUTH_TABLE}, {[], #credential{access_key_id     = Digest0,
+                                                          secret_access_key = Digest1,
+                                                          user_id           = UserId,
+                                                          created_at        = leo_utils:clock()}}),
+            {ok, [{access_key_id,     Digest0},
+                  {secret_access_key, Digest1}]};
+        _ ->
+            {error, not_initialized}
+    end.
+
+
 %% @doc Authenticate#1
 %% @private
 -spec(authenticate1(#auth_params{}) ->

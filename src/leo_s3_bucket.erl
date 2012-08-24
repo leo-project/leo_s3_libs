@@ -32,6 +32,7 @@
 
 -export([start/2, create_bucket_table/2, is_valid_bucket/1,
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
+         find_all_including_owner/0,
          put/2, put/3, delete/2, head/2, head/4]).
 
 -define(BUCKET_DB_TYPE,   leo_s3_bucket_db).
@@ -135,6 +136,28 @@ find_all() ->
     case get_info() of
         {ok, #bucket_info{db = DB}} ->
             leo_s3_bucket_data_handler:find_all({DB, ?BUCKET_TABLE});
+        Error ->
+            Error
+    end.
+
+
+%% @doc Retrieve all buckets and owner
+%%
+-spec(find_all_including_owner() ->
+             {ok, list()} | {error, any()}).
+find_all_including_owner() ->
+    case find_all() of
+        {ok, Buckets} ->
+            Ret = lists:map(fun(#bucket{name       = Name,
+                                        access_key = Key,
+                                        created_at = CreatedAt}) ->
+                                    Owner1 = case leo_s3_auth:get_owner_by_access_key(Key) of
+                                                 {ok, Owner0} -> Owner0;
+                                                 _-> []
+                                             end,
+                                    {Name, Owner1, CreatedAt}
+                            end, Buckets),
+            {ok, Ret};
         Error ->
             Error
     end.
@@ -390,4 +413,4 @@ is_valid_bucket([H|T], _LastChar, LastLabel, OnlyDigit) when (H >= $a andalso H 
     is_valid_bucket(T, H, LastLabel ++ [H], OnlyDigit);
 is_valid_bucket([_|_], _LastChar, _LastLabel, _OnlyDigit) ->
     {error, badarg}.
-    
+

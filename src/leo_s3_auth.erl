@@ -31,9 +31,11 @@
 -include("leo_s3_endpoint.hrl").
 -include("leo_s3_libs.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/qlc.hrl").
 
 -export([start/2, create_credential_table/2,
-         gen_key/1, get_credential/1, authenticate/3, get_signature/2
+         gen_key/1, get_credential/1, authenticate/3, get_signature/2,
+         get_owner_by_access_key/1
         ]).
 
 -define(AUTH_INFO,  leo_s3_auth_info).
@@ -185,6 +187,27 @@ get_signature(SecretAccessKey, SignParams) ->
 
     %% ?debugVal({StringToSign, Signature}),
     Signature.
+
+
+%% @doc Retrieve an owner by access key
+%%
+-spec(get_owner_by_access_key(string()) ->
+             {ok, string()} | not_found).
+get_owner_by_access_key(AccessKey) ->
+    F = fun() ->
+                Q = qlc:q([X || X <- mnesia:table(?AUTH_TABLE),
+                                X#credential.access_key_id =:= AccessKey]),
+                qlc:e(Q)
+        end,
+    Ret = mnesia:transaction(F),
+    case Ret of
+        {error, Cause} ->
+            {error, Cause};
+        {atomic, []} ->
+            not_found;
+        {atomic, [#credential{user_id = Owner}|_]} ->
+            {ok, Owner}
+    end.
 
 
 %%--------------------------------------------------------------------

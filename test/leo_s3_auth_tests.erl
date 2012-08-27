@@ -90,20 +90,24 @@ mnesia_suite_(_) ->
                              ok
                      end),
 
-    SignParams = #sign_params{http_verb    = "GET",
-                              content_md5  = "",
-                              content_type = "",
-                              date         = "Tue, 27 Mar 2007 19:36:42 +0000",
-                              bucket       = "johnsmith",
-                              uri          = "/photos/puppy.jpg"},
-    Signature0 = leo_s3_auth:get_signature(SecretAccessKey, SignParams),
+    SignParams0 = #sign_params{http_verb    = "GET",
+                               content_md5  = "",
+                               content_type = "",
+                               date         = "Tue, 27 Mar 2007 19:36:42 +0000",
+                               bucket       = "johnsmith",
+                               uri          = "/photos/puppy.jpg"},
+    Signature0 = leo_s3_auth:get_signature(SecretAccessKey, SignParams0),
     Authorization0 = "AWS" ++ " " ++ AccessKeyId ++ ":" ++ Signature0,
 
-    {ok, AccessKeyId} = leo_s3_auth:authenticate(Authorization0, SignParams, false),
+    {ok, AccessKeyId} = leo_s3_auth:authenticate(Authorization0, SignParams0, false),
+    {ok, Credential}  = leo_s3_auth:get_credential(AccessKeyId),
+    ?assertEqual(AccessKeyId,     Credential#credential.access_key_id),
+    ?assertEqual(SecretAccessKey, Credential#credential.secret_access_key),
+    ?assertEqual("leofs",         Credential#credential.user_id),
 
     %% inspect-4 - for authentication
     Authorization1 = "AWS" ++ " " ++ AccessKeyId ++ ":example",
-    {error, unmatch} = leo_s3_auth:authenticate(Authorization1, SignParams, false),
+    {error, unmatch} = leo_s3_auth:authenticate(Authorization1, SignParams0, false),
 
     %% inspect-5 - for authentication
     _ = meck:unload(leo_s3_bucket),
@@ -112,7 +116,25 @@ mnesia_suite_(_) ->
                      fun(_AccessKeyId, _Bucket) ->
                              not_found
                      end),
-    {error, unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams, false),
+    {error, unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams0, false),
+
+
+    %% inspect-6 - for authentication
+    SignParams1 = #sign_params{http_verb    = "GET",
+                               content_md5  = "",
+                               content_type = "",
+                               date         = "Tue, 27 Mar 2007 19:36:42 +0000",
+                               bucket       = "johnsmith",
+                               uri          = "/"},
+    Signature1 = leo_s3_auth:get_signature(SecretAccessKey, SignParams1),
+    Authorization2 = "AWS" ++ " " ++ AccessKeyId ++ ":" ++ Signature1,
+
+    {ok, AccessKeyId} = leo_s3_auth:authenticate(Authorization2, SignParams1, false),
+
+
+    %% inspect-7 - Retrieve owner by access key
+    {ok,"leofs"} = leo_s3_auth:get_owner_by_access_key(AccessKeyId),
+    not_found    = leo_s3_auth:get_owner_by_access_key([]),
 
 
     application:stop(mnesia),

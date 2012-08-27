@@ -124,6 +124,18 @@ mnesia_suite_(_) ->
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid1),
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid2),
 
+
+    %% Retrieve buckets including owner
+    ok = meck:new(leo_s3_auth),
+    meck:expect(leo_s3_auth , get_owner_by_access_key,
+                fun(_) ->
+                        {ok, "leofs"}
+                end),
+    {ok, Buckets0} = leo_s3_bucket:find_all_including_owner(),
+    {ok, Buckets1} = leo_s3_bucket:find_all(),
+    ?assertEqual(true, length(Buckets0) == length(Buckets1)),
+
+
     application:stop(mnesia),
     timer:sleep(250),
     ok.

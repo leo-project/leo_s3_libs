@@ -94,7 +94,7 @@ create_credential_table(Mode, Nodes) ->
 -spec(gen_key(string()) ->
              {ok, list()} | {error, any()}).
 gen_key(UserId) ->
-    Clock = integer_to_list(leo_utils:clock()),
+    Clock = integer_to_list(leo_date:clock()),
 
     case get_auth_info() of
         {ok, #auth_info{db = ets}} ->
@@ -237,7 +237,7 @@ gen_key1(UserId, Digest0, Digest1) ->
                   {mnesia, ?AUTH_TABLE}, {[], #credential{access_key_id     = Digest0,
                                                           secret_access_key = Digest1,
                                                           user_id           = UserId,
-                                                          created_at        = leo_utils:clock()}}),
+                                                          created_at        = leo_date:clock()}}),
             {ok, [{access_key_id,     Digest0},
                   {secret_access_key, Digest1}]};
         _ ->

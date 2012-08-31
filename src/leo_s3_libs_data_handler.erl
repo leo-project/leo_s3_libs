@@ -92,7 +92,7 @@ lookup({ets, Table}, Id) ->
              ok | {error, any()}).
 insert({mnesia, Table}, {_Id, Value}) ->
     Fun = fun() -> mnesia:write(Table, Value, write) end,
-    leo_mnesia_utils:write(Fun);
+    leo_mnesia:write(Fun);
 
 insert({ets, Table}, {Id, Value}) ->
     case ets:insert(Table, {Id, Value}) of
@@ -114,7 +114,7 @@ delete({mnesia, Table}, Id) ->
             Fun = fun() ->
                           mnesia:delete_object(Table, Value, write)
                   end,
-            leo_mnesia_utils:delete(Fun);
+            leo_mnesia:delete(Fun);
         {'EXIT', Cause} ->
             {error, Cause};
         Error ->

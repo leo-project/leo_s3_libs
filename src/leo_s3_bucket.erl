@@ -44,7 +44,7 @@
 -ifdef(EUNIT).
 -define(NOW, 0).
 -else.
--define(NOW, leo_utils:now()).
+-define(NOW, leo_date:now()).
 -endif.
 
 %%--------------------------------------------------------------------

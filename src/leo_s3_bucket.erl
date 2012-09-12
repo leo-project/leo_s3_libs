@@ -44,7 +44,7 @@
 -ifdef(EUNIT).
 -define(NOW, 0).
 -else.
--define(NOW, leo_utils:now()).
+-define(NOW, leo_date:now()).
 -endif.
 
 %%--------------------------------------------------------------------
@@ -346,7 +346,7 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
                   not_found;
               {value, {error, Cause}} ->
                   {error, Cause};
-              {badrpc, Cause} ->
+              {value, {badrpc, Cause}} ->
                   {error, Cause};
               {'EXIT', Cause} ->
                   {error, Cause}

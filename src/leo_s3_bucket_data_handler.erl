@@ -45,7 +45,7 @@ lookup({mnesia, Table}, AccessKey) ->
                   Q2 = qlc:sort(Q1, [{order, ascending}]),
                   qlc:e(Q2)
           end,
-    leo_mnesia_utils:read(Fun);
+    leo_mnesia:read(Fun);
 
 lookup({ets, Table}, AccessKey0) ->
     Ret = ets:foldl(fun({_,#bucket{access_key = AccessKey1} = Bucket}, Acc) when AccessKey0 == AccessKey1 ->
@@ -72,7 +72,7 @@ find_by_name({mnesia, Table}, AccessKey0, Name) ->
                   Q2 = qlc:sort(Q1, [{order, ascending}]),
                   qlc:e(Q2)
           end,
-    case leo_mnesia_utils:read(Fun) of
+    case leo_mnesia:read(Fun) of
         {ok, [#bucket{access_key = AccessKey1} = H|_]} when AccessKey0 == AccessKey1 ->
             {ok, H};
         {ok, _} ->
@@ -104,7 +104,7 @@ find_all({mnesia, Table}) ->
                   Q2 = qlc:sort(Q1, [{order, ascending}]),
                   qlc:e(Q2)
           end,
-    leo_mnesia_utils:read(Fun);
+    leo_mnesia:read(Fun);
 find_all(_) ->
     {error, badarg}.
 
@@ -115,7 +115,7 @@ find_all(_) ->
              ok | {error, any()}).
 insert({mnesia, Table}, Bucket) ->
     Fun = fun() -> mnesia:write(Table, Bucket, write) end,
-    leo_mnesia_utils:write(Fun);
+    leo_mnesia:write(Fun);
 
 insert({ets, Table}, #bucket{name = Name} = Value) ->
     case catch ets:insert(Table, {Name, Value}) of
@@ -138,12 +138,12 @@ delete({mnesia, Table}, #bucket{name       = Name,
                                X#bucket.name =:= Name andalso X#bucket.access_key =:= AccessKey]),
                    qlc:e(Q)
            end,
-    case leo_mnesia_utils:read(Fun1) of
+    case leo_mnesia:read(Fun1) of
         {ok, [Value|_]} ->
             Fun2 = fun() ->
                            mnesia:delete_object(Table, Value, write)
                    end,
-            leo_mnesia_utils:delete(Fun2);
+            leo_mnesia:delete(Fun2);
         Error ->
             Error
     end;

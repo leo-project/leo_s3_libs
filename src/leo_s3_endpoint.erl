@@ -84,7 +84,7 @@ set_endpoint(EndPoint) ->
         {ok, #endpoint_info{db = DB}} ->
             ok = leo_s3_libs_data_handler:insert(
                    {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint   = EndPoint,
-                                                               created_at = leo_utils:now()}}),
+                                                               created_at = leo_date:now()}}),
             ok;
         Error ->
             Error

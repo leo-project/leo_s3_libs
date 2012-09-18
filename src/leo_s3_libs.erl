@@ -41,7 +41,7 @@
 start(slave = Type, Options) ->
     _ = application:start(crypto),
 
-    Provider = proplists:get_value('provider', Options, []),
+    Provider = leo_misc:get_value('provider', Options, []),
     ok = start_1(Type, Provider),
     ok;
 

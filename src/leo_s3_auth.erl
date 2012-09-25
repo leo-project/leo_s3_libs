@@ -357,7 +357,7 @@ auth_date(Date0, CannonocalizedResources) ->
 
 %% @doc Retrieve a bucket from string
 %% @private
-auth_bucket("/",_Bucket, []) -> [];
+%% auth_bucket("/",_Bucket, []) -> [];
 auth_bucket("/", Bucket,  _) -> "/" ++ Bucket;
 auth_bucket(_,   [],      _) -> [];
 auth_bucket(_,   Bucket,  _) -> "/" ++ Bucket.

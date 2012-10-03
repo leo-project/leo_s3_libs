@@ -47,8 +47,13 @@
 -spec(start(master | slave, list()) ->
              ok).
 start(slave = Type, Provider) ->
-    ?ENDPOINT_TABLE = ets:new(?ENDPOINT_TABLE, [named_table, set, public, {read_concurrency, true}]),
-    ok = setup(Type, ets, Provider),
+    catch ets:new(?ENDPOINT_TABLE, [named_table, set, public, {read_concurrency, true}]),
+    case Provider of
+        [] ->
+            void;
+        _ ->
+            ok = setup(Type, ets, Provider)
+    end,
     ok;
 
 start(master = Type,_Provider) ->

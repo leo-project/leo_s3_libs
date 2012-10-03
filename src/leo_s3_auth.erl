@@ -57,8 +57,13 @@
 -spec(start(master | slave, list()) ->
              ok).
 start(slave, Provider) ->
-    ?AUTH_TABLE = ets:new(?AUTH_TABLE, [named_table, set, public, {read_concurrency, true}]),
-    ok = setup(ets, Provider),
+    catch ets:new(?AUTH_TABLE, [named_table, set, public, {read_concurrency, true}]),
+    case Provider of
+        [] ->
+            void;
+        _ ->
+            ok = setup(ets, Provider)
+    end,
     ok;
 
 start(master, Provider) ->

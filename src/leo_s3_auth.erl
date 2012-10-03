@@ -58,6 +58,8 @@
              ok).
 start(slave, Provider) ->
     catch ets:new(?AUTH_TABLE, [named_table, set, public, {read_concurrency, true}]),
+    catch ets:new(?AUTH_INFO,  [named_table, set, public, {read_concurrency, true}]),
+
     case Provider of
         [] ->
             void;
@@ -67,6 +69,7 @@ start(slave, Provider) ->
     ok;
 
 start(master, Provider) ->
+    catch ets:new(?AUTH_INFO,  [named_table, set, public, {read_concurrency, true}]),
     ok = setup(mnesia, Provider),
     ok.
 
@@ -223,7 +226,6 @@ get_owner_by_access_key(AccessKey) ->
 -spec(setup(ets|mnesia, list()) ->
              ok).
 setup(DB, Provider) ->
-    ?AUTH_INFO = ets:new(?AUTH_INFO, [named_table, set, public, {read_concurrency, true}]),
     true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = DB,
                                                  provider = Provider}}),
     ok.

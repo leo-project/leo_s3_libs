@@ -22,7 +22,7 @@
 {application, leo_s3_libs,
   [
     {description, "Leo S3-Libs"},
-    {vsn, "0.6.4"},
+    {vsn, "0.6.5"},
     {id, "leo_s3_libs"},
     {registered,   []},
     {applications, [kernel, stdlib]},

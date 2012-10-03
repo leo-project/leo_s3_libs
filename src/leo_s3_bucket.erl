@@ -55,8 +55,13 @@
 -spec(start(atom(), ets | mnesia) ->
              ok).
 start(slave = Type, Provider) ->
-    ?BUCKET_TABLE = ets:new(?BUCKET_TABLE, [named_table, ordered_set, public, {read_concurrency, true}]),
-    ok = setup(Type, ets, Provider),
+    catch ets:new(?BUCKET_TABLE, [named_table, ordered_set, public, {read_concurrency, true}]),
+    case Provider of
+        [] ->
+            void;
+        _ ->
+            ok = setup(Type, ets, Provider)
+    end,
     ok;
 
 start(master = Type, _Options) ->

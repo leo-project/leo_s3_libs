@@ -28,7 +28,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--export([start/2]).
+-export([start/1, start/2]).
 
 
 %%--------------------------------------------------------------------
@@ -36,6 +36,13 @@
 %%--------------------------------------------------------------------
 %% @doc Launch or create  Mnesia/ETS
 %%
+-spec(start(master | slave) ->
+             ok).
+start(Type) ->
+    _ = application:start(crypto),
+    ok = start_1(Type, []),
+    ok.
+
 -spec(start(master | slave, list()) ->
              ok).
 start(slave = Type, Options) ->

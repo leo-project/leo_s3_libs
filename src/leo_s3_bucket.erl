@@ -56,6 +56,8 @@
              ok).
 start(slave = Type, Provider) ->
     catch ets:new(?BUCKET_TABLE, [named_table, ordered_set, public, {read_concurrency, true}]),
+    catch ets:new(?BUCKET_INFO,  [named_table, set,         public, {read_concurrency, true}]),
+
     case Provider of
         [] ->
             void;
@@ -65,6 +67,7 @@ start(slave = Type, Provider) ->
     ok;
 
 start(master = Type, _Options) ->
+    catch ets:new(?BUCKET_INFO,  [named_table, set, public, {read_concurrency, true}]),
     ok = setup(Type, mnesia, []),
     ok.
 
@@ -275,7 +278,6 @@ head(AccessKey, Bucket, DB, Provider) ->
 -spec(setup(master|slave, ets|mnesia, list()) ->
              ok).
 setup(Type, DB, Provider) ->
-    ?BUCKET_INFO  = ets:new(?BUCKET_INFO,  [named_table, set, public, {read_concurrency, true}]),
     true = ets:insert(?BUCKET_INFO, {1, #bucket_info{type = Type,
                                                      db   = DB,
                                                      provider = Provider}}),

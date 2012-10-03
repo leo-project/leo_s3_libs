@@ -47,7 +47,9 @@
 -spec(start(master | slave, list()) ->
              ok).
 start(slave = Type, Provider) ->
-    catch ets:new(?ENDPOINT_TABLE, [named_table, set, public, {read_concurrency, true}]),
+    catch ets:new(?ENDPOINT_TABLE, [named_table, set,         public, {read_concurrency, true}]),
+    catch ets:new(?ENDPOINT_INFO,  [named_table, ordered_set, public, {read_concurrency, true}]),
+
     case Provider of
         [] ->
             void;
@@ -57,6 +59,7 @@ start(slave = Type, Provider) ->
     ok;
 
 start(master = Type,_Provider) ->
+    catch ets:new(?ENDPOINT_INFO,  [named_table, ordered_set, public, {read_concurrency, true}]),
     ok = setup(Type, mnesia, []),
     ok.
 
@@ -129,7 +132,6 @@ delete_endpoint(EndPoint) ->
 %% @doc Setup
 %% @private
 setup(Type, DB, Provider) ->
-    ?ENDPOINT_INFO = ets:new(?ENDPOINT_INFO, [named_table, ordered_set, public, {read_concurrency, true}]),
     true = ets:insert(?ENDPOINT_INFO, {1, #endpoint_info{type = Type,
                                                          db   = DB,
                                                          provider = Provider}}),

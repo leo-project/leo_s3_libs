@@ -112,7 +112,7 @@ mnesia_suite_(_) ->
     {error, forbidden} = leo_s3_bucket:head(?ACCESS_KEY_1, ?Bucket1),
     not_found = leo_s3_bucket:head(?ACCESS_KEY_1, ?Bucket5),
 
-    %% bucket name validations
+    %% bucket name validations @pending
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketTooShort),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketTooLong),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidStart),
@@ -121,6 +121,7 @@ mnesia_suite_(_) ->
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidIPAddr),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidChar1),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidChar2),
+
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid1),
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid2),
 

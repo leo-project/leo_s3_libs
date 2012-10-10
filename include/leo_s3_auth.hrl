@@ -26,8 +26,8 @@
 %% @doc Credential data
 %%
 -record(credential, {
-          access_key_id     :: string(),
-          secret_access_key :: string(),
+          access_key_id     :: binary(),
+          secret_access_key :: binary(),
           user_id           :: string(),
           created_at        :: integer()
          }).
@@ -42,14 +42,14 @@
 %% @doc AMZ-S3-API related
 %%
 -record(sign_params, {
-          http_verb    = "" :: string(),
-          content_md5  = "" :: string(),
-          content_type = "" :: string(),
-          date         = "" :: string(),
-          bucket       = "" :: string(),
-          uri          = "" :: string(),
-          query_str    = "" :: string(),
-          sub_resource = "" :: string(), %% [?acl" | "?location" | "?logging" | "?torrent"]
+          http_verb    = <<>> :: binary(),
+          content_md5  = <<>> :: binary(),
+          content_type = <<>> :: binary(),
+          date         = <<>> :: binary(),
+          bucket       = <<>> :: binary(),
+          uri          = <<>> :: binary(),
+          query_str    = <<>> :: binary(),
+          sub_resource = <<>> :: binary(), %% [?acl" | "?location" | "?logging" | "?torrent"]
           amz_headers  = [] :: list()
          }).
 

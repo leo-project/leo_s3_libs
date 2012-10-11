@@ -109,10 +109,10 @@ gen_key(UserId) ->
             {error, not_generated};
         {ok, #auth_info{db = mnesia}} ->
             Digest0 = list_to_binary(string:sub_string(
-                        leo_hex:binary_to_hex(
-                          crypto:sha(term_to_binary({UserId, Clock}))),1,20)),
+                                       leo_hex:binary_to_hex(
+                                         crypto:sha(term_to_binary({UserId, Clock}))),1,20)),
             Digest1 = list_to_binary(leo_hex:binary_to_hex(
-                        crypto:sha(list_to_binary(UserId ++ "/" ++ Clock)))),
+                                       crypto:sha(list_to_binary(UserId ++ "/" ++ Clock)))),
             gen_key1(UserId, Digest0, Digest1);
         [] ->
             {error, not_initialized};
@@ -183,9 +183,9 @@ get_signature(SecretAccessKey, SignParams) ->
     URI1    = auth_uri(Bucket0, URI0),
     BinToSign = <<HTTPVerb/binary, <<"\n">>/binary, ETag/binary, <<"\n">>/binary, ContentType/binary, <<"\n">>/binary,
                   Date1/binary, Sub0/binary, Bucket1/binary, URI1/binary, Sub1/binary>>,
-    ?debugVal(binary_to_list(BinToSign)),
+    %% ?debugVal(binary_to_list(BinToSign)),
     Signature = base64:encode(
-                    crypto:sha_mac(SecretAccessKey, BinToSign)),
+                  crypto:sha_mac(SecretAccessKey, BinToSign)),
     Signature.
 
 
@@ -369,7 +369,7 @@ auth_uri(<<>>, URI) ->
     URI;
 auth_uri(Bucket, URI) ->
     case binary:match(URI, Bucket) of
-        {1, _} -> 
+        {1, _} ->
             SkipSize = size(Bucket) + 1,
             binary:part(URI, {SkipSize, size(URI) - SkipSize});
         _ -> URI

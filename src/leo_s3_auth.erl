@@ -354,7 +354,7 @@ get_auth_info() ->
 %% @doc Retrieve date
 %% @private
 auth_date(Date0, CannonocalizedResources) ->
-    case lists:keysearch(<<"X-Amz-Date">>, 1, CannonocalizedResources) of
+    case lists:keysearch("X-Amz-Date", 1, CannonocalizedResources) of
         {value, _} -> <<>>;
         false      -> << Date0/binary, <<"\n">>/binary >>
     end.
@@ -370,6 +370,8 @@ auth_bucket(_,   Bucket,  _) -> << <<"/">>/binary, Bucket/binary >>.
 
 %% @doc Retrieve URI
 %% @private
+auth_uri(<<>>, URI) ->
+    URI;
 auth_uri(Bucket, URI) ->
     case binary:match(URI, Bucket) of
         {1, _} -> 

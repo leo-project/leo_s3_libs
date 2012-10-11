@@ -145,7 +145,7 @@ authenticate(Authorization, #sign_params{uri = <<"/">>} = SignParams, _IsCreateB
 authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreateBucketOp) ->
     [AccWithAWS,Signature|_] = binary:split(Authorization, <<":">>),
     <<"AWS ", AccessKeyId/binary>> = AccWithAWS,
-    case {leo_s3_bucket:head(AccessKeyId, Bucket), IsCreateBucketOp} of
+    case {leo_s3_bucket:head(binary_to_list(AccessKeyId), Bucket), IsCreateBucketOp} of
         {ok, false} ->
             authenticate1(#auth_params{access_key_id = AccessKeyId,
                                        signature     = Signature,
@@ -180,17 +180,12 @@ get_signature(SecretAccessKey, SignParams) ->
     Sub0    = auth_resources(AmzHeaders),
     Sub1    = auth_sub_resources(QueryStr),
     Bucket1 = auth_bucket(URI0, Bucket0, QueryStr),
-    URI1    = auth_uri(Bucket1, URI0),
-    %% ?debugVal({Date1, Sub0, Sub1, Bucket1, URI1}),
-%%%    StringToSign = lists:flatten(
-%%%                     io_lib:format("~s\n~s\n~s\n~s~s~s~s~s",
-%%%                                   [HTTPVerb, ETag, ContentType,
-%%%                                    Date1, Sub0, Bucket1, URI1, Sub1])),
+    URI1    = auth_uri(Bucket0, URI0),
     BinToSign = <<HTTPVerb/binary, <<"\n">>/binary, ETag/binary, <<"\n">>/binary, ContentType/binary, <<"\n">>/binary,
                   Date1/binary, Sub0/binary, Bucket1/binary, URI1/binary, Sub1/binary>>,
+    ?debugVal(binary_to_list(BinToSign)),
     Signature = base64:encode(
                     crypto:sha_mac(SecretAccessKey, BinToSign)),
-    %% ?debugVal({StringToSign, Signature}),
     Signature.
 
 

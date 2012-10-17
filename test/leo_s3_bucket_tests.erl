@@ -121,9 +121,12 @@ mnesia_suite_(_) ->
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidIPAddr),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidChar1),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidChar2),
+
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid1),
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid2),
 
+    {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid1),
+    {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid2),
 
     %% Retrieve buckets including owner
     ok = meck:new(leo_s3_auth),

@@ -72,8 +72,10 @@ mnesia_suite_(_) ->
     {ok, Keys} = leo_s3_auth:gen_key(?USER_ID),
     AccessKeyId     = proplists:get_value(access_key_id,     Keys),
     SecretAccessKey = proplists:get_value(secret_access_key, Keys),
-    ?assertEqual(20, length(AccessKeyId)),
-    ?assertEqual(40, length(SecretAccessKey)),
+    ?assertEqual(true, is_binary(AccessKeyId)),
+    ?assertEqual(true, is_binary(SecretAccessKey)),
+    ?assertEqual(20, size(AccessKeyId)),
+    ?assertEqual(40, size(SecretAccessKey)),
 
     {ok, #credential{access_key_id     = AccessKeyId,
                      secret_access_key = SecretAccessKey,
@@ -90,14 +92,14 @@ mnesia_suite_(_) ->
                              ok
                      end),
 
-    SignParams0 = #sign_params{http_verb    = "GET",
-                               content_md5  = "",
-                               content_type = "",
-                               date         = "Tue, 27 Mar 2007 19:36:42 +0000",
-                               bucket       = "johnsmith",
-                               uri          = "/photos/puppy.jpg"},
+    SignParams0 = #sign_params{http_verb    = <<"GET">>,
+                               content_md5  = <<>>,
+                               content_type = <<>>,
+                               date         = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
+                               bucket       = <<"johnsmith">>,
+                               uri          = <<"/photos/puppy.jpg">>},
     Signature0 = leo_s3_auth:get_signature(SecretAccessKey, SignParams0),
-    Authorization0 = "AWS" ++ " " ++ AccessKeyId ++ ":" ++ Signature0,
+    Authorization0 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":">>/binary, Signature0/binary >>,
 
     {ok, AccessKeyId} = leo_s3_auth:authenticate(Authorization0, SignParams0, false),
     {ok, Credential}  = leo_s3_auth:get_credential(AccessKeyId),
@@ -106,7 +108,7 @@ mnesia_suite_(_) ->
     ?assertEqual("leofs",         Credential#credential.user_id),
 
     %% inspect-4 - for authentication
-    Authorization1 = "AWS" ++ " " ++ AccessKeyId ++ ":example",
+    Authorization1 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":example">>/binary >>,
     {error, unmatch} = leo_s3_auth:authenticate(Authorization1, SignParams0, false),
 
     %% inspect-5 - for authentication
@@ -120,20 +122,20 @@ mnesia_suite_(_) ->
 
 
     %% inspect-6 - for authentication
-    SignParams1 = #sign_params{http_verb    = "GET",
-                               content_md5  = "",
-                               content_type = "",
-                               date         = "Tue, 27 Mar 2007 19:36:42 +0000",
-                               bucket       = "johnsmith",
-                               uri          = "/"},
+    SignParams1 = #sign_params{http_verb    = <<"GET">>,
+                               content_md5  = <<>>,
+                               content_type = <<>>,
+                               date         = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
+                               bucket       = <<"johnsmith">>,
+                               uri          = <<"/">>},
     Signature1 = leo_s3_auth:get_signature(SecretAccessKey, SignParams1),
-    Authorization2 = "AWS" ++ " " ++ AccessKeyId ++ ":" ++ Signature1,
+    Authorization2 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":">>/binary, Signature1/binary >>,
 
     {ok, AccessKeyId} = leo_s3_auth:authenticate(Authorization2, SignParams1, false),
 
 
     %% inspect-7 - Retrieve owner by access key
-    {ok,"leofs"} = leo_s3_auth:get_owner_by_access_key(AccessKeyId),
+    {ok,"leofs"} = leo_s3_auth:get_owner_by_access_key(binary_to_list(AccessKeyId)),
     not_found    = leo_s3_auth:get_owner_by_access_key([]),
 
 
@@ -157,8 +159,8 @@ ets_suite_(_) ->
 
 
     %% inspect-1
-    AccessKeyId     = "example_access_key_id",
-    SecretAccessKey = "example_secret_key",
+    AccessKeyId     = <<"example_access_key_id">>,
+    SecretAccessKey = <<"example_secret_key">>,
 
     ok = meck:new(leo_s3_bucket),
     ok = meck:expect(leo_s3_bucket, head,
@@ -177,25 +179,23 @@ ets_suite_(_) ->
 
     ok = leo_s3_auth:start(slave, [Manager1]),
 
-    SignParams = #sign_params{http_verb    = "GET",
-                              content_md5  = "",
-                              content_type = "",
-                              date         = "Tue, 27 Mar 2007 19:36:42 +0000",
-                              bucket       = "johnsmith",
-                              uri          = "/photos/puppy.jpg"},
+    SignParams = #sign_params{http_verb    = <<"GET">>,
+                              content_md5  = <<>>,
+                              content_type = <<>>,
+                              date         = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
+                              bucket       = <<"johnsmith">>,
+                              uri          = <<"/photos/puppy.jpg">>},
     Signature0 = leo_s3_auth:get_signature(SecretAccessKey, SignParams),
-    Authorization0 = "AWS" ++ " " ++ AccessKeyId ++ ":" ++ Signature0,
-    Authorization1 = "AWS" ++ " " ++ AccessKeyId ++ ":EXAMPLE",
+    Authorization0 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":">>/binary, Signature0/binary >>,
+    Authorization1 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":EXAMPLE">>/binary >>,
 
     {ok, AccessKeyId} = leo_s3_auth:authenticate(Authorization0, SignParams, false),
     {error,unmatch} = leo_s3_auth:authenticate(Authorization1, SignParams, false),
-
 
     {ok, #credential{access_key_id     = AccessKeyId,
                      secret_access_key = SecretAccessKey
                     }} = leo_s3_libs_data_handler:lookup({ets, credentials}, AccessKeyId),
     1 = leo_s3_libs_data_handler:size({ets, credentials}),
-
 
     %% inspect-4 - for authentication
     _  = rpc:call(Manager1, meck, unload, []),
@@ -208,7 +208,6 @@ ets_suite_(_) ->
 
     {error,unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams, false),
 
-
     %% teardown
     slave:stop(Manager1),
     net_kernel:stop(),
@@ -219,8 +218,8 @@ ets_suite_(_) ->
 %% @doc Authentication Header TEST
 %% @ref <http://docs.amazonwebservices.com/AmazonS3/latest/dev/RESTAuthentication.html#ConstructingTheAuthenticationHeader>
 %%
--define(AWSAccessKeyId,     "AKIAIOSFODNN7EXAMPLE").
--define(AWSSecretAccessKey, "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY").
+-define(AWSAccessKeyId,     <<"AKIAIOSFODNN7EXAMPLE">>).
+-define(AWSSecretAccessKey, <<"wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY">>).
 
 %% @doc Object GET
 authenticate_0_(_) ->
@@ -243,15 +242,15 @@ authenticate_0_(_) ->
     %% Tue, 27 Mar 2007 19:36:42 +0000\n
     %% /johnsmith/photos/puppy.jpg
 
-    SignParams = #sign_params{http_verb    = "GET",
-                              content_md5  = "",
-                              content_type = "",
-                              date         = "Tue, 27 Mar 2007 19:36:42 +0000",
-                              bucket       = "johnsmith",
-                              uri          = "/photos/puppy.jpg"},
+    SignParams = #sign_params{http_verb    = <<"GET">>,
+                              content_md5  = <<>>,
+                              content_type = <<>>,
+                              date         = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
+                              bucket       = <<"johnsmith">>,
+                              uri          = <<"/photos/puppy.jpg">>},
 
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
-    ?assertEqual("bWq2s1WEIj+Ydj0vQ697zp+IXMU=", Ret),
+    ?assertEqual(<<"bWq2s1WEIj+Ydj0vQ697zp+IXMU=">>, Ret),
     ok.
 
 
@@ -274,15 +273,15 @@ authenticate_1_(_) ->
     %% Tue, 27 Mar 2007 21:15:45 +0000\n
     %% /johnsmith/photos/puppy.jpg
 
-    SignParams = #sign_params{http_verb    = "PUT",
-                              content_md5  = "",
-                              content_type = "image/jpeg",
-                              date         = "Tue, 27 Mar 2007 21:15:45 +0000",
-                              bucket       = "johnsmith",
-                              uri          = "/photos/puppy.jpg"},
+    SignParams = #sign_params{http_verb    = <<"PUT">>,
+                              content_md5  = <<>>,
+                              content_type = <<"image/jpeg">>,
+                              date         = <<"Tue, 27 Mar 2007 21:15:45 +0000">>,
+                              bucket       = <<"johnsmith">>,
+                              uri          = <<"/photos/puppy.jpg">>},
 
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
-    ?assertEqual("MyyxeRY7whkBe+bq8fHCL/2kKUg=", Ret),
+    ?assertEqual(<<"MyyxeRY7whkBe+bq8fHCL/2kKUg=">>, Ret),
     ok.
 
 
@@ -304,16 +303,16 @@ authenticate_2_(_) ->
     %% Tue, 27 Mar 2007 19:42:41 +0000\n
     %% /johnsmith/
 
-    SignParams = #sign_params{http_verb    = "GET",
-                              content_md5  = "",
-                              content_type = "",
-                              date         = "Tue, 27 Mar 2007 19:42:41 +0000",
-                              bucket       = "johnsmith",
-                              uri          = "/",
-                              query_str    = "?prefix=photos&max-keys=50&marker=puppy"
+    SignParams = #sign_params{http_verb    = <<"GET">>,
+                              content_md5  = <<>>,
+                              content_type = <<>>,
+                              date         = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
+                              bucket       = <<"johnsmith">>,
+                              uri          = <<"/">>,
+                              query_str    = <<"?prefix=photos&max-keys=50&marker=puppy">>
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
-    ?assertEqual("htDYFYduRNen8P9ZfE/s9SuKy0U=", Ret),
+    ?assertEqual(<<"htDYFYduRNen8P9ZfE/s9SuKy0U=">>, Ret),
     ok.
 
 
@@ -334,16 +333,16 @@ authenticate_3_(_) ->
     %% Tue, 27 Mar 2007 19:44:46 +0000\n
     %% /johnsmith/?acl
 
-    SignParams = #sign_params{http_verb    = "GET",
-                              content_md5  = "",
-                              content_type = "",
-                              date         = "Tue, 27 Mar 2007 19:44:46 +0000",
-                              bucket       = "johnsmith",
-                              uri          = "/",
-                              query_str    = "?acl"
+    SignParams = #sign_params{http_verb    = <<"GET">>,
+                              content_md5  = <<>>,
+                              content_type = <<>>,
+                              date         = <<"Tue, 27 Mar 2007 19:44:46 +0000">>,
+                              bucket       = <<"johnsmith">>,
+                              uri          = <<"/">>,
+                              query_str    = <<"?acl">>
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
-    ?assertEqual("c2WLPFtWHVgbEmeEG93a4cG37dM=", Ret),
+    ?assertEqual(<<"c2WLPFtWHVgbEmeEG93a4cG37dM=">>, Ret),
     ok.
 
 
@@ -367,16 +366,17 @@ authenticate_4_(_) ->
     %% x-amz-date:Tue, 27 Mar 2007 21:20:26 +0000\n
     %% /johnsmith/photos/puppy.jpg
 
-    SignParams = #sign_params{http_verb    = "DELETE",
-                              content_md5  = "",
-                              content_type = "",
-                              date         = "Tue, 27 Mar 2007 21:20:27 +0000",
-                              bucket       = "johnsmith",
-                              uri          = "/photos/puppy.jpg",
-                              amz_headers  = [{"x-amz-date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
+    SignParams = #sign_params{http_verb    = <<"DELETE">>,
+                              content_md5  = <<>>,
+                              content_type = <<>>,
+                              date         = <<"Tue, 27 Mar 2007 21:20:27 +0000">>,
+                              bucket       = <<"johnsmith">>,
+                              uri          = <<"/photos/puppy.jpg">>,
+                              amz_headers  = [
+                                  {"X-Amz-Date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
-    ?assertEqual("9b2sXq0KfxsxHtdZkzx/9Ngqyh8=", Ret),
+    ?assertEqual(<<"9b2sXq0KfxsxHtdZkzx/9Ngqyh8=">>, Ret),
     ok.
 
 
@@ -414,19 +414,19 @@ authenticate_5_(_) ->
     %% x-amz-meta-reviewedby:joe@johnsmith.net,jane@johnsmith.net\n
     %% /static.johnsmith.net/db-backup.dat.gz
 
-    SignParams1 = #sign_params{http_verb    = "PUT",
-                               content_md5  = "4gJE4saaMU4BqNR0kLY+lw==",
-                               content_type = "application/x-download",
-                               date         = "Tue, 27 Mar 2007 21:06:08 +0000",
-                               bucket       = "static.johnsmith.net",
-                               uri          = "/db-backup.dat.gz",
-                               amz_headers  = [{"x-amz-acl", "public-read"},
+    SignParams1 = #sign_params{http_verb    = <<"PUT">>,
+                               content_md5  = <<"4gJE4saaMU4BqNR0kLY+lw==">>,
+                               content_type = <<"application/x-download">>,
+                               date         = <<"Tue, 27 Mar 2007 21:06:08 +0000">>,
+                               bucket       = <<"static.johnsmith.net">>,
+                               uri          = <<"/db-backup.dat.gz">>,
+                               amz_headers  = [{"X-Amz-Acl", "public-read"},
                                                {"X-Amz-Meta-ReviewedBy", "joe@johnsmith.net"},
                                                {"X-Amz-Meta-ReviewedBy", "jane@johnsmith.net"},
                                                {"X-Amz-Meta-FileChecksum","0x02661779"},
                                                {"X-Amz-Meta-ChecksumAlgorithm", "crc32"}]},
     Ret1 = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams1),
-    ?assertEqual("ilyl83RwaSoYIEdixDQcA4OnAnc=", Ret1),
+    ?assertEqual(<<"ilyl83RwaSoYIEdixDQcA4OnAnc=">>, Ret1),
     ok.
 
 
@@ -446,15 +446,15 @@ authenticate_6_(_) ->
     %% Wed, 28 Mar 2007 01:29:59 +0000\n
     %% /
 
-    SignParams = #sign_params{http_verb    = "GET",
-                              content_md5  = "",
-                              content_type = "",
-                              date         = "Wed, 28 Mar 2007 01:29:59 +0000",
-                              bucket       = "",
-                              uri          = "/",
+    SignParams = #sign_params{http_verb    = <<"GET">>,
+                              content_md5  = <<>>,
+                              content_type = <<>>,
+                              date         = <<"Wed, 28 Mar 2007 01:29:59 +0000">>,
+                              bucket       = <<>>,
+                              uri          = <<"/">>,
                               amz_headers  = []},
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
-    ?assertEqual("qGdzdERIC03wnaRNKh6OqZehG9s=", Ret),
+    ?assertEqual(<<"qGdzdERIC03wnaRNKh6OqZehG9s=">>, Ret),
     ok.
 
 
@@ -473,15 +473,15 @@ authenticate_7_(_) ->
     %% Wed, 28 Mar 2007 01:49:49 +0000\n
     %% /dictionary/fran%C3%A7ais/pr%c3%a9f%c3%a8re
 
-    SignParams = #sign_params{http_verb    = "GET",
-                              content_md5  = "",
-                              content_type = "",
-                              date         = "Wed, 28 Mar 2007 01:49:49 +0000",
-                              bucket       = "",
-                              uri          = "/dictionary/fran%C3%A7ais/pr%c3%a9f%c3%a8re",
+    SignParams = #sign_params{http_verb    = <<"GET">>,
+                              content_md5  = <<>>,
+                              content_type = <<>>,
+                              date         = <<"Wed, 28 Mar 2007 01:49:49 +0000">>,
+                              bucket       = <<>>,
+                              uri          = <<"/dictionary/fran%C3%A7ais/pr%c3%a9f%c3%a8re">>,
                               amz_headers  = []},
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
-    ?assertEqual("DNEZGsoieTZ92F3bUfSPQcbGmlM=", Ret),
+    ?assertEqual(<<"DNEZGsoieTZ92F3bUfSPQcbGmlM=">>, Ret),
     ok.
 
 -endif.

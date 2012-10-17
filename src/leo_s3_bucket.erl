@@ -36,7 +36,6 @@
          put/2, put/3, delete/2, head/2, head/4]).
 
 -define(BUCKET_DB_TYPE,   leo_s3_bucket_db).
--define(BUCKET_DB_EXPIRE, 300).  %% default expire time is 5min
 -define(BUCKET_INFO,      leo_s3_bucket_info).
 -define(BUCKET_TABLE,     buckets).
 -define(DEF_REQ_TIMEOUT,  30000).
@@ -96,7 +95,7 @@ create_bucket_table(Mode, Nodes) ->
 
 %% @doc Retrieve buckets by AccessKey
 %%
--spec(find_buckets_by_id(string()) ->
+-spec(find_buckets_by_id(binary()) ->
              {ok, list()} | {error, any()}).
 find_buckets_by_id(AccessKey) ->
     case get_info() of
@@ -113,7 +112,7 @@ find_buckets_by_id(AccessKey) ->
             Error
     end.
 
--spec(find_buckets_by_id(string(), string()) ->
+-spec(find_buckets_by_id(binary(), string()) ->
              {ok, list()} | {ok, match} | {error, any()}).
 find_buckets_by_id(AccessKey, Checksum0) ->
     case get_info() of
@@ -173,7 +172,7 @@ find_all_including_owner() ->
 
 %% @doc put a bucket.
 %%
--spec(put(string(), string()) ->
+-spec(put(binary(), binary()) ->
              ok | {error, any()}).
 put(AccessKey, Bucket) ->
     case get_info() of
@@ -190,23 +189,29 @@ put(AccessKey, Bucket) ->
             Error
     end.
 
--spec(put(string(), string(), ets | mnesia) ->
+-spec(put(binary(), binary(), ets | mnesia) ->
              ok | {error, any()}).
 put(AccessKey, Bucket, DB) ->
-    case is_valid_bucket(Bucket) of
-        ok ->
-            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                              #bucket{name       = Bucket,
-                                                      access_key = AccessKey,
-                                                      created_at = ?NOW
-                                                     });
-        Error ->
-            Error
+    case head(AccessKey, Bucket) of
+        not_found ->
+            BucketStr = cast_binary_to_str(Bucket),
+            case is_valid_bucket(BucketStr) of
+                ok ->
+                    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
+                                                      #bucket{name       = BucketStr,
+                                                              access_key = AccessKey,
+                                                              created_at = ?NOW});
+                Error ->
+                    Error
+            end;
+        _ ->
+            {error, already_has}
     end.
+
 
 %% @doc delete a bucket.
 %%
--spec(delete(string(), string()) ->
+-spec(delete(binary(), binary()) ->
              ok | {error, any()}).
 delete(AccessKey, Bucket) ->
     case get_info() of
@@ -224,29 +229,32 @@ delete(AccessKey, Bucket) ->
     end.
 
 
--spec(delete(string(), string(), ets | mnesia) ->
+-spec(delete(binary(), binary(), ets | mnesia) ->
              ok | {error, any()}).
 delete(AccessKey, Bucket, DB) ->
+    BucketStr = cast_binary_to_str(Bucket),
     leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE},
-                                      #bucket{name = Bucket,
+                                      #bucket{name = BucketStr,
                                               access_key = AccessKey}).
 
 
 %% @doc Is exist a bucket into the db
 %%
--spec(head(string(), string()) ->
+-spec(head(binary(), binary()) ->
              ok | not_found | {error, forbidden} | {error, any()}).
 head(AccessKey, Bucket) ->
+    BucketStr = cast_binary_to_str(Bucket),
+
     case get_info() of
         {ok, #bucket_info{db       = DB,
                           type     = Type,
                           provider = Provider}} ->
             case leo_s3_bucket_data_handler:find_by_name(
-                   {DB, ?BUCKET_TABLE}, AccessKey, Bucket) of
+                   {DB, ?BUCKET_TABLE}, AccessKey, BucketStr) of
                 {ok, _Value0} ->
                     ok;
                 not_found when Type == slave->
-                    case head(AccessKey, Bucket, DB, Provider) of
+                    case head(AccessKey, BucketStr, DB, Provider) of
                         {ok, _} ->
                             ok;
                         Error ->
@@ -262,8 +270,9 @@ head(AccessKey, Bucket) ->
 head(AccessKey, Bucket, DB, Provider) ->
     case find_buckets_by_id_1(AccessKey, DB, Provider) of
         {ok, _} ->
+            BucketStr = cast_binary_to_str(Bucket),
             Ret = leo_s3_bucket_data_handler:find_by_name(
-                    {DB, ?BUCKET_TABLE}, AccessKey, Bucket),
+                    {DB, ?BUCKET_TABLE}, AccessKey, BucketStr),
             Ret;
         Error ->
             Error
@@ -312,7 +321,7 @@ put_all_values(DB, [H|T]) ->
 
 %% @doc Retrieve buckets by id
 %% @private
--spec(find_buckets_by_id_1(string(), ets|mnesia, list()) ->
+-spec(find_buckets_by_id_1(binary(), ets|mnesia, list()) ->
              {ok, list()} | {error, any()}).
 find_buckets_by_id_1(AccessKey, DB, Providers) ->
     {Value0, CRC} = case leo_s3_bucket_data_handler:lookup(
@@ -333,7 +342,7 @@ find_buckets_by_id_1(AccessKey, DB, Providers) ->
             end, [], Providers),
     Ret.
 
--spec(find_buckets_by_id_2(string(), ets|mnesia, atom(), list(), integer()) ->
+-spec(find_buckets_by_id_2(binary(), ets|mnesia, atom(), list(), integer()) ->
              {ok, list()} | {error, any()}).
 find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
     RPCKey = rpc:async_call(Node, leo_s3_bucket, find_buckets_by_id,
@@ -363,7 +372,7 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
 
 %% @doc Communicate remote node(s)
 %% @private
--spec(rpc_call(list(), atom(), string(), string()) ->
+-spec(rpc_call(list(), atom(), binary(), binary()) ->
              true | false).
 rpc_call(Provider, Function, AccessKey, Bucket) ->
     Ret = lists:foldl(
@@ -421,3 +430,9 @@ is_valid_bucket([H|T], _LastChar, LastLabel, OnlyDigit) when (H >= $a andalso H 
 is_valid_bucket([_|_], _LastChar, _LastLabel, _OnlyDigit) ->
     {error, badarg}.
 
+
+cast_binary_to_str(Bucket) ->
+   case is_binary(Bucket) of
+       true  -> binary_to_list(Bucket);
+       false -> Bucket
+   end.

@@ -41,9 +41,9 @@
 -define(AUTH_INFO,  leo_s3_auth_info).
 -define(AUTH_TABLE, credentials).
 
--record(auth_params, {access_key_id     :: string(),
-                      secret_access_key :: string(),
-                      signature         :: string(),
+-record(auth_params, {access_key_id     :: binary(),
+                      secret_access_key :: binary(),
+                      signature         :: binary(),
                       sign_params       :: #sign_params{},
                       auth_info         :: #auth_info{}
                      }).
@@ -88,9 +88,9 @@ create_credential_table(Mode, Nodes) ->
            {record_name, credential},
            {attributes, record_info(fields, credential)},
            {user_properties,
-            [{access_key_id,     {varchar, undefined}, false, primary,   undefined, identity,  varchar},
-             {secret_access_key, {varchar, undefined}, false, undefined, undefined, undefined, varchar},
-             {user_id,           {varchar, undefined}, false, undefined, undefined, undefined, varchar},
+            [{access_key_id,     {binary, undefined}, false, primary,   undefined, identity,  binary},
+             {secret_access_key, {binary, undefined}, false, undefined, undefined, undefined, binary},
+             {user_id,           {binary, undefined}, false, undefined, undefined, undefined, binary},
              {created_at,        {integer, undefined}, false, undefined, undefined, undefined, integer}
             ]}
           ]),
@@ -108,11 +108,11 @@ gen_key(UserId) ->
         {ok, #auth_info{db = ets}} ->
             {error, not_generated};
         {ok, #auth_info{db = mnesia}} ->
-            Digest0 = string:sub_string(
-                        leo_hex:binary_to_hex(
-                          crypto:sha(term_to_binary({UserId, Clock}))),1,20),
-            Digest1 = leo_hex:binary_to_hex(
-                        crypto:sha(list_to_binary(UserId ++ "/" ++ Clock))),
+            Digest0 = list_to_binary(string:sub_string(
+                                       leo_hex:binary_to_hex(
+                                         crypto:sha(term_to_binary({UserId, Clock}))),1,20)),
+            Digest1 = list_to_binary(leo_hex:binary_to_hex(
+                                       crypto:sha(list_to_binary(UserId ++ "/" ++ Clock)))),
             gen_key1(UserId, Digest0, Digest1);
         [] ->
             {error, not_initialized};
@@ -125,7 +125,7 @@ gen_key(UserId) ->
 
 %% @doc Retrieve a credential from internal-db
 %%
--spec(get_credential(string()) ->
+-spec(get_credential(binary()) ->
              {ok, #credential{}} | not_found | {error, any()}).
 get_credential(AccessKeyId) ->
     leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, AccessKeyId).
@@ -133,21 +133,19 @@ get_credential(AccessKeyId) ->
 
 %% @doc Authenticate
 %%
--spec(authenticate(string(), #sign_params{}, boolean()) ->
-             {ok, string()} | {error, any()}).
-authenticate(Authorization, #sign_params{uri = "/"} = SignParams, _IsCreateBucketOp) ->
-    [AccWithAWS,Signature|_] = string:tokens(Authorization, ":"),
-    AccessKeyId = string:sub_word(AccWithAWS, 2),
-
+-spec(authenticate(binary(), #sign_params{}, boolean()) ->
+             {ok, binary()} | {error, any()}).
+authenticate(Authorization, #sign_params{uri = <<"/">>} = SignParams, _IsCreateBucketOp) ->
+    [AccWithAWS,Signature|_] = binary:split(Authorization, <<":">>),
+    <<"AWS ", AccessKeyId/binary>> = AccWithAWS,
     authenticate1(#auth_params{access_key_id = AccessKeyId,
                                signature     = Signature,
                                sign_params   = SignParams});
 
 authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreateBucketOp) ->
-    [AccWithAWS, Signature|_] = string:tokens(Authorization, ":"),
-    AccessKeyId = string:sub_word(AccWithAWS, 2),
-
-    case {leo_s3_bucket:head(AccessKeyId, Bucket), IsCreateBucketOp} of
+    [AccWithAWS,Signature|_] = binary:split(Authorization, <<":">>),
+    <<"AWS ", AccessKeyId/binary>> = AccWithAWS,
+    case {leo_s3_bucket:head(binary_to_list(AccessKeyId), Bucket), IsCreateBucketOp} of
         {ok, false} ->
             authenticate1(#auth_params{access_key_id = AccessKeyId,
                                        signature     = Signature,
@@ -163,10 +161,10 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
 
 %% @doc Generate a signature.
 %% @private
--define(SUB_RESOURCES, ["?acl", "?location", "?logging", "?torrent"]).
+-define(SUB_RESOURCES, [<<"?acl">>, <<"?location">>, <<"?logging">>, <<"?torrent">>]).
 
--spec(get_signature(string(), #sign_params{}) ->
-             string()).
+-spec(get_signature(binary(), #sign_params{}) ->
+             binary()).
 get_signature(SecretAccessKey, SignParams) ->
     #sign_params{http_verb    = HTTPVerb,
                  content_md5  = ETag,
@@ -182,18 +180,12 @@ get_signature(SecretAccessKey, SignParams) ->
     Sub0    = auth_resources(AmzHeaders),
     Sub1    = auth_sub_resources(QueryStr),
     Bucket1 = auth_bucket(URI0, Bucket0, QueryStr),
-    URI1    = auth_uri(Bucket1, URI0),
-    %% ?debugVal({Date1, Sub0, Sub1, Bucket1, URI1}),
-
-    StringToSign = lists:flatten(
-                     io_lib:format("~s\n~s\n~s\n~s~s~s~s~s",
-                                   [HTTPVerb, ETag, ContentType,
-                                    Date1, Sub0, Bucket1, URI1, Sub1])),
-    Signature = binary_to_list(
-                  base64:encode(
-                    crypto:sha_mac(SecretAccessKey, StringToSign))),
-
-    %% ?debugVal({StringToSign, Signature}),
+    URI1    = auth_uri(Bucket0, URI0),
+    BinToSign = <<HTTPVerb/binary, <<"\n">>/binary, ETag/binary, <<"\n">>/binary, ContentType/binary, <<"\n">>/binary,
+                  Date1/binary, Sub0/binary, Bucket1/binary, URI1/binary, Sub1/binary>>,
+    %% ?debugVal(binary_to_list(BinToSign)),
+    Signature = base64:encode(
+                  crypto:sha_mac(SecretAccessKey, BinToSign)),
     Signature.
 
 
@@ -202,9 +194,10 @@ get_signature(SecretAccessKey, SignParams) ->
 -spec(get_owner_by_access_key(string()) ->
              {ok, string()} | not_found).
 get_owner_by_access_key(AccessKey) ->
+    BinAccessKey = list_to_binary(AccessKey),
     F = fun() ->
                 Q = qlc:q([X || X <- mnesia:table(?AUTH_TABLE),
-                                X#credential.access_key_id =:= AccessKey]),
+                                X#credential.access_key_id =:= BinAccessKey]),
                 qlc:e(Q)
         end,
     Ret = mnesia:transaction(F),
@@ -233,7 +226,7 @@ setup(DB, Provider) ->
 
 %% @doc Generate a credential
 %% @private
--spec(gen_key1(string(), string(), string()) ->
+-spec(gen_key1(string(), binary(), binary()) ->
              {ok, list()} | {error, any()}).
 gen_key1(UserId, Digest0, Digest1) ->
     case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, Digest0) of
@@ -255,7 +248,7 @@ gen_key1(UserId, Digest0, Digest1) ->
 %% @doc Authenticate#1
 %% @private
 -spec(authenticate1(#auth_params{}) ->
-             {ok, string()} | {error, any()}).
+             {ok, binary()} | {error, any()}).
 authenticate1(AuthParams) ->
     case get_auth_info() of
         {ok, AuthInfo} ->
@@ -267,7 +260,7 @@ authenticate1(AuthParams) ->
 %% @doc Authenticate#2
 %% @private
 -spec(authenticate2(#auth_params{}) ->
-             {ok, string()} | {error, any()}).
+             {ok, binary()} | {error, any()}).
 authenticate2(AuthParams) ->
     #auth_params{access_key_id = AccessKeyId,
                  auth_info     = #auth_info{db = DB}} = AuthParams,
@@ -288,7 +281,7 @@ authenticate2(AuthParams) ->
 %% @doc Authenticate#3
 %% @private
 -spec(authenticate3(#auth_params{}) ->
-             {ok, string()} | {error, any()}).
+             {ok, binary()} | {error, any()}).
 authenticate3(#auth_params{secret_access_key = SecretAccessKey,
                            access_key_id     = AccessKeyId,
                            signature         = Signature,
@@ -309,7 +302,7 @@ authenticate3(#auth_params{secret_access_key = SecretAccessKey,
 %% @doc Authenticate#4
 %% @private
 -spec(authenticate4(#auth_params{}) ->
-             {ok, string()} | {error, any()}).
+             {ok, binary()} | {error, any()}).
 authenticate4(AuthParams) ->
     #auth_params{access_key_id = AccessKeyId,
                  auth_info     = #auth_info{provider = Provider}} = AuthParams,
@@ -356,28 +349,31 @@ get_auth_info() ->
 %% @doc Retrieve date
 %% @private
 auth_date(Date0, CannonocalizedResources) ->
-    case lists:keysearch("x-amz-date", 1, CannonocalizedResources) of
-        {value, _} -> [];
-        false      -> Date0 ++ "\n"
+    case lists:keysearch("X-Amz-Date", 1, CannonocalizedResources) of
+        {value, _} -> <<>>;
+        false      -> << Date0/binary, <<"\n">>/binary >>
     end.
 
 
 %% @doc Retrieve a bucket from string
 %% @private
 %% auth_bucket("/",_Bucket, []) -> [];
-auth_bucket("/", Bucket,  _) -> "/" ++ Bucket;
-auth_bucket(_,   [],      _) -> [];
-auth_bucket(_,   Bucket,  _) -> "/" ++ Bucket.
+%% auth_bucket(<<"/">>, Bucket,  _) -> << <<"/">>, Bucket >>;
+auth_bucket(_,   <<>>,      _) -> <<>>;
+auth_bucket(_,   Bucket,  _) -> << <<"/">>/binary, Bucket/binary >>.
 
 
 %% @doc Retrieve URI
 %% @private
+auth_uri(<<>>, URI) ->
+    URI;
 auth_uri(Bucket, URI) ->
-    case (string:str(URI, Bucket) == 1) of
-        true  -> string:sub_string(URI, (length(Bucket) + 1));
-        false -> URI
+    case binary:match(URI, Bucket) of
+        {1, _} ->
+            SkipSize = size(Bucket) + 1,
+            binary:part(URI, {SkipSize, size(URI) - SkipSize});
+        _ -> URI
     end.
-
 
 %% @doc Retrieve resources
 %% @private
@@ -393,23 +389,25 @@ auth_resources(CannonocalizedResources) ->
                              end
                      end, [], CannonocalizedResources) of
         [] ->
-            [];
+            <<>>;
         Headers ->
             lists:foldl(fun({K2, V2}, Acc1) ->
-                                Acc1 ++ K2 ++ ":" ++ V2 ++ "\n"
-                        end, [], Headers)
+                                BinKey =  list_to_binary(K2),
+                                BinVal =  list_to_binary(V2),
+                                <<Acc1/binary, BinKey/binary, <<":">>/binary, BinVal/binary, <<"\n">>/binary>>
+                        end, <<>>, Headers)
     end.
 
 
 %% @doc Retrieve sub-resources
 %% @private
 auth_sub_resources(QueryStr) ->
-    lists:foldl(fun(Param, [] = Acc) ->
-                        case (string:str(QueryStr, Param) > 0) of
-                            true  -> Param;
-                            false -> Acc
+    lists:foldl(fun(Param, <<>> = Acc) ->
+                        case binary:match(QueryStr, Param) of
+                            nomatch -> Acc;
+                            _ -> Param
                         end;
                    (_, Acc) ->
                         Acc
-                end, [], ?SUB_RESOURCES).
+                end, <<>>, ?SUB_RESOURCES).
 

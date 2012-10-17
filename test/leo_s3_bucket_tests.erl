@@ -112,7 +112,7 @@ mnesia_suite_(_) ->
     {error, forbidden} = leo_s3_bucket:head(?ACCESS_KEY_1, ?Bucket1),
     not_found = leo_s3_bucket:head(?ACCESS_KEY_1, ?Bucket5),
 
-    %% bucket name validations @pending
+    %% bucket name validations
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketTooShort),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketTooLong),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidStart),
@@ -125,6 +125,8 @@ mnesia_suite_(_) ->
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid1),
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid2),
 
+    {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid1),
+    {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid2),
 
     %% Retrieve buckets including owner
     ok = meck:new(leo_s3_auth),

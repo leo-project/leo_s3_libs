@@ -192,16 +192,22 @@ put(AccessKey, Bucket) ->
 -spec(put(binary(), binary(), ets | mnesia) ->
              ok | {error, any()}).
 put(AccessKey, Bucket, DB) ->
-    BucketStr = cast_binary_to_str(Bucket),
-    case is_valid_bucket(BucketStr) of
-        ok ->
-    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                      #bucket{name       = BucketStr,
-                                              access_key = AccessKey,
-                                              created_at = ?NOW});
-        Error ->
-            Error
+    case head(AccessKey, Bucket) of
+        not_found ->
+            BucketStr = cast_binary_to_str(Bucket),
+            case is_valid_bucket(BucketStr) of
+                ok ->
+                    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
+                                                      #bucket{name       = BucketStr,
+                                                              access_key = AccessKey,
+                                                              created_at = ?NOW});
+                Error ->
+                    Error
+            end;
+        _ ->
+            {error, already_has}
     end.
+
 
 %% @doc delete a bucket.
 %%

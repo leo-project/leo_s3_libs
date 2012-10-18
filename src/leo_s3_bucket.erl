@@ -192,8 +192,10 @@ put(AccessKey, Bucket) ->
 -spec(put(binary(), binary(), ets | mnesia) ->
              ok | {error, any()}).
 put(AccessKey, Bucket, DB) ->
-    case head(AccessKey, Bucket) of
-        not_found ->
+    Res = head(AccessKey, Bucket),
+
+    case (Res == ok orelse Res == not_found) of
+        true ->
             BucketStr = cast_binary_to_str(Bucket),
             case is_valid_bucket(BucketStr) of
                 ok ->
@@ -204,7 +206,7 @@ put(AccessKey, Bucket, DB) ->
                 Error ->
                     Error
             end;
-        _ ->
+        false ->
             {error, already_has}
     end.
 

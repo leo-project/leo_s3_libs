@@ -176,7 +176,7 @@ authenticate(Authorization, #sign_params{uri = <<"/">>} = SignParams, _IsCreateB
 authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreateBucketOp) ->
     [AccWithAWS,Signature|_] = binary:split(Authorization, <<":">>),
     <<"AWS ", AccessKeyId/binary>> = AccWithAWS,
-    case {leo_s3_bucket:head(binary_to_list(AccessKeyId), Bucket), IsCreateBucketOp} of
+    case {leo_s3_bucket:head(AccessKeyId, Bucket), IsCreateBucketOp} of
         {ok, false} ->
             authenticate1(#auth_params{access_key_id = AccessKeyId,
                                        signature     = Signature,

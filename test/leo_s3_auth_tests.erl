@@ -72,6 +72,7 @@ mnesia_suite_(_) ->
     {ok, Keys} = leo_s3_auth:gen_key(?USER_ID),
     AccessKeyId     = proplists:get_value(access_key_id,     Keys),
     SecretAccessKey = proplists:get_value(secret_access_key, Keys),
+
     ?assertEqual(true, is_binary(AccessKeyId)),
     ?assertEqual(true, is_binary(SecretAccessKey)),
     ?assertEqual(20, size(AccessKeyId)),
@@ -120,7 +121,6 @@ mnesia_suite_(_) ->
                      end),
     {error, unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams0, false),
 
-
     %% inspect-6 - for authentication
     SignParams1 = #sign_params{http_verb    = <<"GET">>,
                                content_md5  = <<>>,
@@ -133,9 +133,8 @@ mnesia_suite_(_) ->
 
     {ok, AccessKeyId} = leo_s3_auth:authenticate(Authorization2, SignParams1, false),
 
-
     %% inspect-7 - Retrieve owner by access key
-    {ok,"leofs"} = leo_s3_auth:get_owner_by_access_key(binary_to_list(AccessKeyId)),
+    {ok,"leofs"} = leo_s3_auth:get_owner_by_access_key(AccessKeyId),
     not_found    = leo_s3_auth:get_owner_by_access_key([]),
 
 

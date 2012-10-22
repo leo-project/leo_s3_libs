@@ -179,12 +179,24 @@ put(AccessKey, Bucket) ->
         {ok, #bucket_info{type = slave,
                           db   = DB,
                           provider = Provider}} ->
-            case rpc_call(Provider, put, AccessKey, Bucket) of
-                true  -> put(AccessKey, Bucket, DB);
-                false -> {error, not_stored}
+            case leo_s3_auth:has_credential(Provider, AccessKey) of
+                true ->
+                    case rpc_call(Provider, put, AccessKey, Bucket) of
+                        true ->
+                            put(AccessKey, Bucket, DB);
+                        false ->
+                            {error, not_stored}
+                    end;
+                false ->
+                    {error, invalid_access}
             end;
         {ok, #bucket_info{type = master, db = DB}} ->
-            put(AccessKey, Bucket, DB);
+            case leo_s3_auth:has_credential(AccessKey) of
+                true ->
+                    put(AccessKey, Bucket, DB);
+                false ->
+                    {error, invalid_access}
+            end;
         Error ->
             Error
     end.
@@ -388,6 +400,7 @@ rpc_call(Provider, Function, AccessKey, Bucket) ->
                     true
             end, false, Provider),
     Ret.
+
 
 %% @doc validate a string if which consits of digit chars
 %% @private

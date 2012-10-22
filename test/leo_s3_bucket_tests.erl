@@ -71,9 +71,17 @@ setup() ->
 
 teardown(_) ->
     application:stop(crypto),
+    meck:unload(),
     ok.
 
 mnesia_suite_(_) ->
+    meck:new(leo_s3_auth),
+    meck:expect(leo_s3_auth, has_credential, fun(_) -> true end),
+    meck:expect(leo_s3_auth, get_owner_by_access_key,
+                fun(_) ->
+                        {ok, "leofs"}
+                end),
+
     ok = leo_s3_bucket:start(master, []),
     ok = leo_s3_bucket:create_bucket_table('ram_copies', [node()]),
 
@@ -129,11 +137,6 @@ mnesia_suite_(_) ->
     {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid2),
 
     %% Retrieve buckets including owner
-    ok = meck:new(leo_s3_auth),
-    meck:expect(leo_s3_auth , get_owner_by_access_key,
-                fun(_) ->
-                        {ok, "leofs"}
-                end),
     {ok, Buckets0} = leo_s3_bucket:find_all_including_owner(),
     {ok, Buckets1} = leo_s3_bucket:find_all(),
     ?assertEqual(true, length(Buckets0) == length(Buckets1)),
@@ -170,6 +173,13 @@ ets_suite_(_) ->
                                                    ok
                                            end]),
 
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_auth, [no_link]]),
+    ok = rpc:call(Manager1, meck, expect, [leo_s3_auth, has_credential,
+                                           fun(_AccessKey) ->
+                                                   true
+                                           end]),
+
+
     ok = leo_s3_bucket:start(slave, [Manager1]),
 
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket0),
@@ -180,10 +190,7 @@ ets_suite_(_) ->
     ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket5),
     ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket6),
 
-
     {ok, Ret0} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
-    ?assertEqual(5, length(Ret0)),
-
     946641075 = erlang:crc32(term_to_binary(Ret0)),
 
     {ok, Ret1} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
@@ -194,7 +201,6 @@ ets_suite_(_) ->
 
     not_found = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
     5 = leo_s3_bucket_data_handler:size({ets, buckets}),
-
 
     %% inspect-2
     ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),

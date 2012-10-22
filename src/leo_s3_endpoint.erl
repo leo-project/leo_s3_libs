@@ -85,7 +85,7 @@ create_endpoint_table(Mode, Nodes) ->
 
 %% @doc Insert a End-Point into the Mnesia or ETS
 %%
--spec(set_endpoint(string) ->
+-spec(set_endpoint(binary()) ->
              ok | {error, any()}).
 set_endpoint(EndPoint) ->
     case get_endpoint_info() of
@@ -115,7 +115,7 @@ get_endpoints() ->
 
 %% @doc Remove a End-Point from the Mnesia or ETS
 %%
--spec(delete_endpoint(string) ->
+-spec(delete_endpoint(binary()) ->
              ok | {error, any()}).
 delete_endpoint(EndPoint) ->
     case get_endpoint_info() of

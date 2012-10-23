@@ -36,28 +36,28 @@
 %%--------------------------------------------------------------------
 -ifdef(EUNIT).
 
--define(ACCESS_KEY_0, "leofs").
--define(ACCESS_KEY_1, "fuglen").
+-define(ACCESS_KEY_0, <<"leofs">>).
+-define(ACCESS_KEY_1, <<"fuglen">>).
 
--define(Bucket0, "bucket0").
--define(Bucket1, "bucket1").
--define(Bucket2, "bucket2").
--define(Bucket3, "bucket3").
--define(Bucket4, "bucket4").
--define(Bucket5, "bucket5").
--define(Bucket6, "bucket6").
--define(Bucket7, "bucket7").
--define(Bucket8, "bucket8").
--define(BucketTooShort, "sh").
--define(BucketTooLong,       "012345678901234567890123456789012345678901234567890123456789012").
--define(BucketInvalidStart,  ".myawsbucket").
--define(BucketInvalidEnd,    "myawsbucket.").
--define(BucketInvalidLabel,  "my..examplebucket").
--define(BucketInvalidIPAddr, "192.168.1.1").
--define(BucketInvalidChar1,  "hogeHoge").
--define(BucketInvalidChar2,  "hoge_hoge").
--define(BucketValid1,        "my.aws.bucket").
--define(BucketValid2,        "wsbucket.1").
+-define(Bucket0, <<"bucket0">>).
+-define(Bucket1, <<"bucket1">>).
+-define(Bucket2, <<"bucket2">>).
+-define(Bucket3, <<"bucket3">>).
+-define(Bucket4, <<"bucket4">>).
+-define(Bucket5, <<"bucket5">>).
+-define(Bucket6, <<"bucket6">>).
+-define(Bucket7, <<"bucket7">>).
+-define(Bucket8, <<"bucket8">>).
+-define(BucketTooShort, <<"sh">>).
+-define(BucketTooLong,       <<"012345678901234567890123456789012345678901234567890123456789012">>).
+-define(BucketInvalidStart,  <<".myawsbucket">>).
+-define(BucketInvalidEnd,    <<"myawsbucket.">>).
+-define(BucketInvalidLabel,  <<"my..examplebucket">>).
+-define(BucketInvalidIPAddr, <<"192.168.1.1">>).
+-define(BucketInvalidChar1,  <<"hogeHoge">>).
+-define(BucketInvalidChar2,  <<"hoge_hoge">>).
+-define(BucketValid1,        <<"my.aws.bucket">>).
+-define(BucketValid2,        <<"wsbucket.1">>).
 
 bucket_test_() ->
     {foreach, fun setup/0, fun teardown/1,
@@ -79,7 +79,7 @@ mnesia_suite_(_) ->
     meck:expect(leo_s3_auth, has_credential, fun(_) -> true end),
     meck:expect(leo_s3_auth, get_owner_by_access_key,
                 fun(_) ->
-                        {ok, "leofs"}
+                        {ok, <<"leofs">>}
                 end),
 
     ok = leo_s3_bucket:start(master, []),
@@ -95,8 +95,10 @@ mnesia_suite_(_) ->
 
     {ok, Ret0} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
     ?assertEqual(5, length(Ret0)),
-    Checksum = 946641075,
+
+    Checksum = 2024999119,
     Checksum = erlang:crc32(term_to_binary(Ret0)),
+
 
     {ok, Ret1} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
     ?assertEqual(2, length(Ret1)),
@@ -113,7 +115,6 @@ mnesia_suite_(_) ->
     {ok, match} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0, Checksum),
     {ok, Ret3}  = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0, 0),
     ?assertEqual(5, length(Ret3)),
-
 
     ok = leo_s3_bucket:head(?ACCESS_KEY_0, ?Bucket1),
 
@@ -191,7 +192,7 @@ ets_suite_(_) ->
     ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket6),
 
     {ok, Ret0} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
-    946641075 = erlang:crc32(term_to_binary(Ret0)),
+    2024999119 = erlang:crc32(term_to_binary(Ret0)),
 
     {ok, Ret1} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
     ?assertEqual(2, length(Ret1)),

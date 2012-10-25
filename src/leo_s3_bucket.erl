@@ -179,12 +179,24 @@ put(AccessKey, Bucket) ->
         {ok, #bucket_info{type = slave,
                           db   = DB,
                           provider = Provider}} ->
-            case rpc_call(Provider, put, AccessKey, Bucket) of
-                true  -> put(AccessKey, Bucket, DB);
-                false -> {error, not_stored}
+            case leo_s3_auth:has_credential(Provider, AccessKey) of
+                true ->
+                    case rpc_call(Provider, put, AccessKey, Bucket) of
+                        true ->
+                            put(AccessKey, Bucket, DB);
+                        false ->
+                            {error, not_stored}
+                    end;
+                false ->
+                    {error, invalid_access}
             end;
         {ok, #bucket_info{type = master, db = DB}} ->
-            put(AccessKey, Bucket, DB);
+            case leo_s3_auth:has_credential(AccessKey) of
+                true ->
+                    put(AccessKey, Bucket, DB);
+                false ->
+                    {error, invalid_access}
+            end;
         Error ->
             Error
     end.
@@ -200,7 +212,7 @@ put(AccessKey, Bucket, DB) ->
             case is_valid_bucket(BucketStr) of
                 ok ->
                     leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                                      #bucket{name       = BucketStr,
+                                                      #bucket{name       = Bucket,
                                                               access_key = AccessKey,
                                                               created_at = ?NOW});
                 Error ->
@@ -234,9 +246,8 @@ delete(AccessKey, Bucket) ->
 -spec(delete(binary(), binary(), ets | mnesia) ->
              ok | {error, any()}).
 delete(AccessKey, Bucket, DB) ->
-    BucketStr = cast_binary_to_str(Bucket),
     leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE},
-                                      #bucket{name = BucketStr,
+                                      #bucket{name = Bucket,
                                               access_key = AccessKey}).
 
 
@@ -245,18 +256,16 @@ delete(AccessKey, Bucket, DB) ->
 -spec(head(binary(), binary()) ->
              ok | not_found | {error, forbidden} | {error, any()}).
 head(AccessKey, Bucket) ->
-    BucketStr = cast_binary_to_str(Bucket),
-
     case get_info() of
         {ok, #bucket_info{db       = DB,
                           type     = Type,
                           provider = Provider}} ->
             case leo_s3_bucket_data_handler:find_by_name(
-                   {DB, ?BUCKET_TABLE}, AccessKey, BucketStr) of
+                   {DB, ?BUCKET_TABLE}, AccessKey, Bucket) of
                 {ok, _Value0} ->
                     ok;
                 not_found when Type == slave->
-                    case head(AccessKey, BucketStr, DB, Provider) of
+                    case head(AccessKey, Bucket, DB, Provider) of
                         {ok, _} ->
                             ok;
                         Error ->
@@ -272,9 +281,8 @@ head(AccessKey, Bucket) ->
 head(AccessKey, Bucket, DB, Provider) ->
     case find_buckets_by_id_1(AccessKey, DB, Provider) of
         {ok, _} ->
-            BucketStr = cast_binary_to_str(Bucket),
             Ret = leo_s3_bucket_data_handler:find_by_name(
-                    {DB, ?BUCKET_TABLE}, AccessKey, BucketStr),
+                    {DB, ?BUCKET_TABLE}, AccessKey, Bucket),
             Ret;
         Error ->
             Error
@@ -388,6 +396,7 @@ rpc_call(Provider, Function, AccessKey, Bucket) ->
                     true
             end, false, Provider),
     Ret.
+
 
 %% @doc validate a string if which consits of digit chars
 %% @private

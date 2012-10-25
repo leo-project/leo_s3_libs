@@ -34,7 +34,8 @@
 -include_lib("stdlib/include/qlc.hrl").
 
 -export([start/2, create_credential_table/2,
-         gen_key/1, get_credential/1, authenticate/3, get_signature/2,
+         gen_key/1, get_credential/1, has_credential/1, has_credential/2,
+         authenticate/3, get_signature/2,
          get_owner_by_access_key/1
         ]).
 
@@ -131,6 +132,36 @@ get_credential(AccessKeyId) ->
     leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, AccessKeyId).
 
 
+%% @doc Has a credential into the master-nodes?
+%%
+-spec(has_credential(binary()) ->
+             true | false).
+has_credential(AccessKeyId) ->
+    case get_credential(AccessKeyId) of
+        {ok, _Credential} ->
+            true;
+        _ ->
+            false
+    end.
+
+-spec(has_credential(list(), binary()) ->
+             true | false).
+has_credential(MasterNodes, AccessKey) ->
+    Ret = lists:foldl(
+            fun(Node, false) ->
+                    RPCKey = rpc:async_call(Node, leo_s3_auth, has_credential, [AccessKey]),
+                    case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
+                        {value, true} ->
+                            true;
+                        _Error ->
+                            false
+                    end;
+               (_,  true) ->
+                    true
+            end, false, MasterNodes),
+    Ret.
+
+
 %% @doc Authenticate
 %%
 -spec(authenticate(binary(), #sign_params{}, boolean()) ->
@@ -145,7 +176,7 @@ authenticate(Authorization, #sign_params{uri = <<"/">>} = SignParams, _IsCreateB
 authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreateBucketOp) ->
     [AccWithAWS,Signature|_] = binary:split(Authorization, <<":">>),
     <<"AWS ", AccessKeyId/binary>> = AccWithAWS,
-    case {leo_s3_bucket:head(binary_to_list(AccessKeyId), Bucket), IsCreateBucketOp} of
+    case {leo_s3_bucket:head(AccessKeyId, Bucket), IsCreateBucketOp} of
         {ok, false} ->
             authenticate1(#auth_params{access_key_id = AccessKeyId,
                                        signature     = Signature,
@@ -191,13 +222,12 @@ get_signature(SecretAccessKey, SignParams) ->
 
 %% @doc Retrieve an owner by access key
 %%
--spec(get_owner_by_access_key(string()) ->
+-spec(get_owner_by_access_key(binary()) ->
              {ok, string()} | not_found).
 get_owner_by_access_key(AccessKey) ->
-    BinAccessKey = list_to_binary(AccessKey),
     F = fun() ->
                 Q = qlc:q([X || X <- mnesia:table(?AUTH_TABLE),
-                                X#credential.access_key_id =:= BinAccessKey]),
+                                X#credential.access_key_id =:= AccessKey]),
                 qlc:e(Q)
         end,
     Ret = mnesia:transaction(F),

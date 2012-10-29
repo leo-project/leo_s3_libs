@@ -212,8 +212,11 @@ get_signature(SecretAccessKey, SignParams) ->
     Sub1    = auth_sub_resources(QueryStr),
     Bucket1 = auth_bucket(URI0, Bucket0, QueryStr),
     URI1    = auth_uri(Bucket0, URI0),
-    BinToSign = <<HTTPVerb/binary, <<"\n">>/binary, ETag/binary, <<"\n">>/binary, ContentType/binary, <<"\n">>/binary,
-                  Date1/binary, Sub0/binary, Bucket1/binary, URI1/binary, Sub1/binary>>,
+    BinToSign = <<HTTPVerb/binary,    "\n",
+                  ETag/binary,        "\n",
+                  ContentType/binary, "\n",
+                  Date1/binary,       "\n",
+                  Sub0/binary, Bucket1/binary, URI1/binary, Sub1/binary>>,
     %% ?debugVal(binary_to_list(BinToSign)),
     Signature = base64:encode(
                   crypto:sha_mac(SecretAccessKey, BinToSign)),
@@ -384,7 +387,7 @@ auth_date(Date0, CannonocalizedResources) ->
         {value, _} ->
             <<>>;
         false ->
-            << Date0/binary, <<"\n">>/binary >>
+            << Date0/binary >>
     end.
 
 
@@ -427,7 +430,7 @@ auth_resources(CannonocalizedResources) ->
             lists:foldl(fun({K2, V2}, Acc1) ->
                                 BinKey =  list_to_binary(K2),
                                 BinVal =  list_to_binary(V2),
-                                <<Acc1/binary, BinKey/binary, <<":">>/binary, BinVal/binary, <<"\n">>/binary>>
+                                <<Acc1/binary, BinKey/binary, ":", BinVal/binary, "\n" >>
                         end, <<>>, Headers)
     end.
 

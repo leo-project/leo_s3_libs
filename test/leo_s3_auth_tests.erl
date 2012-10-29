@@ -375,7 +375,8 @@ authenticate_4_(_) ->
                                   {"X-Amz-Date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
-    ?assertEqual(<<"9b2sXq0KfxsxHtdZkzx/9Ngqyh8=">>, Ret),
+    ?assertEqual(<<"R4dJ53KECjStyBO5iTBJZ4XVOaI=">>, Ret),
+    %% ?assertEqual(<<"9b2sXq0KfxsxHtdZkzx/9Ngqyh8=">>, Ret),
     ok.
 
 

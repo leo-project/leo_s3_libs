@@ -217,6 +217,7 @@ get_signature(SecretAccessKey, SignParams) ->
     %% ?debugVal(binary_to_list(BinToSign)),
     Signature = base64:encode(
                   crypto:sha_mac(SecretAccessKey, BinToSign)),
+    %% ?debugVal(Signature),
     Signature.
 
 
@@ -380,13 +381,10 @@ get_auth_info() ->
 %% @private
 auth_date(Date0, CannonocalizedResources) ->
     case lists:keysearch("X-Amz-Date", 1, CannonocalizedResources) of
-        {value, {_, Val0}} when Date0 == <<>> ->
-            Val1 = list_to_binary(Val0),
-            << Val1/binary, <<"\n">>/binary >>;
+        {value, _} ->
+            <<>>;
         false ->
-            << Date0/binary, <<"\n">>/binary >>;
-        _ ->
-            <<>>
+            << Date0/binary, <<"\n">>/binary >>
     end.
 
 
@@ -394,8 +392,8 @@ auth_date(Date0, CannonocalizedResources) ->
 %% @private
 %% auth_bucket("/",_Bucket, []) -> [];
 %% auth_bucket(<<"/">>, Bucket,  _) -> << <<"/">>, Bucket >>;
-auth_bucket(_,   <<>>,      _) -> <<>>;
-auth_bucket(_,   Bucket,  _) -> << <<"/">>/binary, Bucket/binary >>.
+auth_bucket(_, <<>>,  _) -> <<>>;
+auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 
 
 %% @doc Retrieve URI

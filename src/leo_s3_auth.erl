@@ -380,8 +380,13 @@ get_auth_info() ->
 %% @private
 auth_date(Date0, CannonocalizedResources) ->
     case lists:keysearch("X-Amz-Date", 1, CannonocalizedResources) of
-        {value, _} -> <<>>;
-        false      -> << Date0/binary, <<"\n">>/binary >>
+        {value, {_, Val0}} when Date0 == <<>> ->
+            Val1 = list_to_binary(Val0),
+            << Val1/binary, <<"\n">>/binary >>;
+        false ->
+            << Date0/binary, <<"\n">>/binary >>;
+        _ ->
+            <<>>
     end.
 
 

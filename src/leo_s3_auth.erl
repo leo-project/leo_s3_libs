@@ -40,7 +40,7 @@
         ]).
 
 -define(AUTH_INFO,  leo_s3_auth_info).
--define(AUTH_TABLE, credentials).
+-define(AUTH_TABLE, leo_s3_credentials).
 
 -record(auth_params, {access_key_id     :: binary(),
                       secret_access_key :: binary(),

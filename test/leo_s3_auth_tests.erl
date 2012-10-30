@@ -81,9 +81,9 @@ mnesia_suite_(_) ->
     {ok, #credential{access_key_id     = AccessKeyId,
                      secret_access_key = SecretAccessKey,
                      user_id           = ?USER_ID
-                    }} = leo_s3_libs_data_handler:lookup({mnesia, credentials}, AccessKeyId),
+                    }} = leo_s3_libs_data_handler:lookup({mnesia, leo_s3_credentials}, AccessKeyId),
 
-    1 = leo_s3_libs_data_handler:size({mnesia, credentials}),
+    1 = leo_s3_libs_data_handler:size({mnesia, leo_s3_credentials}),
 
 
     %% inspect-3 - for authentication
@@ -193,8 +193,8 @@ ets_suite_(_) ->
 
     {ok, #credential{access_key_id     = AccessKeyId,
                      secret_access_key = SecretAccessKey
-                    }} = leo_s3_libs_data_handler:lookup({ets, credentials}, AccessKeyId),
-    1 = leo_s3_libs_data_handler:size({ets, credentials}),
+                    }} = leo_s3_libs_data_handler:lookup({ets, leo_s3_credentials}, AccessKeyId),
+    1 = leo_s3_libs_data_handler:size({ets, leo_s3_credentials}),
 
     %% inspect-4 - for authentication
     _  = rpc:call(Manager1, meck, unload, []),
@@ -203,7 +203,7 @@ ets_suite_(_) ->
                                            fun(_AccessKeyId) ->
                                                    not_found
                                            end]),
-    ets:delete_all_objects(credentials),
+    ets:delete_all_objects(leo_s3_credentials),
 
     {error,unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams, false),
 

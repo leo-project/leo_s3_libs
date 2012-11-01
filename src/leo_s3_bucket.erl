@@ -233,8 +233,10 @@ delete(AccessKey, Bucket) ->
                           db   = DB,
                           provider = Provider}} ->
             case rpc_call(Provider, delete, AccessKey, Bucket) of
-                true  -> delete(AccessKey, Bucket, DB);
-                false -> {error, not_deleted}
+                true ->
+                    delete(AccessKey, Bucket, DB);
+                false ->
+                    {error, not_deleted}
             end;
         {ok, #bucket_info{type = master, db = DB}} ->
             delete(AccessKey, Bucket, DB);

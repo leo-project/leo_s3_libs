@@ -37,7 +37,7 @@
 
 -define(BUCKET_DB_TYPE,   leo_s3_bucket_db).
 -define(BUCKET_INFO,      leo_s3_bucket_info).
--define(BUCKET_TABLE,     buckets).
+-define(BUCKET_TABLE,     leo_s3_buckets).
 -define(DEF_REQ_TIMEOUT,  30000).
 
 -ifdef(EUNIT).
@@ -233,8 +233,10 @@ delete(AccessKey, Bucket) ->
                           db   = DB,
                           provider = Provider}} ->
             case rpc_call(Provider, delete, AccessKey, Bucket) of
-                true  -> delete(AccessKey, Bucket, DB);
-                false -> {error, not_deleted}
+                true ->
+                    delete(AccessKey, Bucket, DB);
+                false ->
+                    {error, not_deleted}
             end;
         {ok, #bucket_info{type = master, db = DB}} ->
             delete(AccessKey, Bucket, DB);

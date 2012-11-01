@@ -134,7 +134,7 @@ delete({mnesia, Table}, #bucket{name       = Name,
                                 access_key = AccessKey}) ->
     Fun1 = fun() ->
                    Q = qlc:q(
-                         [X || X <- mnesia:table(buckets),
+                         [X || X <- mnesia:table(leo_s3_buckets),
                                X#bucket.name =:= Name andalso X#bucket.access_key =:= AccessKey]),
                    qlc:e(Q)
            end,

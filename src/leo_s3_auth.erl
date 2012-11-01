@@ -40,7 +40,7 @@
         ]).
 
 -define(AUTH_INFO,  leo_s3_auth_info).
--define(AUTH_TABLE, credentials).
+-define(AUTH_TABLE, leo_s3_credentials).
 
 -record(auth_params, {access_key_id     :: binary(),
                       secret_access_key :: binary(),
@@ -212,11 +212,15 @@ get_signature(SecretAccessKey, SignParams) ->
     Sub1    = auth_sub_resources(QueryStr),
     Bucket1 = auth_bucket(URI0, Bucket0, QueryStr),
     URI1    = auth_uri(Bucket0, URI0),
-    BinToSign = <<HTTPVerb/binary, <<"\n">>/binary, ETag/binary, <<"\n">>/binary, ContentType/binary, <<"\n">>/binary,
-                  Date1/binary, Sub0/binary, Bucket1/binary, URI1/binary, Sub1/binary>>,
+    BinToSign = <<HTTPVerb/binary,    "\n",
+                  ETag/binary,        "\n",
+                  ContentType/binary, "\n",
+                  Date1/binary,       "\n",
+                  Sub0/binary, Bucket1/binary, URI1/binary, Sub1/binary>>,
     %% ?debugVal(binary_to_list(BinToSign)),
     Signature = base64:encode(
                   crypto:sha_mac(SecretAccessKey, BinToSign)),
+    %% ?debugVal(Signature),
     Signature.
 
 
@@ -380,8 +384,10 @@ get_auth_info() ->
 %% @private
 auth_date(Date0, CannonocalizedResources) ->
     case lists:keysearch("X-Amz-Date", 1, CannonocalizedResources) of
-        {value, _} -> <<>>;
-        false      -> << Date0/binary, <<"\n">>/binary >>
+        {value, _} ->
+            <<>>;
+        false ->
+            << Date0/binary >>
     end.
 
 
@@ -389,8 +395,8 @@ auth_date(Date0, CannonocalizedResources) ->
 %% @private
 %% auth_bucket("/",_Bucket, []) -> [];
 %% auth_bucket(<<"/">>, Bucket,  _) -> << <<"/">>, Bucket >>;
-auth_bucket(_,   <<>>,      _) -> <<>>;
-auth_bucket(_,   Bucket,  _) -> << <<"/">>/binary, Bucket/binary >>.
+auth_bucket(_, <<>>,  _) -> <<>>;
+auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 
 
 %% @doc Retrieve URI
@@ -424,7 +430,7 @@ auth_resources(CannonocalizedResources) ->
             lists:foldl(fun({K2, V2}, Acc1) ->
                                 BinKey =  list_to_binary(K2),
                                 BinVal =  list_to_binary(V2),
-                                <<Acc1/binary, BinKey/binary, <<":">>/binary, BinVal/binary, <<"\n">>/binary>>
+                                <<Acc1/binary, BinKey/binary, ":", BinVal/binary, "\n" >>
                         end, <<>>, Headers)
     end.
 

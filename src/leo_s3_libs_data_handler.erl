@@ -27,9 +27,13 @@
 
 -author('Yosuke Hara').
 
+-include("leo_s3_auth.hrl").
+-include_lib("stdlib/include/qlc.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([all/1, lookup/2, insert/2, delete/2, size/1]).
+-export([all/1, lookup/2, insert/2, delete/2, size/1,
+         find_credential_by_userid/2
+        ]).
 
 
 %% Retrieve all records from the table.
@@ -84,6 +88,21 @@ lookup({ets, Table}, Id) ->
         {'EXIT', Cause} ->
             {error, Cause}
     end.
+
+
+%% @doc Retrieve a record by key
+%%
+-spec(find_credential_by_userid({mnesia, atom()}, any()) ->
+             {ok, list()} | not_found | {error, any()}).
+find_credential_by_userid({mnesia, Table}, UserId) ->
+    F = fun() ->
+                Q = qlc:q([X || X <- mnesia:table(Table),
+                                X#credential.user_id =:= UserId]),
+                qlc:e(Q)
+        end,
+    leo_mnesia:read(F);
+find_credential_by_userid(_,_) ->
+    {error, not_supported}.
 
 
 %% @doc Insert a record into the table.

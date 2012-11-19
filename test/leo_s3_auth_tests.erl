@@ -78,6 +78,8 @@ mnesia_suite_(_) ->
     ?assertEqual(20, size(AccessKeyId)),
     ?assertEqual(40, size(SecretAccessKey)),
 
+    ?assertEqual({error,already_exists}, leo_s3_auth:gen_key(?USER_ID)),
+
     {ok, #credential{access_key_id     = AccessKeyId,
                      secret_access_key = SecretAccessKey,
                      user_id           = ?USER_ID

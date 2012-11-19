@@ -109,12 +109,20 @@ gen_key(UserId) ->
         {ok, #auth_info{db = ets}} ->
             {error, not_generated};
         {ok, #auth_info{db = mnesia}} ->
-            Digest0 = list_to_binary(string:sub_string(
-                                       leo_hex:binary_to_hex(
-                                         crypto:sha(term_to_binary({UserId, Clock}))),1,20)),
-            Digest1 = list_to_binary(leo_hex:binary_to_hex(
-                                       crypto:sha(list_to_binary(UserId ++ "/" ++ Clock)))),
-            gen_key1(UserId, Digest0, Digest1);
+            case leo_s3_libs_data_handler:find_credential_by_userid(
+                   {mnesia, ?AUTH_TABLE}, UserId) of
+                not_found ->
+                    Digest0 = list_to_binary(string:sub_string(
+                                               leo_hex:binary_to_hex(
+                                                 crypto:sha(term_to_binary({UserId, Clock}))),1,20)),
+                    Digest1 = list_to_binary(leo_hex:binary_to_hex(
+                                               crypto:sha(list_to_binary(UserId ++ "/" ++ Clock)))),
+                    gen_key1(UserId, Digest0, Digest1);
+                {ok, _} ->
+                    {error, already_exists};
+                {error, Cause} ->
+                    {error, Cause}
+            end;
         [] ->
             {error, not_initialized};
         not_found ->

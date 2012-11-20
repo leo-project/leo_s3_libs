@@ -36,7 +36,7 @@
 -export([start/2, create_credential_table/2,
          gen_key/1, get_credential/1, has_credential/1, has_credential/2,
          authenticate/3, get_signature/2,
-         get_owner_by_access_key/1
+         get_owner_by_access_key/1, get_owners/0
         ]).
 
 -define(AUTH_INFO,  leo_s3_auth_info).
@@ -109,12 +109,24 @@ gen_key(UserId) ->
         {ok, #auth_info{db = ets}} ->
             {error, not_generated};
         {ok, #auth_info{db = mnesia}} ->
-            Digest0 = list_to_binary(string:sub_string(
-                                       leo_hex:binary_to_hex(
-                                         crypto:sha(term_to_binary({UserId, Clock}))),1,20)),
-            Digest1 = list_to_binary(leo_hex:binary_to_hex(
-                                       crypto:sha(list_to_binary(UserId ++ "/" ++ Clock)))),
-            gen_key1(UserId, Digest0, Digest1);
+            F = fun() ->
+                        Q = qlc:q([X || X <- mnesia:table(?AUTH_TABLE),
+                                        X#credential.user_id =:= UserId]),
+                        qlc:e(Q)
+                end,
+            case leo_mnesia:read(F) of
+                not_found ->
+                    Digest0 = list_to_binary(string:sub_string(
+                                               leo_hex:binary_to_hex(
+                                                 crypto:sha(term_to_binary({UserId, Clock}))),1,20)),
+                    Digest1 = list_to_binary(leo_hex:binary_to_hex(
+                                               crypto:sha(list_to_binary(UserId ++ "/" ++ Clock)))),
+                    gen_key1(UserId, Digest0, Digest1);
+                {ok, _} ->
+                    {error, already_exists};
+                {error, Cause} ->
+                    {error, Cause}
+            end;
         [] ->
             {error, not_initialized};
         not_found ->
@@ -229,19 +241,45 @@ get_signature(SecretAccessKey, SignParams) ->
 -spec(get_owner_by_access_key(binary()) ->
              {ok, string()} | not_found).
 get_owner_by_access_key(AccessKey) ->
-    F = fun() ->
-                Q = qlc:q([X || X <- mnesia:table(?AUTH_TABLE),
-                                X#credential.access_key_id =:= AccessKey]),
-                qlc:e(Q)
-        end,
-    Ret = mnesia:transaction(F),
-    case Ret of
+    Fun = fun() ->
+                  Q = qlc:q([X || X <- mnesia:table(?AUTH_TABLE),
+                                  X#credential.access_key_id =:= AccessKey]),
+                  qlc:e(Q)
+          end,
+    case leo_mnesia:read(Fun) of
         {error, Cause} ->
             {error, Cause};
-        {atomic, []} ->
+        not_found ->
             not_found;
-        {atomic, [#credential{user_id = Owner}|_]} ->
+        {ok, [#credential{user_id = Owner}|_]} ->
             {ok, Owner}
+    end.
+
+
+%% @doc Retrieve owners (omit secret_key)
+%%
+-spec(get_owners() ->
+             {ok, list(#credential{})} | {error, any()}).
+get_owners() ->
+    Fun = fun() ->
+                  Q1 = qlc:q([X || X <- mnesia:table(?AUTH_TABLE)]),
+                  Q2 = qlc:sort(Q1, [{order, ascending}]),
+                  qlc:e(Q2)
+          end,
+    case leo_mnesia:read(Fun) of
+        {error, Cause} ->
+            {error, Cause};
+        not_found ->
+            not_found;
+        {ok, List} ->
+            Owners = lists:map(fun(#credential{access_key_id = AccessKeyId,
+                                               user_id       = UserId,
+                                               created_at    = CreatedAt}) ->
+                                       #credential{access_key_id = AccessKeyId,
+                                                   user_id       = UserId,
+                                                   created_at    = CreatedAt}
+                               end, List),
+            {ok, Owners}
     end.
 
 
@@ -271,7 +309,7 @@ gen_key1(UserId, Digest0, Digest1) ->
                   {mnesia, ?AUTH_TABLE}, {[], #credential{access_key_id     = Digest0,
                                                           secret_access_key = Digest1,
                                                           user_id           = UserId,
-                                                          created_at        = leo_date:clock()}}),
+                                                          created_at        = leo_date:now()}}),
             {ok, [{access_key_id,     Digest0},
                   {secret_access_key, Digest1}]};
         _ ->

@@ -69,6 +69,7 @@ mnesia_suite_(_) ->
     ok = leo_s3_auth:start(master, []),
     ok = leo_s3_auth:create_credential_table(ram_copies, [node()]),
 
+    not_found  = leo_s3_auth:get_owners(),
     {ok, Keys} = leo_s3_auth:gen_key(?USER_ID),
     AccessKeyId     = proplists:get_value(access_key_id,     Keys),
     SecretAccessKey = proplists:get_value(secret_access_key, Keys),
@@ -77,6 +78,12 @@ mnesia_suite_(_) ->
     ?assertEqual(true, is_binary(SecretAccessKey)),
     ?assertEqual(20, size(AccessKeyId)),
     ?assertEqual(40, size(SecretAccessKey)),
+
+    ?assertEqual({error,already_exists}, leo_s3_auth:gen_key(?USER_ID)),
+
+    {ok, Owners} = leo_s3_auth:get_owners(),
+    ?assertEqual(1, length(Owners)),
+    ?assertEqual(undefined, (hd(Owners))#credential.secret_access_key),
 
     {ok, #credential{access_key_id     = AccessKeyId,
                      secret_access_key = SecretAccessKey,

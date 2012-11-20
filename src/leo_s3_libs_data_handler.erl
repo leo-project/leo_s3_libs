@@ -27,6 +27,8 @@
 
 -author('Yosuke Hara').
 
+-include("leo_s3_auth.hrl").
+-include_lib("stdlib/include/qlc.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -export([all/1, lookup/2, insert/2, delete/2, size/1]).

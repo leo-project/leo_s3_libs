@@ -309,7 +309,7 @@ gen_key1(UserId, Digest0, Digest1) ->
                   {mnesia, ?AUTH_TABLE}, {[], #credential{access_key_id     = Digest0,
                                                           secret_access_key = Digest1,
                                                           user_id           = UserId,
-                                                          created_at        = leo_date:clock()}}),
+                                                          created_at        = leo_date:now()}}),
             {ok, [{access_key_id,     Digest0},
                   {secret_access_key, Digest1}]};
         _ ->

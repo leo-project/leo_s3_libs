@@ -82,6 +82,10 @@ mnesia_suite_(_) ->
                         {ok, <<"leofs">>}
                 end),
 
+    meck:new(leo_s3_user),
+    meck:expect(leo_s3_user, find_by_access_key_id,
+                fun(_) -> {ok, <<"leofs">>} end),
+
     ok = leo_s3_bucket:start(master, []),
     ok = leo_s3_bucket:create_bucket_table('ram_copies', [node()]),
 

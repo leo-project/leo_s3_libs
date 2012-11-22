@@ -19,7 +19,7 @@
 %% under the License.
 %%
 %% ---------------------------------------------------------------------
-%% Leo Libs - Bucket - ETS/Mnesia Data Handler
+%% Leo S3 Libs - Bucket - ETS/Mnesia Data Handler
 %% @doc
 %% @end
 %%======================================================================

@@ -124,14 +124,19 @@ create_user1(UserId, Password, WithS3Keys) ->
 
 %% @doc Create a user account w/access-key-id/secret-access-key
 %% @private
-create_user2(UserId, CreatedAt) ->
-    case leo_s3_auth:create_key(binary_to_list(UserId)) of
+create_user2(UserId0, CreatedAt) ->
+    UserId1 = case is_binary(UserId0) of
+                  true  -> binary_to_list(UserId0);
+                  false -> UserId0
+              end,
+
+    case leo_s3_auth:create_key(UserId1) of
         {ok, Keys} ->
             AccessKeyId = leo_misc:get_value(access_key_id, Keys),
 
             case leo_s3_libs_data_handler:insert(
                    {mnesia, ?USER_CREDENTIAL_TABLE},
-                   {[], #user_credential{user_id       = UserId,
+                   {[], #user_credential{user_id       = UserId1,
                                          access_key_id = AccessKeyId,
                                          created_at    = CreatedAt}}) of
                 ok ->
@@ -140,7 +145,6 @@ create_user2(UserId, CreatedAt) ->
                     Error
             end;
         Error ->
-            ?debugVal(Error),
             Error
     end.
 
@@ -216,10 +220,10 @@ get_credential_by_id(UserId) ->
                                access_key_id = AccessKeyId,
                                created_at    = CreatedAt}|_]} ->
             case leo_s3_auth:get_credential(AccessKeyId) of
-                {ok, [#credential{secret_access_key = SecretAccessKey}|_]} ->
+                {ok, Credential} ->
                     {ok, [{user_id,           UserId},
                           {access_key_id,     AccessKeyId},
-                          {secret_access_key, SecretAccessKey},
+                          {secret_access_key, Credential#credential.secret_access_key},
                           {created_at,        CreatedAt}]};
                 Other ->
                     Other

@@ -23,10 +23,13 @@
 %% @doc
 %% @end
 %%======================================================================
+-define(ROLE_GENERAL, 1).
+-define(ROLE_ADMIN,   9).
+
 -record(user, {
           id            :: binary(),
           password      :: binary(),
-          role_id       :: integer(),
+          role_id = 1   :: integer(),
           created_at    :: integer()
          }).
 -record(user_credential, {

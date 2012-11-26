@@ -179,6 +179,7 @@ find_by_access_key_id(AccessKeyId) ->
         end,
     case leo_mnesia:read(F) of
         {ok, [UserCredential|_]} ->
+            ?debugVal(UserCredential),
             {ok, UserCredential};
         Other ->
             Other

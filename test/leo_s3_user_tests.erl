@@ -60,11 +60,11 @@ suite_(_) ->
     ok = leo_s3_user:create_user_credential_table(ram_copies, [node()]),
     ok = leo_s3_auth:create_credential_table(ram_copies, [node()]),
 
-    UserId    = <<"Name is Leo">>,
+    UserId    = "Name is Leo",
     Password0 = <<"Type is FS">>,
     Password1 = erlang:md5(Password0),
 
-    %% create-user
+    %% %% create-user
     {ok, Keys} = leo_s3_user:create_user(UserId, Password0, true),
     AccessKeyId     = leo_misc:get_value('access_key_id',     Keys),
     SecretAccessKey = leo_misc:get_value('secret_access_key', Keys),
@@ -76,28 +76,28 @@ suite_(_) ->
     {error,already_exists} =
         leo_s3_user:create_user(UserId, Password0, true),
 
-    %% find-by-id
+    %% %% find-by-id
     {ok, Res1} = leo_s3_user:find_by_id(UserId),
     ?assertEqual(UserId,    Res1#user.id),
     ?assertEqual(Password1, Res1#user.password),
 
-    %% find_by_access_key_id
+    %% %% find_by_access_key_id
     {ok, Res2} = leo_s3_user:find_by_access_key_id(AccessKeyId),
     ?assertEqual(UserId,      Res2#user_credential.user_id),
     ?assertEqual(AccessKeyId, Res2#user_credential.access_key_id),
 
-    %% find_users_all
-    {ok, _} = leo_s3_user:create_user(<<UserId/binary, "_1">>, Password0, true),
-    {ok, _} = leo_s3_user:create_user(<<UserId/binary, "_2">>, Password0, true),
-    {ok, _} = leo_s3_user:create_user(<<UserId/binary, "_3">>, Password0, true),
-    {ok, _} = leo_s3_user:create_user(<<UserId/binary, "_4">>, Password0, true),
+    %% %% find_users_all
+    {ok, _} = leo_s3_user:create_user(UserId ++ "_1", Password0, true),
+    {ok, _} = leo_s3_user:create_user(UserId ++ "_2", Password0, true),
+    {ok, _} = leo_s3_user:create_user(UserId ++ "_3", Password0, true),
+    {ok, _} = leo_s3_user:create_user(UserId ++ "_4", Password0, true),
     {ok, Users} = leo_s3_user:find_users_all(),
     ?assertEqual(5, length(Users)),
 
-    %% get_credential_by_id
+    %% %% get_credential_by_id
     {ok, Credential} = leo_s3_user:get_credential_by_id(UserId),
-    ?assertEqual(AccessKeyId,     Credential#credential.access_key_id),
-    ?assertEqual(SecretAccessKey, Credential#credential.secret_access_key),
+    ?assertEqual(AccessKeyId,     leo_misc:get_value(access_key_id, Credential)),
+    ?assertEqual(SecretAccessKey, leo_misc:get_value(secret_access_key, Credential)),
 
     %% auth,
     {ok, _} = leo_s3_user:auth(UserId, Password0),

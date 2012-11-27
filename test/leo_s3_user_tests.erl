@@ -65,7 +65,7 @@ suite_(_) ->
     Password1 = erlang:md5(Password0),
 
     %% %% create-user
-    {ok, Keys} = leo_s3_user:create_user(UserId, Password0, true),
+    {ok, Keys} = leo_s3_user:add(UserId, Password0, true),
     AccessKeyId     = leo_misc:get_value('access_key_id',     Keys),
     SecretAccessKey = leo_misc:get_value('secret_access_key', Keys),
 
@@ -74,7 +74,7 @@ suite_(_) ->
     ?assertEqual(true, SecretAccessKey /= <<>>),
 
     {error,already_exists} =
-        leo_s3_user:create_user(UserId, Password0, true),
+        leo_s3_user:add(UserId, Password0, true),
 
     %% %% find-by-id
     {ok, Res1} = leo_s3_user:find_by_id(UserId),
@@ -87,10 +87,10 @@ suite_(_) ->
     ?assertEqual(AccessKeyId, Res2#user_credential.access_key_id),
 
     %% %% find_users_all
-    {ok, _} = leo_s3_user:create_user(UserId ++ "_1", Password0, true),
-    {ok, _} = leo_s3_user:create_user(UserId ++ "_2", Password0, true),
-    {ok, _} = leo_s3_user:create_user(UserId ++ "_3", Password0, true),
-    {ok, _} = leo_s3_user:create_user(UserId ++ "_4", Password0, true),
+    {ok, _} = leo_s3_user:add(UserId ++ "_1", Password0, true),
+    {ok, _} = leo_s3_user:add(UserId ++ "_2", Password0, true),
+    {ok, _} = leo_s3_user:add(UserId ++ "_3", Password0, true),
+    {ok, _} = leo_s3_user:add(UserId ++ "_4", Password0, true),
     {ok, Users} = leo_s3_user:find_users_all(),
     ?assertEqual(5, length(Users)),
 
@@ -102,6 +102,18 @@ suite_(_) ->
     %% auth,
     {ok, _} = leo_s3_user:auth(UserId, Password0),
     {error,invalid_values} = leo_s3_user:auth(UserId, <<>>),
+
+    %% update
+    ok = leo_s3_user:update(#user{id      = UserId,
+                                  role_id = 9}),
+    {ok, Res3} = leo_s3_user:find_by_id(UserId),
+    ?assertEqual(UserId,    Res3#user.id),
+    ?assertEqual(9,         Res3#user.role_id),
+    ?assertEqual(Password1, Res3#user.password),
+
+    %% delete
+    ok = leo_s3_user:delete(UserId),
+    not_found = leo_s3_user:find_by_id(UserId),
     ok.
 
 -endif.

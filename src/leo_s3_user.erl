@@ -34,7 +34,8 @@
 -include_lib("stdlib/include/qlc.hrl").
 
 -export([create_user_table/2, create_user_credential_table/2,
-         create_user/3, find_by_id/1, find_by_access_key_id/1, find_users_all/0,
+         add/3, update/1, delete/1,
+         find_by_id/1, find_by_access_key_id/1, find_users_all/0,
          get_credential_by_id/1, auth/2
         ]).
 
@@ -89,12 +90,12 @@ create_user_credential_table(Mode, Nodes) ->
 
 %% @doc Create a user account
 %%
--spec(create_user(binary(), binary(), boolean()) ->
+-spec(add(binary(), binary(), boolean()) ->
              {ok, list(tuple())} | {error, any()}).
-create_user(UserId, Password, WithS3Keys) ->
+add(UserId, Password, WithS3Keys) ->
     case find_by_id(UserId) of
         not_found ->
-            create_user1(UserId, Password, WithS3Keys);
+            add1(UserId, Password, WithS3Keys);
         {ok, _} ->
             {error, already_exists};
         {error, Cause} ->
@@ -104,7 +105,7 @@ create_user(UserId, Password, WithS3Keys) ->
 
 %% @doc Create a user account w/access-key-id/secret-access-key
 %% @private
-create_user1(UserId, Password, WithS3Keys) ->
+add1(UserId, Password, WithS3Keys) ->
     CreatedAt = leo_date:now(),
 
     case leo_s3_libs_data_handler:insert(
@@ -114,7 +115,7 @@ create_user1(UserId, Password, WithS3Keys) ->
         ok ->
             case WithS3Keys of
                 true ->
-                    create_user2(UserId, CreatedAt);
+                    add2(UserId, CreatedAt);
                 false ->
                     {ok, []}
             end;
@@ -124,7 +125,7 @@ create_user1(UserId, Password, WithS3Keys) ->
 
 %% @doc Create a user account w/access-key-id/secret-access-key
 %% @private
-create_user2(UserId0, CreatedAt) ->
+add2(UserId0, CreatedAt) ->
     UserId1 = case is_binary(UserId0) of
                   true  -> binary_to_list(UserId0);
                   false -> UserId0
@@ -144,6 +145,50 @@ create_user2(UserId0, CreatedAt) ->
                 Error ->
                     Error
             end;
+        Error ->
+            Error
+    end.
+
+
+%% @doc Update a user
+%%
+-spec(update(#user{}) ->
+             ok | {error, any()}).
+update(#user{id       = UserId,
+             role_id  = RoleId0,
+             password = Password0}) ->
+    case find_by_id(UserId) of
+        {ok, #user{role_id    = RoleId1,
+                   password   = Password1,
+                   created_at = CreatedAt}} ->
+
+            RoleId2 = case (RoleId0 == 0) of
+                          true  -> RoleId1;
+                          false -> RoleId0
+                      end,
+            Password2 = case (Password0 == <<>>) of
+                            true  -> Password1;
+                            false -> Password0
+                        end,
+
+            leo_s3_libs_data_handler:insert(
+              {mnesia, ?USERS_TABLE}, {[], #user{id         = UserId,
+                                                 role_id    = RoleId2,
+                                                 password   = Password2,
+                                                 created_at = CreatedAt}});
+        Error ->
+            Error
+    end.
+
+
+%% @doc Delete a user
+%%
+-spec(delete(integer()) ->
+             ok | {error, any()}).
+delete(UserId) ->
+    case leo_s3_libs_data_handler:delete({mnesia, ?USERS_TABLE}, UserId) of
+        ok ->
+            leo_s3_libs_data_handler:delete({mnesia, ?USER_CREDENTIAL_TABLE}, UserId);
         Error ->
             Error
     end.

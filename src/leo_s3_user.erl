@@ -166,9 +166,10 @@ update(#user{id       = UserId,
                           true  -> RoleId1;
                           false -> RoleId0
                       end,
-            Password2 = case (Password0 == <<>>) of
+            Password2 = case (Password0 == <<>> orelse
+                              Password0 == []) of
                             true  -> Password1;
-                            false -> Password0
+                            false -> erlang:md5(Password0)
                         end,
 
             leo_s3_libs_data_handler:insert(

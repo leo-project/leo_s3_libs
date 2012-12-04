@@ -19,7 +19,7 @@
 %% under the License.
 %%
 %% ---------------------------------------------------------------------
-%% Leo Libs - Bucket
+%% Leo S3 Libs - Bucket
 %% @doc
 %% @end
 %%======================================================================
@@ -156,9 +156,9 @@ find_all_including_owner() ->
     case find_all() of
         {ok, Buckets} ->
             Ret = lists:map(fun(#bucket{name       = Name,
-                                        access_key = Key,
+                                        access_key = AccessKeyId,
                                         created_at = CreatedAt}) ->
-                                    Owner1 = case leo_s3_auth:get_owner_by_access_key(Key) of
+                                    Owner1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
                                                  {ok, Owner0} -> Owner0;
                                                  _-> []
                                              end,

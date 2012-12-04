@@ -1,6 +1,6 @@
 %%======================================================================
 %%
-%% Leo Auth
+%% Leo S3 Auth
 %%
 %% Copyright (c) 2012 Rakuten, Inc.
 %%
@@ -19,7 +19,7 @@
 %% under the License.
 %%
 %% ---------------------------------------------------------------------
-%% Leo Auth
+%% Leo S3 Auth
 %% @doc
 %% @end
 %%======================================================================
@@ -28,7 +28,6 @@
 -record(credential, {
           access_key_id     :: binary(),
           secret_access_key :: binary(),
-          user_id           :: string(),
           created_at        :: integer()
          }).
 
@@ -50,6 +49,6 @@
           uri          = <<>> :: binary(),
           query_str    = <<>> :: binary(),
           sub_resource = <<>> :: binary(), %% [?acl" | "?location" | "?logging" | "?torrent"]
-          amz_headers  = [] :: list()
+          amz_headers  = []   :: list()
          }).
 

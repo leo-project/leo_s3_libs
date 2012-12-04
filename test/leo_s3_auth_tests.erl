@@ -57,20 +57,26 @@ setup() ->
 
 teardown(_) ->
     application:stop(crypto),
+    meck:unload(),
     ok.
 
 %% @doc Mnesia
 %%
 mnesia_suite_(_) ->
     %% inspect-1
-    {error, not_initialized} = leo_s3_auth:gen_key(?USER_ID),
+    {error, not_initialized} = leo_s3_auth:create_key(?USER_ID),
 
     %% inspect-2
+    ok = meck:new(leo_s3_user),
+    ok = meck:expect(leo_s3_user, find_by_id,
+                     fun(_) ->
+                             not_found
+                     end),
+
     ok = leo_s3_auth:start(master, []),
     ok = leo_s3_auth:create_credential_table(ram_copies, [node()]),
 
-    not_found  = leo_s3_auth:get_owners(),
-    {ok, Keys} = leo_s3_auth:gen_key(?USER_ID),
+    {ok, Keys} = leo_s3_auth:create_key(?USER_ID),
     AccessKeyId     = proplists:get_value(access_key_id,     Keys),
     SecretAccessKey = proplists:get_value(secret_access_key, Keys),
 
@@ -79,16 +85,9 @@ mnesia_suite_(_) ->
     ?assertEqual(20, size(AccessKeyId)),
     ?assertEqual(40, size(SecretAccessKey)),
 
-    ?assertEqual({error,already_exists}, leo_s3_auth:gen_key(?USER_ID)),
-
-    {ok, Owners} = leo_s3_auth:get_owners(),
-    ?assertEqual(1, length(Owners)),
-    ?assertEqual(undefined, (hd(Owners))#credential.secret_access_key),
-
     {ok, #credential{access_key_id     = AccessKeyId,
-                     secret_access_key = SecretAccessKey,
-                     user_id           = ?USER_ID
-                    }} = leo_s3_libs_data_handler:lookup({mnesia, leo_s3_credentials}, AccessKeyId),
+                     secret_access_key = SecretAccessKey}} =
+        leo_s3_libs_data_handler:lookup({mnesia, leo_s3_credentials}, AccessKeyId),
 
     1 = leo_s3_libs_data_handler:size({mnesia, leo_s3_credentials}),
 
@@ -113,7 +112,6 @@ mnesia_suite_(_) ->
     {ok, Credential}  = leo_s3_auth:get_credential(AccessKeyId),
     ?assertEqual(AccessKeyId,     Credential#credential.access_key_id),
     ?assertEqual(SecretAccessKey, Credential#credential.secret_access_key),
-    ?assertEqual("leofs",         Credential#credential.user_id),
 
     %% inspect-4 - for authentication
     Authorization1 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":example">>/binary >>,
@@ -140,10 +138,6 @@ mnesia_suite_(_) ->
 
     {ok, AccessKeyId} = leo_s3_auth:authenticate(Authorization2, SignParams1, false),
 
-    %% inspect-7 - Retrieve owner by access key
-    {ok,"leofs"} = leo_s3_auth:get_owner_by_access_key(AccessKeyId),
-    not_found    = leo_s3_auth:get_owner_by_access_key([]),
-
 
     application:stop(mnesia),
     timer:sleep(250),
@@ -167,6 +161,12 @@ ets_suite_(_) ->
     %% inspect-1
     AccessKeyId     = <<"example_access_key_id">>,
     SecretAccessKey = <<"example_secret_key">>,
+
+    ok = meck:new(leo_s3_user),
+    ok = meck:expect(leo_s3_user, find_by_id,
+                     fun(_) ->
+                             not_found
+                     end),
 
     ok = meck:new(leo_s3_bucket),
     ok = meck:expect(leo_s3_bucket, head,

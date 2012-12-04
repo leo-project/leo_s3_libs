@@ -1,6 +1,6 @@
 %%======================================================================
 %%
-%% Leo S3-Libs
+%% Leo S3 User
 %%
 %% Copyright (c) 2012 Rakuten, Inc.
 %%
@@ -18,15 +18,23 @@
 %% specific language governing permissions and limitations
 %% under the License.
 %%
+%% ---------------------------------------------------------------------
+%% Leo S3 User
+%% @doc
+%% @end
 %%======================================================================
-{application, leo_s3_libs,
-  [
-    {description, "Leo S3-Libs"},
-    {vsn, "0.12.0"},
-    {id, "leo_s3_libs"},
-    {registered,   []},
-    {applications, [kernel, stdlib]},
-    {mod, {leo_s3_libs, []}},
-    {env, []}
-  ]
-}.
+-define(ROLE_GENERAL, 1).
+-define(ROLE_ADMIN,   9).
+
+-record(user, {
+          id              :: binary(),
+          password = <<>> :: binary(),
+          role_id = 0     :: integer(),
+          created_at = 0  :: integer()
+         }).
+-record(user_credential, {
+          user_id         :: binary(),
+          access_key_id   :: binary(),
+          created_at = 0  :: integer()
+         }).
+

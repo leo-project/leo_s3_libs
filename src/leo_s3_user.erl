@@ -35,7 +35,7 @@
 
 -export([create_user_table/2, create_user_credential_table/2,
          add/3, update/1, delete/1,
-         find_by_id/1, find_by_access_key_id/1, find_users_all/0,
+         find_by_id/1, find_by_access_key_id/1, find_all/0,
          get_credential_by_id/1, auth/2
         ]).
 
@@ -233,9 +233,9 @@ find_by_access_key_id(AccessKeyId) ->
 
 %% @doc Retrieve owners (omit secret_key)
 %%
--spec(find_users_all() ->
+-spec(find_all() ->
              {ok, list(#user_credential{})} | {error, any()}).
-find_users_all() ->
+find_all() ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(?USER_CREDENTIAL_TABLE)]),
                   Q2 = qlc:sort(Q1, [{order, ascending}]),
@@ -246,8 +246,15 @@ find_users_all() ->
             {error, Cause};
         not_found ->
             not_found;
-        {ok, Users} ->
-            {ok, Users}
+        {ok, Users0} ->
+            Users1 = lists:map(fun(#user_credential{user_id = UserId,
+                                                 access_key_id = AccessKeyId,
+                                                 created_at = CretedAt}) ->
+                                    {ok, #user{role_id = RoleId}} = find_by_id(UserId),
+                                    [{user_id, UserId}, {role_id, RoleId},
+                                     {access_key_id, AccessKeyId}, {created_at, CretedAt}]
+                               end, Users0),
+            {ok, Users1}
     end.
 
 

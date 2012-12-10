@@ -27,14 +27,14 @@
 -define(ROLE_ADMIN,   9).
 
 -record(user, {
-          id              :: binary(),
-          password = <<>> :: binary(),
-          role_id = 0     :: integer(),
-          created_at = 0  :: integer()
+          id                      :: binary(),
+          password = <<>>         :: binary(),
+          role_id = ?ROLE_GENERAL :: integer(),
+          created_at = 0          :: integer()
          }).
 -record(user_credential, {
-          user_id         :: binary(),
-          access_key_id   :: binary(),
-          created_at = 0  :: integer()
+          user_id        :: binary(),
+          access_key_id  :: binary(),
+          created_at = 0 :: integer()
          }).
 

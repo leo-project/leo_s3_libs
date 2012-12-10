@@ -86,12 +86,13 @@ suite_(_) ->
     ?assertEqual(UserId,      Res2#user_credential.user_id),
     ?assertEqual(AccessKeyId, Res2#user_credential.access_key_id),
 
-    %% %% find_users_all
+    %% %% find_all
     {ok, _} = leo_s3_user:add(UserId ++ "_1", Password0, true),
     {ok, _} = leo_s3_user:add(UserId ++ "_2", Password0, true),
     {ok, _} = leo_s3_user:add(UserId ++ "_3", Password0, true),
     {ok, _} = leo_s3_user:add(UserId ++ "_4", Password0, true),
-    {ok, Users} = leo_s3_user:find_users_all(),
+    {ok, Users} = leo_s3_user:find_all(),
+    ?debugVal(Users),
     ?assertEqual(5, length(Users)),
 
     %% %% get_credential_by_id

@@ -197,7 +197,7 @@ delete(UserId) ->
                                                       role_id    = RoleId,
                                                       password   = Password,
                                                       created_at = CreatedAt,
-                                                      del        = ?DEL_TRUE}}) of
+                                                      del        = true}}) of
                 ok ->
                     leo_s3_libs_data_handler:delete(
                             {mnesia, ?USER_CREDENTIAL_TABLE}, UserId);
@@ -222,9 +222,9 @@ find_by_id(UserId) ->
     case leo_mnesia:read(F) of
         {ok, [User|_]} ->
             case User#user.del of
-                ?DEL_TRUE ->
+                true ->
                     not_found;
-                ?DEL_FALSE ->
+                false ->
                     {ok, User}
             end;
         Other ->

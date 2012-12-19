@@ -34,8 +34,8 @@
           del = false             :: boolean()
          }).
 -record(user_credential, {
-          user_id        :: binary(),
-          access_key_id  :: binary(),
-          created_at = 0 :: integer()
+          user_id = []         :: binary(),
+          access_key_id = <<>> :: binary(),
+          created_at = 0       :: integer()
          }).
 

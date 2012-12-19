@@ -28,6 +28,7 @@
 -author('Yosuke Hara').
 
 -include("leo_s3_bucket.hrl").
+-include("leo_s3_user.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -export([start/2, create_bucket_table/2, is_valid_bucket/1,
@@ -160,11 +161,14 @@ find_all_including_owner() ->
                                         created_at = CreatedAt}) ->
                                     Owner1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
                                                  {ok, Owner0} -> Owner0;
-                                                 _-> []
+                                                 _ -> #user_credential{}
                                              end,
                                     {Name, Owner1, CreatedAt}
                             end, Buckets),
-            {ok, Ret};
+            case Ret of
+                [] -> not_found;
+                _  -> {ok, Ret}
+            end;
         Error ->
             Error
     end.

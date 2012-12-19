@@ -25,12 +25,15 @@
 %%======================================================================
 -define(ROLE_GENERAL, 1).
 -define(ROLE_ADMIN,   9).
+-define(DEL_FALSE,    false).
+-define(DEL_TRUE,     true).
 
 -record(user, {
           id                      :: binary(),
           password = <<>>         :: binary(),
           role_id = ?ROLE_GENERAL :: integer(),
-          created_at = 0          :: integer()
+          created_at = 0          :: integer(),
+          del = ?DEL_FALSE        :: boolean()
          }).
 -record(user_credential, {
           user_id        :: binary(),

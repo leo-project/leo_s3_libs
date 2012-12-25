@@ -61,7 +61,8 @@ create_user_table(Mode, Nodes) ->
             [{id,         {binary,  undefined}, false, primary,   undefined, identity,  binary },
              {password,   {binary,  undefined}, false, undefined, undefined, undefined, binary },
              {role_id,    {integer, undefined}, false, undefined, undefined, undefined, integer},
-             {created_at, {integer, undefined}, false, undefined, undefined, undefined, integer}
+             {created_at, {integer, undefined}, false, undefined, undefined, undefined, integer},
+             {del,        {boolean, undefined}, false, undefined, undefined, undefined, boolean}
             ]}
           ]),
     ok.
@@ -187,9 +188,22 @@ update(#user{id       = UserId,
 -spec(delete(integer()) ->
              ok | {error, any()}).
 delete(UserId) ->
-    case leo_s3_libs_data_handler:delete({mnesia, ?USERS_TABLE}, UserId) of
-        ok ->
-            leo_s3_libs_data_handler:delete({mnesia, ?USER_CREDENTIAL_TABLE}, UserId);
+    case find_by_id(UserId) of
+        {ok, #user{role_id    = RoleId,
+                   password   = Password,
+                   created_at = CreatedAt}} ->
+            case leo_s3_libs_data_handler:insert(
+                   {mnesia, ?USERS_TABLE}, {[], #user{id         = UserId,
+                                                      role_id    = RoleId,
+                                                      password   = Password,
+                                                      created_at = CreatedAt,
+                                                      del        = true}}) of
+                ok ->
+                    leo_s3_libs_data_handler:delete(
+                      {mnesia, ?USER_CREDENTIAL_TABLE}, UserId);
+                Error ->
+                    Error
+            end;
         Error ->
             Error
     end.
@@ -207,7 +221,12 @@ find_by_id(UserId) ->
         end,
     case leo_mnesia:read(F) of
         {ok, [User|_]} ->
-            {ok, User};
+            case User#user.del of
+                true ->
+                    not_found;
+                false ->
+                    {ok, User}
+            end;
         Other ->
             Other
     end.
@@ -248,11 +267,11 @@ find_all() ->
             not_found;
         {ok, Users0} ->
             Users1 = lists:map(fun(#user_credential{user_id = UserId,
-                                                 access_key_id = AccessKeyId,
-                                                 created_at = CretedAt}) ->
-                                    {ok, #user{role_id = RoleId}} = find_by_id(UserId),
-                                    [{user_id, UserId}, {role_id, RoleId},
-                                     {access_key_id, AccessKeyId}, {created_at, CretedAt}]
+                                                    access_key_id = AccessKeyId,
+                                                    created_at = CretedAt}) ->
+                                       {ok, #user{role_id = RoleId}} = find_by_id(UserId),
+                                       [{user_id, UserId}, {role_id, RoleId},
+                                        {access_key_id, AccessKeyId}, {created_at, CretedAt}]
                                end, Users0),
             {ok, Users1}
     end.

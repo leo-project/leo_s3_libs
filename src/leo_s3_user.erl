@@ -200,7 +200,7 @@ delete(UserId) ->
                                                       del        = true}}) of
                 ok ->
                     leo_s3_libs_data_handler:delete(
-                            {mnesia, ?USER_CREDENTIAL_TABLE}, UserId);
+                      {mnesia, ?USER_CREDENTIAL_TABLE}, UserId);
                 Error ->
                     Error
             end;
@@ -267,11 +267,11 @@ find_all() ->
             not_found;
         {ok, Users0} ->
             Users1 = lists:map(fun(#user_credential{user_id = UserId,
-                                                 access_key_id = AccessKeyId,
-                                                 created_at = CretedAt}) ->
-                                    {ok, #user{role_id = RoleId}} = find_by_id(UserId),
-                                    [{user_id, UserId}, {role_id, RoleId},
-                                     {access_key_id, AccessKeyId}, {created_at, CretedAt}]
+                                                    access_key_id = AccessKeyId,
+                                                    created_at = CretedAt}) ->
+                                       {ok, #user{role_id = RoleId}} = find_by_id(UserId),
+                                       [{user_id, UserId}, {role_id, RoleId},
+                                        {access_key_id, AccessKeyId}, {created_at, CretedAt}]
                                end, Users0),
             {ok, Users1}
     end.

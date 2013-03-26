@@ -108,7 +108,7 @@ add(UserId, Password, WithS3Keys) ->
 %% @private
 add1(UserId, Password, WithS3Keys) ->
     CreatedAt = leo_date:now(),
-    Digest = hash_and_salt_password(CreatedAt, Password),
+    Digest = hash_and_salt_password(Password, CreatedAt),
 
     case leo_s3_libs_data_handler:insert(
            {mnesia, ?USERS_TABLE}, {[], #user{id         = UserId,
@@ -171,7 +171,7 @@ update(#user{id       = UserId,
             Password2 = case (Password0 == <<>> orelse
                               Password0 == []) of
                             true  -> Password1;
-                            false -> hash_and_salt_password(CreatedAt, Password0)
+                            false -> hash_and_salt_password(Password0, CreatedAt)
                         end,
 
             leo_s3_libs_data_handler:insert(
@@ -315,7 +315,7 @@ auth(UserId, PW0) ->
     case find_by_id(UserId) of
         {ok, #user{password = PW1,
                    created_at = CreatedAt} = User} ->
-            case hash_and_salt_password(CreatedAt, PW0) of
+            case hash_and_salt_password(PW0, CreatedAt) of
                 PW1 ->
                     {ok, User#user{password = []}};
                 _ ->
@@ -338,10 +338,10 @@ auth(UserId, PW0) ->
 %%--------------------------------------------------------------------
 %% @doc Generate hash/salt-ed password
 %% @private
--spec(hash_and_salt_password(integer(), binary()) ->
+-spec(hash_and_salt_password(binary(), integer()) ->
              binary()).
-hash_and_salt_password(CreatedAt, Password) ->
-    Salt = list_to_binary(leo_hex:integer_to_hex(CreatedAt, 16)),
+hash_and_salt_password(Password, CreatedAt) ->
+    Salt = list_to_binary(leo_hex:integer_to_hex(CreatedAt, 8)),
     Context1 = crypto:md5_init(),
     Context2 = crypto:md5_update(Context1, Password),
     Context3 = crypto:md5_update(Context2, Salt),

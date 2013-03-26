@@ -62,7 +62,6 @@ suite_(_) ->
 
     UserId    = "Name is Leo",
     Password0 = <<"Type is FS">>,
-    Password1 = erlang:md5(Password0),
 
     %% %% create-user
     {ok, Keys} = leo_s3_user:add(UserId, Password0, true),
@@ -78,8 +77,8 @@ suite_(_) ->
 
     %% %% find-by-id
     {ok, Res1} = leo_s3_user:find_by_id(UserId),
-    ?assertEqual(UserId,    Res1#user.id),
-    ?assertEqual(Password1, Res1#user.password),
+    ?assertEqual(UserId, Res1#user.id),
+    ?debugVal(Res1#user.password),
 
     %% %% find_by_access_key_id
     {ok, Res2} = leo_s3_user:find_by_access_key_id(AccessKeyId),
@@ -108,9 +107,8 @@ suite_(_) ->
     ok = leo_s3_user:update(#user{id      = UserId,
                                   role_id = 9}),
     {ok, Res3} = leo_s3_user:find_by_id(UserId),
-    ?assertEqual(UserId,    Res3#user.id),
-    ?assertEqual(9,         Res3#user.role_id),
-    ?assertEqual(Password1, Res3#user.password),
+    ?assertEqual(UserId, Res3#user.id),
+    ?assertEqual(9,      Res3#user.role_id),
 
     %% delete
     ok = leo_s3_user:delete(UserId),

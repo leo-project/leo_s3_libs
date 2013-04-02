@@ -379,7 +379,7 @@ authenticate_4_(_) ->
                               bucket       = <<"johnsmith">>,
                               uri          = <<"/photos/puppy.jpg">>,
                               amz_headers  = [
-                                  {"X-Amz-Date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
+                                  {"x-amz-date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"R4dJ53KECjStyBO5iTBJZ4XVOaI=">>, Ret),
@@ -427,11 +427,11 @@ authenticate_5_(_) ->
                                date         = <<"Tue, 27 Mar 2007 21:06:08 +0000">>,
                                bucket       = <<"static.johnsmith.net">>,
                                uri          = <<"/db-backup.dat.gz">>,
-                               amz_headers  = [{"X-Amz-Acl", "public-read"},
-                                               {"X-Amz-Meta-ReviewedBy", "joe@johnsmith.net"},
-                                               {"X-Amz-Meta-ReviewedBy", "jane@johnsmith.net"},
-                                               {"X-Amz-Meta-FileChecksum","0x02661779"},
-                                               {"X-Amz-Meta-ChecksumAlgorithm", "crc32"}]},
+                               amz_headers  = [{"x-amz-Acl", "public-read"},
+                                               {"x-amz-Meta-ReviewedBy", "joe@johnsmith.net"},
+                                               {"x-amz-Meta-ReviewedBy", "jane@johnsmith.net"},
+                                               {"x-amz-Meta-FileChecksum","0x02661779"},
+                                               {"x-amz-Meta-ChecksumAlgorithm", "crc32"}]},
     Ret1 = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams1),
     ?assertEqual(<<"ilyl83RwaSoYIEdixDQcA4OnAnc=">>, Ret1),
     ok.

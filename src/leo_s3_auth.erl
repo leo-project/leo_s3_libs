@@ -361,7 +361,7 @@ get_auth_info() ->
 %% @doc Retrieve date
 %% @private
 auth_date(Date0, CannonocalizedResources) ->
-    case lists:keysearch("X-Amz-Date", 1, CannonocalizedResources) of
+    case lists:keysearch("x-amz-date", 1, CannonocalizedResources) of
         {value, _} ->
             <<>>;
         false ->

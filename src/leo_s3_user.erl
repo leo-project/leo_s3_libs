@@ -108,10 +108,11 @@ add(UserId, Password, WithS3Keys) ->
 %% @private
 add1(UserId, Password, WithS3Keys) ->
     CreatedAt = leo_date:now(),
+    Digest = hash_and_salt_password(Password, CreatedAt),
 
     case leo_s3_libs_data_handler:insert(
            {mnesia, ?USERS_TABLE}, {[], #user{id         = UserId,
-                                              password   = erlang:md5(Password),
+                                              password   = Digest,
                                               created_at = CreatedAt}}) of
         ok ->
             case WithS3Keys of
@@ -170,7 +171,7 @@ update(#user{id       = UserId,
             Password2 = case (Password0 == <<>> orelse
                               Password0 == []) of
                             true  -> Password1;
-                            false -> erlang:md5(Password0)
+                            false -> hash_and_salt_password(Password0, CreatedAt)
                         end,
 
             leo_s3_libs_data_handler:insert(
@@ -311,11 +312,22 @@ get_credential_by_id(UserId) ->
 -spec(auth(binary(), binary()) ->
              {ok, #user{}} | {error, invalid_values}).
 auth(UserId, PW0) ->
-    PW1 = erlang:md5(PW0),
-
     case find_by_id(UserId) of
-        {ok, #user{password = PW2} = User} when PW1 == PW2 ->
-            {ok, User#user{password = []}};
+        {ok, #user{password = PW1,
+                   created_at = CreatedAt} = User} ->
+            case hash_and_salt_password(PW0, CreatedAt) of
+                PW1 ->
+                    {ok, User#user{password = []}};
+                _ ->
+                    %% migrate previous-version(v0.12.7)'s data
+                    case erlang:md5(PW0) of
+                        PW1 ->
+                            _ = update(User),
+                            {ok, User#user{password = []}};
+                        _ ->
+                            {error, invalid_values}
+                    end
+            end;
         _Other ->
             {error, invalid_values}
     end.
@@ -324,4 +336,14 @@ auth(UserId, PW0) ->
 %%--------------------------------------------------------------------
 %%% INTERNAL FUNCTIONS
 %%--------------------------------------------------------------------
+%% @doc Generate hash/salt-ed password
+%% @private
+-spec(hash_and_salt_password(binary(), integer()) ->
+             binary()).
+hash_and_salt_password(Password, CreatedAt) ->
+    Salt = list_to_binary(leo_hex:integer_to_hex(CreatedAt, 8)),
+    Context1 = crypto:md5_init(),
+    Context2 = crypto:md5_update(Context1, Password),
+    Context3 = crypto:md5_update(Context2, Salt),
+    crypto:md5_final(Context3).
 

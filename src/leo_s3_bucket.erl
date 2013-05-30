@@ -29,17 +29,13 @@
 
 -include("leo_s3_bucket.hrl").
 -include("leo_s3_user.hrl").
+-include("leo_s3_libs.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -export([start/2, create_bucket_table/2, is_valid_bucket/1,
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
          find_all_including_owner/0,
          put/2, put/3, delete/2, head/2, head/4]).
-
--define(BUCKET_DB_TYPE,   leo_s3_bucket_db).
--define(BUCKET_INFO,      leo_s3_bucket_info).
--define(BUCKET_TABLE,     leo_s3_buckets).
--define(DEF_REQ_TIMEOUT,  30000).
 
 -ifdef(EUNIT).
 -define(NOW, 0).

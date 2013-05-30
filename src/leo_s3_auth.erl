@@ -38,8 +38,6 @@
          authenticate/3, get_signature/2
         ]).
 
--define(AUTH_INFO,  leo_s3_auth_info).
--define(AUTH_TABLE, leo_s3_credentials).
 
 -record(auth_params, {access_key_id     :: binary(),
                       secret_access_key :: binary(),
@@ -47,7 +45,6 @@
                       sign_params       :: #sign_params{},
                       auth_info         :: #auth_info{}
                      }).
-
 
 %%--------------------------------------------------------------------
 %% API

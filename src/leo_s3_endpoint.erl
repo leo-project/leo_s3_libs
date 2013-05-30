@@ -35,10 +35,6 @@
          set_endpoint/1, get_endpoints/0, delete_endpoint/1
         ]).
 
--define(ENDPOINT_INFO,  leo_s3_endpoint_info).
--define(ENDPOINT_TABLE, leo_s3_endpoints).
-
-
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
@@ -62,7 +58,6 @@ start(master = Type,_Provider) ->
     catch ets:new(?ENDPOINT_INFO,  [named_table, ordered_set, public, {read_concurrency, true}]),
     ok = setup(Type, mnesia, []),
     ok.
-
 
 %% @doc Create endpoint table(mnesia)
 %%

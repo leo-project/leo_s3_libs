@@ -28,7 +28,7 @@
 
 -include_lib("eunit/include/eunit.hrl").
 
--export([start/1, start/2]).
+-export([start/1, start/2, update_providers/1]).
 
 
 %%--------------------------------------------------------------------
@@ -59,6 +59,15 @@ start(master = Type, _Options) ->
     ok = start_1(Type, Provider),
     ok.
 
+%% @doc update_providers(slave only)
+%%
+-spec(update_providers(list()) ->
+             ok).
+update_providers(Provider) ->
+    ok = leo_s3_auth:update_providers(Provider),
+    ok = leo_s3_bucket:update_providers(Provider),
+    ok = leo_s3_endpoint:update_providers(Provider),
+    ok.
 
 %%--------------------------------------------------------------------
 %% INNER FUNCTION

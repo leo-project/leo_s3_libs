@@ -32,6 +32,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -export([start/2,  create_endpoint_table/2,
+         update_providers/1,
          set_endpoint/1, get_endpoints/0, delete_endpoint/1
         ]).
 
@@ -57,6 +58,16 @@ start(slave = Type, Provider) ->
 start(master = Type,_Provider) ->
     catch ets:new(?ENDPOINT_INFO,  [named_table, ordered_set, public, {read_concurrency, true}]),
     ok = setup(Type, mnesia, []),
+    ok.
+
+%% @doc update_providers(slave only)
+%%
+-spec(update_providers(list()) ->
+             ok).
+update_providers(Provider) ->
+    true = ets:insert(?ENDPOINT_INFO, {1, #endpoint_info{type = slave,
+                                                         db   = ets,
+                                                         provider = Provider}}),
     ok.
 
 %% @doc Create endpoint table(mnesia)

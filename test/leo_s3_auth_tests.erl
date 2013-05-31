@@ -214,6 +214,10 @@ ets_suite_(_) ->
 
     {error,unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams, false),
 
+    %% update_providers
+    Manager2 = list_to_atom("manager_2@" ++ Hostname),
+    ok = leo_s3_auth:update_providers([Manager2]),
+
     %% teardown
     slave:stop(Manager1),
     net_kernel:stop(),

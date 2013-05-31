@@ -33,6 +33,7 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -export([start/2, create_bucket_table/2, is_valid_bucket/1,
+         update_providers/1,
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
          find_all_including_owner/0,
          put/2, put/3, delete/2, head/2, head/4]).
@@ -67,6 +68,15 @@ start(master = Type, _Options) ->
     ok = setup(Type, mnesia, []),
     ok.
 
+%% @doc update_providers(slave only)
+%%
+-spec(update_providers(list()) ->
+             ok).
+update_providers(Provider) ->
+    true = ets:insert(?BUCKET_INFO, {1, #bucket_info{type = slave,
+                                                     db   = ets,
+                                                     provider = Provider}}),
+    ok.
 
 %% Create bucket table(mnesia)
 %%

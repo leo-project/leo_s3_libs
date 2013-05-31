@@ -23,7 +23,9 @@
 %% @doc
 %% @end
 %%======================================================================
+-ifndef(DEF_REQ_TIMEOUT).
 -define(DEF_REQ_TIMEOUT, 30000).
+-endif.
 
 -define(ENDPOINT_INFO,  leo_s3_endpoint_info).
 -define(ENDPOINT_TABLE, leo_s3_endpoints).

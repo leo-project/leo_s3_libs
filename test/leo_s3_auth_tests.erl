@@ -383,7 +383,7 @@ authenticate_4_(_) ->
                               bucket       = <<"johnsmith">>,
                               uri          = <<"/photos/puppy.jpg">>,
                               amz_headers  = [
-                                  {"x-amz-date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
+                                              {"x-amz-date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"R4dJ53KECjStyBO5iTBJZ4XVOaI=">>, Ret),

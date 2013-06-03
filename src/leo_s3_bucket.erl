@@ -448,14 +448,14 @@ is_valid_bucket([$.|T], _LastChar, LastLabel, true) ->
     end;
 is_valid_bucket([H|T], _LastChar, LastLabel, OnlyDigit) when (H >= $a andalso H =< $z) orelse
                                                              (H >= $0 andalso H =< $9) orelse
-                                                              H == $- ->
+                                                             H == $- ->
     is_valid_bucket(T, H, LastLabel ++ [H], OnlyDigit);
 is_valid_bucket([_|_], _LastChar, _LastLabel, _OnlyDigit) ->
     {error, badarg}.
 
 
 cast_binary_to_str(Bucket) ->
-   case is_binary(Bucket) of
-       true  -> binary_to_list(Bucket);
-       false -> Bucket
-   end.
+    case is_binary(Bucket) of
+        true  -> binary_to_list(Bucket);
+        false -> Bucket
+    end.

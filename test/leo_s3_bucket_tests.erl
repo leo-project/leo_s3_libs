@@ -263,6 +263,9 @@ ets_suite_(_) ->
     not_found = leo_s3_bucket:head(?ACCESS_KEY_0, ?Bucket4),
     ?debugVal(ets:tab2list('leo_s3_buckets')),
 
+    %% update_providers
+    Manager2 = list_to_atom("manager_2@" ++ Hostname),
+    ok = leo_s3_bucket:update_providers([Manager2]),
 
     %% teardown
     slave:stop(Manager1),

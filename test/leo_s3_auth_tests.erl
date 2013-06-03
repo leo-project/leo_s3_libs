@@ -214,6 +214,10 @@ ets_suite_(_) ->
 
     {error,unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams, false),
 
+    %% update_providers
+    Manager2 = list_to_atom("manager_2@" ++ Hostname),
+    ok = leo_s3_auth:update_providers([Manager2]),
+
     %% teardown
     slave:stop(Manager1),
     net_kernel:stop(),
@@ -379,7 +383,7 @@ authenticate_4_(_) ->
                               bucket       = <<"johnsmith">>,
                               uri          = <<"/photos/puppy.jpg">>,
                               amz_headers  = [
-                                  {"x-amz-date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
+                                              {"x-amz-date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"R4dJ53KECjStyBO5iTBJZ4XVOaI=">>, Ret),

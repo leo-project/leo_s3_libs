@@ -107,6 +107,10 @@ ets_suite_(_) ->
     {ok, EndPoints1} = leo_s3_endpoint:get_endpoints(),
     ?assertEqual(1, length(EndPoints1)),
 
+    %% update_providers
+    Manager2 = list_to_atom("manager_2@" ++ Hostname),
+    ok = leo_s3_endpoint:update_providers([Manager2]),
+
 
     %% teardown
     slave:stop(Manager1),

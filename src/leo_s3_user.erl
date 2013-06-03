@@ -39,9 +39,6 @@
          get_credential_by_id/1, auth/2
         ]).
 
--define(USERS_TABLE,           leo_s3_users).
--define(USER_CREDENTIAL_TABLE, leo_s3_user_credential).
-
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------

@@ -29,17 +29,14 @@
 
 -include("leo_s3_bucket.hrl").
 -include("leo_s3_user.hrl").
+-include("leo_s3_libs.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -export([start/2, create_bucket_table/2, is_valid_bucket/1,
+         update_providers/1,
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
          find_all_including_owner/0,
          put/2, put/3, delete/2, head/2, head/4]).
-
--define(BUCKET_DB_TYPE,   leo_s3_bucket_db).
--define(BUCKET_INFO,      leo_s3_bucket_info).
--define(BUCKET_TABLE,     leo_s3_buckets).
--define(DEF_REQ_TIMEOUT,  30000).
 
 -ifdef(EUNIT).
 -define(NOW, 0).
@@ -71,6 +68,15 @@ start(master = Type, _Options) ->
     ok = setup(Type, mnesia, []),
     ok.
 
+%% @doc update_providers(slave only)
+%%
+-spec(update_providers(list()) ->
+             ok).
+update_providers(Provider) ->
+    true = ets:insert(?BUCKET_INFO, {1, #bucket_info{type = slave,
+                                                     db   = ets,
+                                                     provider = Provider}}),
+    ok.
 
 %% Create bucket table(mnesia)
 %%
@@ -442,14 +448,14 @@ is_valid_bucket([$.|T], _LastChar, LastLabel, true) ->
     end;
 is_valid_bucket([H|T], _LastChar, LastLabel, OnlyDigit) when (H >= $a andalso H =< $z) orelse
                                                              (H >= $0 andalso H =< $9) orelse
-                                                              H == $- ->
+                                                             H == $- ->
     is_valid_bucket(T, H, LastLabel ++ [H], OnlyDigit);
 is_valid_bucket([_|_], _LastChar, _LastLabel, _OnlyDigit) ->
     {error, badarg}.
 
 
 cast_binary_to_str(Bucket) ->
-   case is_binary(Bucket) of
-       true  -> binary_to_list(Bucket);
-       false -> Bucket
-   end.
+    case is_binary(Bucket) of
+        true  -> binary_to_list(Bucket);
+        false -> Bucket
+    end.

@@ -32,12 +32,9 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -export([start/2,  create_endpoint_table/2,
+         update_providers/1,
          set_endpoint/1, get_endpoints/0, delete_endpoint/1
         ]).
-
--define(ENDPOINT_INFO,  leo_s3_endpoint_info).
--define(ENDPOINT_TABLE, leo_s3_endpoints).
-
 
 %%--------------------------------------------------------------------
 %% API
@@ -63,6 +60,15 @@ start(master = Type,_Provider) ->
     ok = setup(Type, mnesia, []),
     ok.
 
+%% @doc update_providers(slave only)
+%%
+-spec(update_providers(list()) ->
+             ok).
+update_providers(Provider) ->
+    true = ets:insert(?ENDPOINT_INFO, {1, #endpoint_info{type = slave,
+                                                         db   = ets,
+                                                         provider = Provider}}),
+    ok.
 
 %% @doc Create endpoint table(mnesia)
 %%

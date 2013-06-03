@@ -34,12 +34,11 @@
 -include_lib("stdlib/include/qlc.hrl").
 
 -export([start/2, create_credential_table/2,
+         update_providers/1,
          create_key/1, get_credential/1, has_credential/1, has_credential/2,
          authenticate/3, get_signature/2
         ]).
 
--define(AUTH_INFO,  leo_s3_auth_info).
--define(AUTH_TABLE, leo_s3_credentials).
 
 -record(auth_params, {access_key_id     :: binary(),
                       secret_access_key :: binary(),
@@ -47,7 +46,6 @@
                       sign_params       :: #sign_params{},
                       auth_info         :: #auth_info{}
                      }).
-
 
 %%--------------------------------------------------------------------
 %% API
@@ -73,6 +71,14 @@ start(master, Provider) ->
     ok = setup(mnesia, Provider),
     ok.
 
+%% @doc update_providers(slave only)
+%%
+-spec(update_providers(list()) ->
+             ok).
+update_providers(Provider) ->
+    true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = ets,
+                                                 provider = Provider}}),
+    ok.
 
 %% @doc Create credential table(mnesia)
 %%

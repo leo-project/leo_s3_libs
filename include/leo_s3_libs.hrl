@@ -23,5 +23,16 @@
 %% @doc
 %% @end
 %%======================================================================
+-ifndef(DEF_REQ_TIMEOUT).
 -define(DEF_REQ_TIMEOUT, 30000).
+-endif.
 
+-define(ENDPOINT_INFO,  leo_s3_endpoint_info).
+-define(ENDPOINT_TABLE, leo_s3_endpoints).
+-define(AUTH_INFO,  leo_s3_auth_info).
+-define(AUTH_TABLE, leo_s3_credentials).
+-define(BUCKET_DB_TYPE,   leo_s3_bucket_db).
+-define(BUCKET_INFO,      leo_s3_bucket_info).
+-define(BUCKET_TABLE,     leo_s3_buckets).
+-define(USERS_TABLE,           leo_s3_users).
+-define(USER_CREDENTIAL_TABLE, leo_s3_user_credential).

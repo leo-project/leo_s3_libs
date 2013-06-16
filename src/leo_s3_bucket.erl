@@ -426,7 +426,7 @@ is_valid_bucket(Bucket) when is_list(Bucket), length(Bucket) > 62 ->
 is_valid_bucket([$.|_]) ->
     {error, badarg};
 is_valid_bucket([H|T]) ->
-    is_valid_bucket(T, H, [], true).
+    is_valid_bucket(T, H, [H], true).
 
 is_valid_bucket([], LastChar, _LastLabel, _OnlyDigit) when LastChar == $. ->
     {error, badarg};

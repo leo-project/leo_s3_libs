@@ -48,6 +48,7 @@
 -define(Bucket6, <<"bucket6">>).
 -define(Bucket7, <<"bucket7">>).
 -define(Bucket8, <<"bucket8">>).
+-define(Bucket9, <<"b01012013">>). %% https://github.com/leo-project/leofs/issues/75
 -define(BucketTooShort, <<"sh">>).
 -define(BucketTooLong,       <<"012345678901234567890123456789012345678901234567890123456789012">>).
 -define(BucketInvalidStart,  <<".myawsbucket">>).
@@ -146,6 +147,8 @@ mnesia_suite_(_) ->
     {ok, Buckets1} = leo_s3_bucket:find_all(),
     ?assertEqual(true, length(Buckets0) == length(Buckets1)),
 
+    %% https://github.com/leo-project/leofs/issues/75
+    ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket9),
 
     application:stop(mnesia),
     timer:sleep(250),

@@ -339,8 +339,8 @@ auth(UserId, PW0) ->
              binary()).
 hash_and_salt_password(Password, CreatedAt) ->
     Salt = list_to_binary(leo_hex:integer_to_hex(CreatedAt, 8)),
-    Context1 = crypto:md5_init(),
-    Context2 = crypto:md5_update(Context1, Password),
-    Context3 = crypto:md5_update(Context2, Salt),
-    crypto:md5_final(Context3).
+    Context1 = crypto:hash_init(md5),
+    Context2 = crypto:hash_update(Context1, Password),
+    Context3 = crypto:hash_update(Context2, Salt),
+    crypto:hash_final(Context3).
 

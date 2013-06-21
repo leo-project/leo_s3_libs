@@ -116,9 +116,9 @@ create_key(UserId) ->
         {ok, #auth_info{db = mnesia}} ->
             Digest0 = list_to_binary(string:sub_string(
                                        leo_hex:binary_to_hex(
-                                         crypto:sha(term_to_binary({UserId, Clock}))),1,20)),
+                                         crypto:hash(sha, term_to_binary({UserId, Clock}))),1,20)),
             Digest1 = list_to_binary(leo_hex:binary_to_hex(
-                                       crypto:sha(
+                                       crypto:hash(sha,
                                          list_to_binary(lists:append([UserId,"/",Clock]))))),
             create_key1(UserId, Digest0, Digest1);
         [] ->
@@ -224,8 +224,10 @@ get_signature(SecretAccessKey, SignParams) ->
                   Date1/binary,       "\n",
                   Sub0/binary, Bucket1/binary, URI1/binary, Sub1/binary>>,
     %% ?debugVal(binary_to_list(BinToSign)),
-    Signature = base64:encode(
-                  crypto:sha_mac(SecretAccessKey, BinToSign)),
+    Context = crypto:hmac_init(sha, SecretAccessKey),
+    Context2 = crypto:hmac_update(Context, BinToSign),
+    Mac = crypto:hmac_final(Context2),
+    Signature = base64:encode(Mac),
     %% ?debugVal(Signature),
     Signature.
 

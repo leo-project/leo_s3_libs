@@ -37,6 +37,7 @@
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
          find_all_including_owner/0,
          get_acls/2, update_acls/3,
+         update_acls2private/2, update_acls2public_read/2, update_acls2public_read_write/2, update_acls2authenticated_read/2,
          put/2, put/3, delete/2, head/2, head/4]).
 
 -ifdef(EUNIT).
@@ -302,6 +303,20 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
         Error ->
             Error
     end.
+
+% API for canned acl
+update_acls2private(AccessKey, Bucket) ->
+    ACLs = [],
+    update_acls(AccessKey, Bucket, ACLs).
+update_acls2public_read(AccessKey, Bucket) ->
+    ACLs = [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, permissions = [read]}],
+    update_acls(AccessKey, Bucket, ACLs).
+update_acls2public_read_write(AccessKey, Bucket) ->
+    ACLs = [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, permissions = [read, write]}],
+    update_acls(AccessKey, Bucket, ACLs).
+update_acls2authenticated_read(AccessKey, Bucket) ->
+    ACLs = [#bucket_acl_info{user_id = ?GRANTEE_AUTHENTICATED_USER, permissions = [read]}],
+    update_acls(AccessKey, Bucket, ACLs).
 
 -spec(get_acls(binary(), binary()) ->
         {ok, acls() }| not_found | {error, forbidden} | {error, any()}).

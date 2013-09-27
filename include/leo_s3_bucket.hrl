@@ -23,6 +23,11 @@
 %% @doc
 %% @end
 %%======================================================================
+
+% predefined users
+-define(GRANTEE_ALL_USER, <<"http://acs.amazonaws.com/groups/global/AllUsers">>).
+-define(GRANTEE_AUTHENTICATED_USER, <<"http://acs.amazonaws.com/groups/global/AuthenticatedUsers">>).
+
 -type permission()  :: read|write|read_acp|write_acp|full_control.
 -type permissions() :: [permission()].
 

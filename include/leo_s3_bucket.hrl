@@ -32,8 +32,8 @@
 -type permissions() :: [permission()].
 
 -record(bucket_acl_info, {
-          user_id       :: string(),      %% correspond with user table's user_id
-          permissions   :: permissions()  %% permissions
+          user_id          :: string(),      %% correspond with user table's user_id
+          permissions = [] :: permissions()  %% permissions
          }).
 
 -type acls() :: [#bucket_acl_info{}].
@@ -41,7 +41,7 @@
 -record(bucket, {
           name          :: string(), %% bucket name
           access_key    :: string(), %% access key
-          acls          :: acls(),   %% acl list
+          acls = []     :: acls(),   %% acl list
           created_at =0 :: integer() %% create date and time
          }).
 

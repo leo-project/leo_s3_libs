@@ -101,7 +101,7 @@ mnesia_suite_(_) ->
     {ok, Ret0} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
     ?assertEqual(5, length(Ret0)),
 
-    Checksum = 2238681728,
+    Checksum = 3289288953,
     Checksum = erlang:crc32(term_to_binary(Ret0)),
 
     {ok, Ret1} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
@@ -198,7 +198,7 @@ ets_suite_(_) ->
     ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket6),
 
     {ok, Ret0} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
-    2238681728 = erlang:crc32(term_to_binary(Ret0)),
+    3289288953 = erlang:crc32(term_to_binary(Ret0)),
 
     {ok, Ret1} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
     ?assertEqual(2, length(Ret1)),

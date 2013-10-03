@@ -216,9 +216,12 @@ put(AccessKey, Bucket, DB) ->
             BucketStr = cast_binary_to_str(Bucket),
             case is_valid_bucket(BucketStr) of
                 ok ->
+                    % ACL is set to private(default)
+                    ACLs = [#bucket_acl_info{user_id = AccessKey, permissions = [full_control]}],
                     leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
                                                       #bucket{name       = Bucket,
                                                               access_key = AccessKey,
+                                                              acls       = ACLs,
                                                               created_at = ?NOW});
                 Error ->
                     Error
@@ -306,7 +309,7 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
 
 % API for canned acl
 update_acls2private(AccessKey, Bucket) ->
-    ACLs = [],
+    ACLs = [#bucket_acl_info{user_id = AccessKey, permissions = [full_control]}],
     update_acls(AccessKey, Bucket, ACLs).
 update_acls2public_read(AccessKey, Bucket) ->
     ACLs = [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, permissions = [read]}],

@@ -42,11 +42,13 @@
           name          :: string(), %% bucket name
           access_key    :: string(), %% access key
           acls = []     :: acls(),   %% acl list
-          created_at =0 :: integer() %% create date and time
+          last_synced_at = 0 :: integer(), %% last synced date and time
+          created_at     = 0 :: integer() %% create date and time
          }).
 
 -record(bucket_info, {
           type          :: atom(), %% [master | slave]
           db            :: atom(), %% db-type:[ets | mnesia]
-          provider = [] :: list()  %% auth-info provides
+          provider = [] :: list(), %% auth-info provides
+          sync_interval :: pos_integer() %% interval to use syncing local records with manager's 
          }).

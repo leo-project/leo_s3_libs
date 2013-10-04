@@ -31,7 +31,7 @@
 -include_lib("stdlib/include/qlc.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([lookup/2, find_by_name/3, find_all/1, insert/2, delete/2, size/1]).
+-export([lookup/2, find_by_name/3, find_by_name/4, find_all/1, insert/2, delete/2, size/1]).
 
 
 %% Retrieve a record by key from the table.
@@ -60,12 +60,16 @@ lookup({ets, Table}, AccessKey0) ->
             {ok, lists:sort(Ret)}
     end.
 
-
 %% @doc Retrieve a record by name
 %%
 -spec(find_by_name({mnesia|ets, atom()}, string(), string()) ->
              {ok, list()} | {error, any()}).
-find_by_name({mnesia, Table}, AccessKey0, Name) ->
+find_by_name(Provider, AccessKey0, Name) ->
+    find_by_name(Provider, AccessKey0, Name, true).
+
+-spec(find_by_name({mnesia|ets, atom()}, string(), string(), boolean()) ->
+             {ok, list()} | {error, any()}).
+find_by_name({mnesia, Table}, AccessKey0, Name, NeedAccessKey) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table),
                                    X#bucket.name =:= Name]),
@@ -73,7 +77,7 @@ find_by_name({mnesia, Table}, AccessKey0, Name) ->
                   qlc:e(Q2)
           end,
     case leo_mnesia:read(Fun) of
-        {ok, [#bucket{access_key = AccessKey1} = H|_]} when AccessKey0 == AccessKey1 ->
+        {ok, [#bucket{access_key = AccessKey1} = H|_]} when NeedAccessKey == false orelse AccessKey0 == AccessKey1 ->
             {ok, H};
         {ok, _} ->
             {error, forbidden};
@@ -81,13 +85,13 @@ find_by_name({mnesia, Table}, AccessKey0, Name) ->
             Other
     end;
 
-find_by_name({ets, Table}, AccessKey0, Name0) ->
+find_by_name({ets, Table}, AccessKey0, Name0, NeedAccessKey) ->
     case catch ets:lookup(Table, Name0) of
         {'EXIT', Cause} ->
             {error, Cause};
         [] ->
             not_found;
-        [{_, #bucket{access_key = AccessKey1} = Value}|_] when AccessKey0 == AccessKey1 ->
+        [{_, #bucket{access_key = AccessKey1} = Value}|_] when NeedAccessKey == false orelse AccessKey0 == AccessKey1 ->
             {ok, Value};
         _ ->
             {error, forbidden}

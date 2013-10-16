@@ -41,12 +41,6 @@
          update_acls2private/2, update_acls2public_read/2, update_acls2public_read_write/2, update_acls2authenticated_read/2,
          put/2, put/3, delete/2, head/2, head/4]).
 
--ifdef(EUNIT).
--define(NOW, 0).
--else.
--define(NOW, leo_date:now()).
--endif.
-
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
@@ -154,17 +148,17 @@ find_bucket_by_name(Bucket) ->
             Error
     end.
 
--spec(find_bucket_by_name(binary(), string()) ->
+-spec(find_bucket_by_name(binary(), integer()) ->
              {ok, #bucket{}} | {ok, match} | {error, any()}).
-find_bucket_by_name(Bucket, Checksum0) ->
+find_bucket_by_name(Bucket, LastModifiedAt) ->
     case get_info() of
         {ok, #bucket_info{db = DB}} when DB == mnesia ->
             case find_bucket_by_name(Bucket) of
-                {ok, Value} ->
-                    case erlang:crc32(term_to_binary(Value)) of
-                        Checksum0 ->
+                {ok, #bucket{last_modified_at = OrgLastModifiedAt} = Value} ->
+                    case LastModifiedAt == OrgLastModifiedAt of
+                        true ->
                             {ok, match};
-                        _ ->
+                        false ->
                             {ok, Value}
                     end;
                 Error ->
@@ -197,12 +191,12 @@ find_all_including_owner() ->
         {ok, Buckets} ->
             Ret = lists:map(fun(#bucket{name       = Name,
                                         access_key = AccessKeyId,
-                                        created_at = CreatedAt}) ->
+                                        last_modified_at = LastModifiedAt}) ->
                                     Owner1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
                                                  {ok, Owner0} -> Owner0;
                                                  _ -> #user_credential{}
                                              end,
-                                    {Name, Owner1, CreatedAt}
+                                    {Name, Owner1, LastModifiedAt}
                             end, Buckets),
             case Ret of
                 [] -> not_found;
@@ -260,7 +254,7 @@ put(AccessKey, Bucket, DB) ->
                                                       #bucket{name       = Bucket,
                                                               access_key = AccessKey,
                                                               acls       = ACLs,
-                                                              created_at = ?NOW});
+                                                              last_modified_at = leo_date:now()});
                 Error ->
                     Error
             end;
@@ -340,7 +334,8 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
                                               #bucket{name       = Bucket,
                                                       access_key = AccessKey,
                                                       acls       = ACLs,
-                                                      created_at = ?NOW});
+                                                      last_synced_at = leo_date:now(),
+                                                      last_modified_at = leo_date:now()});
         Error ->
             Error
     end.
@@ -366,28 +361,24 @@ get_acls(Bucket) ->
         {ok, #bucket_info{db       = DB,
                           sync_interval = SyncInterval,
                           type     = Type}} ->
-            Now = ?NOW,
+            Now = leo_date:now(),
             case leo_s3_bucket_data_handler:find_by_name(
                     {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
                 {ok, #bucket{acls = ACLs, last_synced_at = LastSyncedAt} = _} when Now - LastSyncedAt < SyncInterval ->
                     % valid local record
                     {ok, ACLs};
-                {ok, #bucket{acls = ACLs, last_synced_at = _LastSyncedAt} = BucketVal} ->
+                {ok, #bucket{acls = _ACLs, last_synced_at = _LastSyncedAt} = _BucketVal} ->
                     % to be synced with manager's record
                     case find_bucket_by_name(Bucket) of
-                        {ok, #bucket{acls = ACLs} = _BucketVal} ->
-                            NewBucketVal = BucketVal#bucket{acls = ACLs, last_synced_at = ?NOW},
-                            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
-                            {ok, ACLs};
+                        {ok, #bucket{acls = NewACLs} = _NewBucketVal} ->
+                            {ok, NewACLs};
                         Error ->
                             Error
                     end;
                 not_found when Type == slave->
                     case find_bucket_by_name(Bucket) of
-                        {ok, #bucket{acls = ACLs} = BucketVal} ->
-                            NewBucketVal = BucketVal#bucket{last_synced_at = ?NOW},
-                            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
-                            {ok, ACLs};
+                        {ok, #bucket{acls = NewACLs} = _NewBucketVal} ->
+                            {ok, NewACLs};
                         Error ->
                             Error
                     end;
@@ -532,38 +523,45 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
 -spec(find_bucket_by_name_1(binary(), ets|mnesia, list()) ->
              {ok, list()} | {error, any()}).
 find_bucket_by_name_1(Bucket, DB, Providers) ->
-    {Value0, CRC} = case leo_s3_bucket_data_handler:find_by_name(
-                            {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
-                        {ok, Val} ->
-                            {Val, erlang:crc32(term_to_binary(Val))};
-                        _Other ->
-                            {[], -1}
-                    end,
+    Value0 = case leo_s3_bucket_data_handler:find_by_name(
+                     {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
+                 {ok, Val} ->
+                     Val;
+                 _Other ->
+                     []
+             end,
 
     Ret = lists:foldl(
             fun(Node, []) ->
-                    find_bucket_by_name_2(Bucket, DB, Node, Value0, CRC);
+                    find_bucket_by_name_2(Bucket, DB, Node, Value0);
                (Node, {error, _Cause}) ->
-                    find_bucket_by_name_2(Bucket, DB, Node, Value0, CRC);
+                    find_bucket_by_name_2(Bucket, DB, Node, Value0);
                (_Node, Acc) ->
                     Acc
             end, [], Providers),
     Ret.
 
--spec(find_bucket_by_name_2(binary(), ets|mnesia, atom(), list(), integer()) ->
+-spec(find_bucket_by_name_2(binary(), ets|mnesia, atom(), list()) ->
              {ok, list()} | {error, any()}).
-find_bucket_by_name_2(Bucket, DB, Node, Value0, CRC) ->
+find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
+    LastModifiedAt = case Value0 == [] of
+        true ->
+            0;
+        false ->
+            Value0#bucket.last_modified_at
+    end,
     RPCKey = rpc:async_call(Node, leo_s3_bucket, find_bucket_by_name,
-                            [Bucket, CRC]),
+                            [Bucket, LastModifiedAt]),
     Ret = case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
               {value, {ok, match}} when Value0 == [] ->
                   not_found;
               {value, {ok, match}} when Value0 /= [] ->
                   {ok, Value0};
               {value, {ok, Value1}} ->
+                  NewBucketVal = Value1#bucket{last_synced_at = leo_date:now()},
                   catch leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Value0),
-                  leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, Value1),
-                  {ok, Value1};
+                  leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
+                  {ok, NewBucketVal};
               {value, not_found} ->
                   not_found;
               {value, {error, Cause}} ->

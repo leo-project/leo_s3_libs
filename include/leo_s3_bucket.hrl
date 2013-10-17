@@ -43,6 +43,7 @@
           access_key    :: string(), %% access key
           acls = []     :: acls(),   %% acl list
           last_synced_at = 0 :: integer(), %% last synced date and time
+          created_at     = 0 :: integer(), %% created date and time
           last_modified_at = 0 :: integer() %% modified date and time
          }).
 

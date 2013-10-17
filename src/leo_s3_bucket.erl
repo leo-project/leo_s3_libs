@@ -191,12 +191,12 @@ find_all_including_owner() ->
         {ok, Buckets} ->
             Ret = lists:map(fun(#bucket{name       = Name,
                                         access_key = AccessKeyId,
-                                        last_modified_at = LastModifiedAt}) ->
+                                        created_at = CreatedAt}) ->
                                     Owner1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
                                                  {ok, Owner0} -> Owner0;
                                                  _ -> #user_credential{}
                                              end,
-                                    {Name, Owner1, LastModifiedAt}
+                                    {Name, Owner1, CreatedAt}
                             end, Buckets),
             case Ret of
                 [] -> not_found;
@@ -254,6 +254,7 @@ put(AccessKey, Bucket, DB) ->
                                                       #bucket{name       = Bucket,
                                                               access_key = AccessKey,
                                                               acls       = ACLs,
+                                                              created_at = leo_date:now(),
                                                               last_modified_at = leo_date:now()});
                 Error ->
                     Error

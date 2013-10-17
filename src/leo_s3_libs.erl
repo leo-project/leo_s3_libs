@@ -76,7 +76,8 @@ update_providers(Provider) ->
 %% @private
 start_1(Type, Provider) ->
     ok = leo_s3_auth:start(Type, Provider),
-    ok = leo_s3_bucket:start(Type, Provider),
+    % @todo to be configurable
+    ok = leo_s3_bucket:start(Type, Provider, 60),
     ok = leo_s3_endpoint:start(Type, Provider),
     ok.
 

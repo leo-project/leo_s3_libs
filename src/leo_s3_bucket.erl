@@ -32,26 +32,23 @@
 -include("leo_s3_libs.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([start/2, create_bucket_table/2, is_valid_bucket/1,
+-export([start/3, create_bucket_table/2, is_valid_bucket/1,
          update_providers/1,
+         find_bucket_by_name/1, find_bucket_by_name/2,
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
          find_all_including_owner/0,
+         get_acls/1, update_acls/3,
+         update_acls2private/2, update_acls2public_read/2, update_acls2public_read_write/2, update_acls2authenticated_read/2,
          put/2, put/3, delete/2, head/2, head/4]).
-
--ifdef(EUNIT).
--define(NOW, 0).
--else.
--define(NOW, leo_date:now()).
--endif.
 
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
 %% @doc Launch a lib
 %%
--spec(start(atom(), ets | mnesia) ->
+-spec(start(atom(), ets | mnesia, pos_integer()) ->
              ok).
-start(slave = Type, Provider) ->
+start(slave = Type, Provider, SyncInterval) ->
     catch ets:new(?BUCKET_TABLE, [named_table, ordered_set, public, {read_concurrency, true}]),
     catch ets:new(?BUCKET_INFO,  [named_table, set,         public, {read_concurrency, true}]),
 
@@ -59,13 +56,13 @@ start(slave = Type, Provider) ->
         [] ->
             void;
         _ ->
-            ok = setup(Type, ets, Provider)
+            ok = setup(Type, ets, Provider, SyncInterval)
     end,
     ok;
 
-start(master = Type, _Options) ->
+start(master = Type, _Provider, SyncInterval) ->
     catch ets:new(?BUCKET_INFO,  [named_table, set, public, {read_concurrency, true}]),
-    ok = setup(Type, mnesia, []),
+    ok = setup(Type, mnesia, [], SyncInterval),
     ok.
 
 %% @doc update_providers(slave only)
@@ -90,15 +87,9 @@ create_bucket_table(Mode, Nodes) ->
           [{Mode, Nodes},
            {type, set},
            {record_name, bucket},
-           {attributes, record_info(fields, bucket)},
-           {user_properties,
-            [{name,       {varchar, undefined}, false, primary,   undefined, identity,  varchar},
-             {access_key, {varchar, undefined}, false, undefined, undefined, undefined, varchar},
-             {created_at, {integer, undefined}, false, undefined, undefined, undefined, integer}
-            ]}
+           {attributes, record_info(fields, bucket)}
           ]),
     ok.
-
 
 %% @doc Retrieve buckets by AccessKey
 %%
@@ -141,6 +132,43 @@ find_buckets_by_id(AccessKey, Checksum0) ->
             Error
     end.
 
+-spec(find_bucket_by_name(binary()) ->
+    {ok, #bucket{}} | {error, any()}).
+find_bucket_by_name(Bucket) ->
+    case get_info() of
+        %% Retrieve value from local-mnesia.
+        {ok, #bucket_info{db = DB}} when DB == mnesia ->
+            leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, <<>>, Bucket, false);
+        %% Inquiry bucket-checksum to manager-nodes.
+        %% If local-checksum equal provider's checksum, then return local-list,
+        %% but local-checksum does NOT equal provider's checksum, then return provider's list.
+        {ok, #bucket_info{db = DB, provider = Provider}} when DB == ets ->
+            find_bucket_by_name_1(Bucket, DB, Provider);
+        Error ->
+            Error
+    end.
+
+-spec(find_bucket_by_name(binary(), integer()) ->
+             {ok, #bucket{}} | {ok, match} | {error, any()}).
+find_bucket_by_name(Bucket, LastModifiedAt) ->
+    case get_info() of
+        {ok, #bucket_info{db = DB}} when DB == mnesia ->
+            case find_bucket_by_name(Bucket) of
+                {ok, #bucket{last_modified_at = OrgLastModifiedAt} = Value} ->
+                    case LastModifiedAt == OrgLastModifiedAt of
+                        true ->
+                            {ok, match};
+                        false ->
+                            {ok, Value}
+                    end;
+                Error ->
+                    Error
+            end;
+        {ok, #bucket_info{db = DB}} when DB == ets ->
+            {error, ignored};
+        Error ->
+            Error
+    end.
 
 %% @doc Retrieve all buckets
 %%
@@ -153,7 +181,6 @@ find_all() ->
         Error ->
             Error
     end.
-
 
 %% @doc Retrieve all buckets and owner
 %%
@@ -191,7 +218,7 @@ put(AccessKey, Bucket) ->
                           provider = Provider}} ->
             case leo_s3_auth:has_credential(Provider, AccessKey) of
                 true ->
-                    case rpc_call(Provider, put, AccessKey, Bucket) of
+                    case rpc_call(Provider, put, [AccessKey, Bucket]) of
                         true ->
                             put(AccessKey, Bucket, DB);
                         false ->
@@ -221,10 +248,14 @@ put(AccessKey, Bucket, DB) ->
             BucketStr = cast_binary_to_str(Bucket),
             case is_valid_bucket(BucketStr) of
                 ok ->
+                    % ACL is set to private(default)
+                    ACLs = [#bucket_acl_info{user_id = AccessKey, permissions = [full_control]}],
                     leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
                                                       #bucket{name       = Bucket,
                                                               access_key = AccessKey,
-                                                              created_at = ?NOW});
+                                                              acls       = ACLs,
+                                                              created_at = leo_date:now(),
+                                                              last_modified_at = leo_date:now()});
                 Error ->
                     Error
             end;
@@ -242,7 +273,7 @@ delete(AccessKey, Bucket) ->
         {ok, #bucket_info{type = slave,
                           db   = DB,
                           provider = Provider}} ->
-            case rpc_call(Provider, delete, AccessKey, Bucket) of
+            case rpc_call(Provider, delete, [AccessKey, Bucket]) of
                 true ->
                     delete(AccessKey, Bucket, DB);
                 false ->
@@ -262,6 +293,102 @@ delete(AccessKey, Bucket, DB) ->
                                       #bucket{name = Bucket,
                                               access_key = AccessKey}).
 
+%% @doc ACL APIs
+%%
+-spec(update_acls(binary(), binary(), acls()) ->
+             ok | {error, any()}).
+update_acls(AccessKey, Bucket, ACLs) ->
+    case get_info() of
+        {ok, #bucket_info{type = slave,
+                          db   = DB,
+                          provider = Provider}} ->
+            case leo_s3_auth:has_credential(Provider, AccessKey) of
+                true ->
+                    case rpc_call(Provider, update_acls, [AccessKey, Bucket, ACLs]) of
+                        true ->
+                            update_acls(AccessKey, Bucket, ACLs, DB);
+                        false ->
+                            {error, not_stored}
+                    end;
+                false ->
+                    {error, invalid_access}
+            end;
+        {ok, #bucket_info{type = master, db = DB}} ->
+            case leo_s3_auth:has_credential(AccessKey) of
+                true ->
+                    update_acls(AccessKey, Bucket, ACLs, DB);
+                false ->
+                    {error, invalid_access}
+            end;
+        Error ->
+            Error
+    end.
+
+-spec(update_acls(binary(), binary(), acls(), ets | mnesia) ->
+             ok | {error, any()}).
+update_acls(AccessKey, Bucket, ACLs, DB) ->
+    BucketStr = cast_binary_to_str(Bucket),
+    % @todo impl is_valid_acls
+    case is_valid_bucket(BucketStr) of
+        ok ->
+            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
+                                              #bucket{name       = Bucket,
+                                                      access_key = AccessKey,
+                                                      acls       = ACLs,
+                                                      last_synced_at = leo_date:now(),
+                                                      last_modified_at = leo_date:now()});
+        Error ->
+            Error
+    end.
+
+% API for canned acl
+update_acls2private(AccessKey, Bucket) ->
+    ACLs = [#bucket_acl_info{user_id = AccessKey, permissions = [full_control]}],
+    update_acls(AccessKey, Bucket, ACLs).
+update_acls2public_read(AccessKey, Bucket) ->
+    ACLs = [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, permissions = [read]}],
+    update_acls(AccessKey, Bucket, ACLs).
+update_acls2public_read_write(AccessKey, Bucket) ->
+    ACLs = [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, permissions = [read, write]}],
+    update_acls(AccessKey, Bucket, ACLs).
+update_acls2authenticated_read(AccessKey, Bucket) ->
+    ACLs = [#bucket_acl_info{user_id = ?GRANTEE_AUTHENTICATED_USER, permissions = [read]}],
+    update_acls(AccessKey, Bucket, ACLs).
+
+-spec(get_acls(binary()) ->
+        {ok, acls() }| not_found | {error, forbidden} | {error, any()}).
+get_acls(Bucket) ->
+    case get_info() of
+        {ok, #bucket_info{db       = DB,
+                          sync_interval = SyncInterval,
+                          type     = Type}} ->
+            Now = leo_date:now(),
+            case leo_s3_bucket_data_handler:find_by_name(
+                    {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
+                {ok, #bucket{acls = ACLs, last_synced_at = LastSyncedAt} = _} when Now - LastSyncedAt < SyncInterval ->
+                    % valid local record
+                    {ok, ACLs};
+                {ok, #bucket{acls = _ACLs, last_synced_at = _LastSyncedAt} = _BucketVal} ->
+                    % to be synced with manager's record
+                    case find_bucket_by_name(Bucket) of
+                        {ok, #bucket{acls = NewACLs} = _NewBucketVal} ->
+                            {ok, NewACLs};
+                        Error ->
+                            Error
+                    end;
+                not_found when Type == slave->
+                    case find_bucket_by_name(Bucket) of
+                        {ok, #bucket{acls = NewACLs} = _NewBucketVal} ->
+                            {ok, NewACLs};
+                        Error ->
+                            Error
+                    end;
+                Other ->
+                    Other
+            end;
+        Error ->
+            Error
+    end.
 
 %% @doc Is exist a bucket into the db
 %%
@@ -306,12 +433,13 @@ head(AccessKey, Bucket, DB, Provider) ->
 %%--------------------------------------------------------------------
 %% @doc Setup
 %% @private
--spec(setup(master|slave, ets|mnesia, list()) ->
+-spec(setup(master|slave, ets|mnesia, list(), pos_integer()) ->
              ok).
-setup(Type, DB, Provider) ->
+setup(Type, DB, Provider, SyncInterval) ->
     true = ets:insert(?BUCKET_INFO, {1, #bucket_info{type = Type,
                                                      db   = DB,
-                                                     provider = Provider}}),
+                                                     provider = Provider,
+                                                     sync_interval= SyncInterval}}),
     ok.
 
 
@@ -391,15 +519,70 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
           end,
     Ret.
 
+%% @doc Retrieve buckets by name
+%% @private
+-spec(find_bucket_by_name_1(binary(), ets|mnesia, list()) ->
+             {ok, list()} | {error, any()}).
+find_bucket_by_name_1(Bucket, DB, Providers) ->
+    Value0 = case leo_s3_bucket_data_handler:find_by_name(
+                     {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
+                 {ok, Val} ->
+                     Val;
+                 _Other ->
+                     []
+             end,
+
+    Ret = lists:foldl(
+            fun(Node, []) ->
+                    find_bucket_by_name_2(Bucket, DB, Node, Value0);
+               (Node, {error, _Cause}) ->
+                    find_bucket_by_name_2(Bucket, DB, Node, Value0);
+               (_Node, Acc) ->
+                    Acc
+            end, [], Providers),
+    Ret.
+
+-spec(find_bucket_by_name_2(binary(), ets|mnesia, atom(), list()) ->
+             {ok, list()} | {error, any()}).
+find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
+    LastModifiedAt = case Value0 == [] of
+        true ->
+            0;
+        false ->
+            Value0#bucket.last_modified_at
+    end,
+    RPCKey = rpc:async_call(Node, leo_s3_bucket, find_bucket_by_name,
+                            [Bucket, LastModifiedAt]),
+    Ret = case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
+              {value, {ok, match}} when Value0 == [] ->
+                  not_found;
+              {value, {ok, match}} when Value0 /= [] ->
+                  {ok, Value0};
+              {value, {ok, Value1}} ->
+                  NewBucketVal = Value1#bucket{last_synced_at = leo_date:now()},
+                  catch leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Value0),
+                  leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
+                  {ok, NewBucketVal};
+              {value, not_found} ->
+                  not_found;
+              {value, {error, Cause}} ->
+                  {error, Cause};
+              {value, {badrpc, Cause}} ->
+                  {error, Cause};
+              {'EXIT', Cause} ->
+                  {error, Cause}
+          end,
+    Ret.
+
 
 %% @doc Communicate remote node(s)
 %% @private
--spec(rpc_call(list(), atom(), binary(), binary()) ->
+-spec(rpc_call(list(), atom(), list()) ->
              true | false).
-rpc_call(Provider, Function, AccessKey, Bucket) ->
+rpc_call(Provider, Function, Args) ->
     Ret = lists:foldl(
             fun(Node, false) ->
-                    RPCKey = rpc:async_call(Node, leo_s3_bucket, Function, [AccessKey, Bucket]),
+                    RPCKey = rpc:async_call(Node, leo_s3_bucket, Function, Args),
                     case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
                         {value, ok} -> true;
                         _Error      -> false

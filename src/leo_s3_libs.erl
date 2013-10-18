@@ -40,7 +40,7 @@
              ok).
 start(Type) ->
     _ = application:start(crypto),
-    ok = start_1(Type, []),
+    ok = start_1(Type, [], 60),
     ok.
 
 -spec(start(master | slave, list()) ->
@@ -49,14 +49,16 @@ start(slave = Type, Options) ->
     _ = application:start(crypto),
 
     Provider = leo_misc:get_value('provider', Options, []),
-    ok = start_1(Type, Provider),
+    SyncInterval = leo_misc:get_value('sync_interval', Options, 60),
+    ok = start_1(Type, Provider, SyncInterval),
     ok;
 
 start(master = Type, _Options) ->
     _ = application:start(crypto),
 
     Provider = [],
-    ok = start_1(Type, Provider),
+    SyncInterval = 60,
+    ok = start_1(Type, Provider, SyncInterval),
     ok.
 
 %% @doc update_providers(slave only)
@@ -74,9 +76,9 @@ update_providers(Provider) ->
 %%--------------------------------------------------------------------
 %% @doc Launch auth-lib, bucket-lib and endpoint-lib
 %% @private
-start_1(Type, Provider) ->
+start_1(Type, Provider, SyncInterval) ->
     ok = leo_s3_auth:start(Type, Provider),
-    ok = leo_s3_bucket:start(Type, Provider),
+    ok = leo_s3_bucket:start(Type, Provider, SyncInterval),
     ok = leo_s3_endpoint:start(Type, Provider),
     ok.
 

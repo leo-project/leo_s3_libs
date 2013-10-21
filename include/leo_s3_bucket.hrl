@@ -24,9 +24,16 @@
 %% @end
 %%======================================================================
 
-% predefined users
+%% predefined users
 -define(GRANTEE_ALL_USER, <<"http://acs.amazonaws.com/groups/global/AllUsers">>).
 -define(GRANTEE_AUTHENTICATED_USER, <<"http://acs.amazonaws.com/groups/global/AuthenticatedUsers">>).
+
+-ifdef(TEST).
+-define(DEF_BUCKET_PROP_SYNC_INTERVAL, 60).
+-else.
+-define(DEF_BUCKET_PROP_SYNC_INTERVAL, 300).
+-endif.
+
 
 -type permission()  :: read|write|read_acp|write_acp|full_control.
 -type permissions() :: [permission()].
@@ -42,14 +49,14 @@
           name          :: string(), %% bucket name
           access_key    :: string(), %% access key
           acls = []     :: acls(),   %% acl list
-          last_synced_at = 0 :: integer(), %% last synced date and time
-          created_at     = 0 :: integer(), %% created date and time
-          last_modified_at = 0 :: integer() %% modified date and time
+          last_synchroized_at = 0 :: integer(), %% last synchronized date and time
+          created_at          = 0 :: integer(), %% created date and time
+          last_modified_at    = 0 :: integer() %% modified date and time
          }).
 
 -record(bucket_info, {
           type          :: atom(), %% [master | slave]
           db            :: atom(), %% db-type:[ets | mnesia]
           provider = [] :: list(), %% auth-info provides
-          sync_interval :: pos_integer() %% interval in seconrd to use syncing local records with manager's 
+          sync_interval :: pos_integer() %% interval in seconrd to use syncing local records with manager's
          }).

@@ -26,6 +26,7 @@
 -module(leo_s3_libs).
 -author('Yosuke Hara').
 
+-include("leo_s3_bucket.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 -export([start/1, start/2, update_providers/1]).
@@ -40,7 +41,7 @@
              ok).
 start(Type) ->
     _ = application:start(crypto),
-    ok = start_1(Type, [], 60),
+    ok = start_1(Type, [], ?DEF_BUCKET_PROP_SYNC_INTERVAL),
     ok.
 
 -spec(start(master | slave, list()) ->
@@ -49,16 +50,17 @@ start(slave = Type, Options) ->
     _ = application:start(crypto),
 
     Provider = leo_misc:get_value('provider', Options, []),
-    SyncInterval = leo_misc:get_value('sync_interval', Options, 60),
-    ok = start_1(Type, Provider, SyncInterval),
+    BucketPropSyncInterval = leo_misc:get_value(
+                               'bucket_prop_sync_interval', Options,
+                               ?DEF_BUCKET_PROP_SYNC_INTERVAL),
+    ok = start_1(Type, Provider, BucketPropSyncInterval),
     ok;
 
 start(master = Type, _Options) ->
     _ = application:start(crypto),
 
-    Provider = [],
-    SyncInterval = 60,
-    ok = start_1(Type, Provider, SyncInterval),
+    BucketPropSyncInterval = ?DEF_BUCKET_PROP_SYNC_INTERVAL,
+    ok = start_1(Type, [], BucketPropSyncInterval),
     ok.
 
 %% @doc update_providers(slave only)
@@ -76,9 +78,9 @@ update_providers(Provider) ->
 %%--------------------------------------------------------------------
 %% @doc Launch auth-lib, bucket-lib and endpoint-lib
 %% @private
-start_1(Type, Provider, SyncInterval) ->
+start_1(Type, Provider, BucketPropSyncInterval) ->
     ok = leo_s3_auth:start(Type, Provider),
-    ok = leo_s3_bucket:start(Type, Provider, SyncInterval),
+    ok = leo_s3_bucket:start(Type, Provider, BucketPropSyncInterval),
     ok = leo_s3_endpoint:start(Type, Provider),
     ok.
 

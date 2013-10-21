@@ -77,7 +77,8 @@ find_by_name({mnesia, Table}, AccessKey0, Name, NeedAccessKey) ->
                   qlc:e(Q2)
           end,
     case leo_mnesia:read(Fun) of
-        {ok, [#bucket{access_key = AccessKey1} = H|_]} when NeedAccessKey == false orelse AccessKey0 == AccessKey1 ->
+        {ok, [#bucket{access_key = AccessKey1} = H|_]} when NeedAccessKey == false orelse
+                                                            AccessKey0 == AccessKey1 ->
             {ok, H};
         {ok, _} ->
             {error, forbidden};
@@ -91,7 +92,8 @@ find_by_name({ets, Table}, AccessKey0, Name0, NeedAccessKey) ->
             {error, Cause};
         [] ->
             not_found;
-        [{_, #bucket{access_key = AccessKey1} = Value}|_] when NeedAccessKey == false orelse AccessKey0 == AccessKey1 ->
+        [{_, #bucket{access_key = AccessKey1} = Value}|_] when NeedAccessKey == false orelse
+                                                               AccessKey0 == AccessKey1 ->
             {ok, Value};
         _ ->
             {error, forbidden}

@@ -38,7 +38,8 @@
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
          find_all_including_owner/0,
          get_acls/1, update_acls/3,
-         update_acls2private/2, update_acls2public_read/2, update_acls2public_read_write/2, update_acls2authenticated_read/2,
+         update_acls2private/2, update_acls2public_read/2,
+         update_acls2public_read_write/2, update_acls2authenticated_read/2,
          put/2, put/3, delete/2, head/2, head/4]).
 
 %%--------------------------------------------------------------------
@@ -65,6 +66,7 @@ start(master = Type, _Provider, SyncInterval) ->
     ok = setup(Type, mnesia, [], SyncInterval),
     ok.
 
+
 %% @doc update_providers(slave only)
 %%
 -spec(update_providers(list()) ->
@@ -74,6 +76,7 @@ update_providers(Provider) ->
                                                      db   = ets,
                                                      provider = Provider}}),
     ok.
+
 
 %% Create bucket table(mnesia)
 %%
@@ -90,6 +93,7 @@ create_bucket_table(Mode, Nodes) ->
            {attributes, record_info(fields, bucket)}
           ]),
     ok.
+
 
 %% @doc Retrieve buckets by AccessKey
 %%
@@ -132,8 +136,11 @@ find_buckets_by_id(AccessKey, Checksum0) ->
             Error
     end.
 
+
+%% @doc Retrieve a bucket by bucket-name
+%%
 -spec(find_bucket_by_name(binary()) ->
-    {ok, #bucket{}} | {error, any()}).
+             {ok, #bucket{}} | {error, any()}).
 find_bucket_by_name(Bucket) ->
     case get_info() of
         %% Retrieve value from local-mnesia.
@@ -170,6 +177,7 @@ find_bucket_by_name(Bucket, LastModifiedAt) ->
             Error
     end.
 
+
 %% @doc Retrieve all buckets
 %%
 -spec(find_all() ->
@@ -181,6 +189,7 @@ find_all() ->
         Error ->
             Error
     end.
+
 
 %% @doc Retrieve all buckets and owner
 %%
@@ -248,14 +257,16 @@ put(AccessKey, Bucket, DB) ->
             BucketStr = cast_binary_to_str(Bucket),
             case is_valid_bucket(BucketStr) of
                 ok ->
-                    % ACL is set to private(default)
-                    ACLs = [#bucket_acl_info{user_id = AccessKey, permissions = [full_control]}],
+                    %% ACL is set to private(default)
+                    ACLs = [#bucket_acl_info{user_id     = AccessKey,
+                                             permissions = [full_control]}],
+                    Now = leo_date:now(),
                     leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
                                                       #bucket{name       = Bucket,
                                                               access_key = AccessKey,
                                                               acls       = ACLs,
-                                                              created_at = leo_date:now(),
-                                                              last_modified_at = leo_date:now()});
+                                                              created_at = Now,
+                                                              last_modified_at = Now});
                 Error ->
                     Error
             end;
@@ -285,7 +296,6 @@ delete(AccessKey, Bucket) ->
             Error
     end.
 
-
 -spec(delete(binary(), binary(), ets | mnesia) ->
              ok | {error, any()}).
 delete(AccessKey, Bucket, DB) ->
@@ -293,7 +303,8 @@ delete(AccessKey, Bucket, DB) ->
                                       #bucket{name = Bucket,
                                               access_key = AccessKey}).
 
-%% @doc ACL APIs
+
+%% @doc update acls in a bukcet-property
 %%
 -spec(update_acls(binary(), binary(), acls()) ->
              ok | {error, any()}).
@@ -328,57 +339,88 @@ update_acls(AccessKey, Bucket, ACLs) ->
              ok | {error, any()}).
 update_acls(AccessKey, Bucket, ACLs, DB) ->
     BucketStr = cast_binary_to_str(Bucket),
-    % @todo impl is_valid_acls
     case is_valid_bucket(BucketStr) of
         ok ->
+            Now = leo_date:now(),
             leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
                                               #bucket{name       = Bucket,
                                                       access_key = AccessKey,
                                                       acls       = ACLs,
-                                                      last_synced_at = leo_date:now(),
-                                                      last_modified_at = leo_date:now()});
+                                                      last_synchroized_at = Now,
+                                                      last_modified_at    = Now});
         Error ->
             Error
     end.
 
-% API for canned acl
+
+%% @doc update acls to 'private'
+%%
+-spec(update_acls2private(binary(), #bucket{}) ->
+             ok | {error, any()}).
 update_acls2private(AccessKey, Bucket) ->
-    ACLs = [#bucket_acl_info{user_id = AccessKey, permissions = [full_control]}],
-    update_acls(AccessKey, Bucket, ACLs).
-update_acls2public_read(AccessKey, Bucket) ->
-    ACLs = [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, permissions = [read]}],
-    update_acls(AccessKey, Bucket, ACLs).
-update_acls2public_read_write(AccessKey, Bucket) ->
-    ACLs = [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, permissions = [read, write]}],
-    update_acls(AccessKey, Bucket, ACLs).
-update_acls2authenticated_read(AccessKey, Bucket) ->
-    ACLs = [#bucket_acl_info{user_id = ?GRANTEE_AUTHENTICATED_USER, permissions = [read]}],
+    ACLs = [#bucket_acl_info{user_id     = AccessKey,
+                             permissions = [full_control]}],
     update_acls(AccessKey, Bucket, ACLs).
 
+
+%% @doc update acls to 'public_read'
+%%
+-spec(update_acls2public_read(binary(), #bucket{}) ->
+             ok | {error, any()}).
+update_acls2public_read(AccessKey, Bucket) ->
+    ACLs = [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
+                             permissions = [read]}],
+    update_acls(AccessKey, Bucket, ACLs).
+
+
+%% @doc update acls to 'public_read_write'
+%%
+-spec(update_acls2public_read_write(binary(), #bucket{}) ->
+             ok | {error, any()}).
+update_acls2public_read_write(AccessKey, Bucket) ->
+    ACLs = [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
+                             permissions = [read, write]}],
+    update_acls(AccessKey, Bucket, ACLs).
+
+
+%% @doc update acls to 'authenticated_read'
+%%
+-spec(update_acls2authenticated_read(binary(), #bucket{}) ->
+             ok | {error, any()}).
+update_acls2authenticated_read(AccessKey, Bucket) ->
+    ACLs = [#bucket_acl_info{user_id     = ?GRANTEE_AUTHENTICATED_USER,
+                             permissions = [read]}],
+    update_acls(AccessKey, Bucket, ACLs).
+
+
+%% @doc Retrive acls by a bucket
+%%
 -spec(get_acls(binary()) ->
-        {ok, acls() }| not_found | {error, forbidden} | {error, any()}).
+             {ok, acls() }| not_found | {error, forbidden} | {error, any()}).
 get_acls(Bucket) ->
     case get_info() of
-        {ok, #bucket_info{db       = DB,
+        {ok, #bucket_info{db = DB,
                           sync_interval = SyncInterval,
-                          type     = Type}} ->
+                          type = Type}} ->
             Now = leo_date:now(),
             case leo_s3_bucket_data_handler:find_by_name(
-                    {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
-                {ok, #bucket{acls = ACLs, last_synced_at = LastSyncedAt} = _} when Now - LastSyncedAt < SyncInterval ->
-                    % valid local record
+                   {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
+                {ok, #bucket{acls = ACLs,
+                             last_synchroized_at = LastSynchronizedAt}}
+                  when (Now - LastSynchronizedAt) < SyncInterval ->
+                    %% valid local record
                     {ok, ACLs};
-                {ok, #bucket{acls = _ACLs, last_synced_at = _LastSyncedAt} = _BucketVal} ->
-                    % to be synced with manager's record
+                {ok, #bucket{acls = _ACLs}} ->
+                    %% to be synced with manager's record
                     case find_bucket_by_name(Bucket) of
-                        {ok, #bucket{acls = NewACLs} = _NewBucketVal} ->
+                        {ok, #bucket{acls = NewACLs}} ->
                             {ok, NewACLs};
                         Error ->
                             Error
                     end;
                 not_found when Type == slave->
                     case find_bucket_by_name(Bucket) of
-                        {ok, #bucket{acls = NewACLs} = _NewBucketVal} ->
+                        {ok, #bucket{acls = NewACLs}} ->
                             {ok, NewACLs};
                         Error ->
                             Error
@@ -389,6 +431,7 @@ get_acls(Bucket) ->
         Error ->
             Error
     end.
+
 
 %% @doc Is exist a bucket into the db
 %%
@@ -519,13 +562,14 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
           end,
     Ret.
 
+
 %% @doc Retrieve buckets by name
 %% @private
 -spec(find_bucket_by_name_1(binary(), ets|mnesia, list()) ->
              {ok, list()} | {error, any()}).
 find_bucket_by_name_1(Bucket, DB, Providers) ->
     Value0 = case leo_s3_bucket_data_handler:find_by_name(
-                     {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
+                    {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
                  {ok, Val} ->
                      Val;
                  _Other ->
@@ -546,11 +590,11 @@ find_bucket_by_name_1(Bucket, DB, Providers) ->
              {ok, list()} | {error, any()}).
 find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
     LastModifiedAt = case Value0 == [] of
-        true ->
-            0;
-        false ->
-            Value0#bucket.last_modified_at
-    end,
+                         true ->
+                             0;
+                         false ->
+                             Value0#bucket.last_modified_at
+                     end,
     RPCKey = rpc:async_call(Node, leo_s3_bucket, find_bucket_by_name,
                             [Bucket, LastModifiedAt]),
     Ret = case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
@@ -559,7 +603,7 @@ find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
               {value, {ok, match}} when Value0 /= [] ->
                   {ok, Value0};
               {value, {ok, Value1}} ->
-                  NewBucketVal = Value1#bucket{last_synced_at = leo_date:now()},
+                  NewBucketVal = Value1#bucket{last_synchroized_at = leo_date:now()},
                   catch leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Value0),
                   leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
                   {ok, NewBucketVal};
@@ -597,6 +641,7 @@ rpc_call(Provider, Function, Args) ->
 %% @private
 is_only_digits(String) ->
     [Char || Char <- String, Char < $0 orelse Char > $9] == [].
+
 
 %% @doc validate a bucket name
 %% @private
@@ -637,6 +682,8 @@ is_valid_bucket([_|_], _LastChar, _LastLabel, _OnlyDigit) ->
     {error, badarg}.
 
 
+%% @doc exchange value type from binary to string
+%% @private
 cast_binary_to_str(Bucket) ->
     case is_binary(Bucket) of
         true  -> binary_to_list(Bucket);

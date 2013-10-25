@@ -198,7 +198,7 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
 
 %% @doc Generate a signature.
 %% @private
--define(SUB_RESOURCES, [<<"?acl">>, <<"?location">>, <<"?logging">>, <<"?torrent">>]).
+-define(SUB_RESOURCES, [<<"acl">>, <<"location">>, <<"logging">>, <<"torrent">>, <<"versioning">>, <<"versionid">>]).
 
 -spec(get_signature(binary(), #sign_params{}) ->
              binary()).
@@ -427,7 +427,7 @@ auth_sub_resources(QueryStr) ->
     lists:foldl(fun(Param, <<>> = Acc) ->
                         case binary:match(QueryStr, Param) of
                             nomatch -> Acc;
-                            _ -> Param
+                            _ -> <<"?", Param/binary>>
                         end;
                    (_, Acc) ->
                         Acc

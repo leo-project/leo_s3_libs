@@ -48,7 +48,10 @@ auth_test_() ->
                            fun authenticate_4_/1,
                            fun authenticate_5_/1,
                            fun authenticate_6_/1,
-                           fun authenticate_7_/1
+                           fun authenticate_7_/1,
+                           fun authenticate_8_/1,
+                           fun authenticate_9_/1,
+                           fun authenticate_10_/1
                           ]]}.
 
 setup() ->
@@ -494,5 +497,102 @@ authenticate_7_(_) ->
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"DNEZGsoieTZ92F3bUfSPQcbGmlM=">>, Ret),
     ok.
+
+%% @doc Get an object with versionid
+authenticate_8_(_) ->
+    %% == PARAMS ==
+    %% GET /path/to/file?versionid=9 HTTP/1.1
+    %% User-Agent: Mozilla/5.0
+    %% Host: johnsmith.s3.amazonaws.com
+    %% Date: Tue, 27 Mar 2007 19:42:41 +0000
+    %%
+    %% Authorization: AWS AKIAIOSFODNN7EXAMPLE:
+    %% htDYFYduRNen8P9ZfE/s9SuKy0U=
+
+    %% == StringToSign ==
+    %% GET\n
+    %% \n
+    %% \n
+    %% Tue, 27 Mar 2007 19:42:41 +0000\n
+    %% /johnsmith/path/to/file?versionid=9
+
+    SignParams = #sign_params{http_verb    = <<"GET">>,
+                              content_md5  = <<>>,
+                              content_type = <<>>,
+                              date         = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
+                              bucket       = <<"johnsmith">>,
+                              uri          = <<"/path/to/file">>,
+                              query_str    = <<"?versionid=9">>
+                             },
+    Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
+    ?assertEqual(<<"ld6nhMmeUif8N/zae7DGfB5xYiI=">>, Ret),
+    ok.
+
+%% @doc Get an object ACL with versionid
+authenticate_9_(_) ->
+    %% == PARAMS ==
+    %% GET /path/to/file?versionid=9&acl HTTP/1.1
+    %% User-Agent: Mozilla/5.0
+    %% Host: johnsmith.s3.amazonaws.com
+    %% Date: Tue, 27 Mar 2007 19:42:41 +0000
+    %%
+    %% Authorization: AWS AKIAIOSFODNN7EXAMPLE:
+    %% htDYFYduRNen8P9ZfE/s9SuKy0U=
+
+    %% == StringToSign ==
+    %% GET\n
+    %% \n
+    %% \n
+    %% Tue, 27 Mar 2007 19:42:41 +0000\n
+    %% /johnsmith/path/to/file?acl&versionid=9
+
+    %% query params must be sorted lexicographically by param name
+    %% so in this example, acl must be appeared at first
+    SignParams = #sign_params{http_verb    = <<"GET">>,
+                              content_md5  = <<>>,
+                              content_type = <<>>,
+                              date         = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
+                              bucket       = <<"johnsmith">>,
+                              uri          = <<"/path/to/file">>,
+                              query_str    = <<"?acl&versionid=9">>
+                             },
+    Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
+    ?assertEqual(<<"b3zx5W2PwpsnI/raaZH7heh1NH0=">>, Ret),
+    ok.
+
+%% @doc Get an object with parameters overriding the response header values
+authenticate_10_(_) ->
+    %% == PARAMS ==
+    %% GET /path/to/file?response-cache-control=No-cache&response-content-disposition=attachment%3B%20filename%3Dtesting.txt&response-content-encoding=x-gzip&response-content-language=mi%2C%20en&response-expires=Thu%2C%2001%20Dec%201994%2016:00:00%20GMT
+    %% User-Agent: Mozilla/5.0
+    %% Host: johnsmith.s3.amazonaws.com
+    %% Date: Tue, 27 Mar 2007 19:42:41 +0000
+    %%
+    %% Authorization: AWS AKIAIOSFODNN7EXAMPLE:
+    %% htDYFYduRNen8P9ZfE/s9SuKy0U=
+
+    %% == StringToSign ==
+    %% GET\n
+    %% \n
+    %% \n
+    %% Tue, 27 Mar 2007 19:42:41 +0000\n
+    %% /johnsmith/path/to/file?response-cache-control=No-cache&response-content-disposition=attachment; filename=testing.txt&response-content-encoding=x-gzip&response-content-language=mi, en&response-expires=Thu, 01 Dec 1994 16:00:00 GMT
+
+    %% query params must be sorted lexicographically by param name
+    %% so in this example, acl must be appeared at first
+    %% AND query params must be URL decoded when signing
+    SignParams = #sign_params{http_verb    = <<"GET">>,
+                              content_md5  = <<>>,
+                              content_type = <<>>,
+                              date         = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
+                              bucket       = <<"johnsmith">>,
+                              uri          = <<"/path/to/file">>,
+                              query_str    = <<"?response-cache-control=No-cache&response-content-disposition=attachment%3B%20filename%3Dtesting.txt&response-content-encoding=x-gzip&response-content-language=mi%2C%20en&response-expires=Thu%2C%2001%20Dec%201994%2016:00:00%20GMT">>
+                             },
+    Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
+    ?assertEqual(<<"IjeV85YN0SCCw26yHd8DXCIvBjk=">>, Ret),
+    ok.
+
+
 
 -endif.

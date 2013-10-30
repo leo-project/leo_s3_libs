@@ -198,7 +198,7 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
 
 %% @doc Generate a signature.
 %% @private
--define(SUB_RESOURCES, [<<"acl">>, <<"location">>, <<"logging">>, <<"torrent">>, <<"versioning">>, <<"versionid">>]).
+-define(SUB_RESOURCES, [<<"acl">>, <<"lifecycle">>, <<"location">>, <<"logging">>, <<"notification">>, <<"partNumber">>, <<"policy">>, <<"requestPayment">>, <<"torrent">>, <<"uploadId">>, <<"uploads">>, <<"versionid">>, <<"versioning">>, <<"versions">>, <<"website">>, <<"response-content-type">>, <<"response-content-language">>, <<"response-expires">>, <<"response-cache-control">>, <<"response-content-disposition">>, <<"response-content-encoding">>]).
 
 -spec(get_signature(binary(), #sign_params{}) ->
              binary()).
@@ -423,13 +423,37 @@ auth_resources(CannonocalizedResources) ->
 
 %% @doc Retrieve sub-resources
 %% @private
+%% QueryStr must be sorted lexicographically by param name at caller
 auth_sub_resources(QueryStr) ->
-    lists:foldl(fun(Param, <<>> = Acc) ->
-                        case binary:match(QueryStr, Param) of
-                            nomatch -> Acc;
-                            _ -> <<"?", Param/binary>>
-                        end;
-                   (_, Acc) ->
-                        Acc
-                end, <<>>, ?SUB_RESOURCES).
+    ParamList = binary:split(QueryStr, [<<"?">>, <<"&">>], [global]),
+    lists:foldl(fun(<<>>, Acc) ->
+                       %% ignore empty elements 
+                       Acc;
+                   (Param, <<>>) ->
+                       %% append '?' to first param
+                       [Key|Rest] = binary:split(Param, <<"=">>),
+                       case binary:match(Key, ?SUB_RESOURCES) of
+                           nomatch -> <<>>;
+                           _ ->
+                               case Rest of
+                                   [] -> <<"?", Key/binary>>;
+                                   [Val|_] ->
+                                       DecodedVal = cowboy_http:urldecode(Val),
+                                       <<"?", Key/binary, "=", DecodedVal/binary>>
+                               end
+                       end;
+                   (Param, Acc) ->
+                       %% append '&' to other params
+                       [Key|Rest] = binary:split(Param, <<"=">>),
+                       case binary:match(Key, ?SUB_RESOURCES) of
+                           nomatch -> Acc;
+                           _ ->
+                               case Rest of
+                                   [] -> <<Acc/binary, "&", Key/binary>>;
+                                   [Val|_] ->
+                                       DecodedVal = cowboy_http:urldecode(Val),
+                                       <<Acc/binary, "&", Key/binary, "=", DecodedVal/binary>>
+                               end
+                       end
+                end, <<>>, ParamList).
 

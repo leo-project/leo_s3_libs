@@ -50,15 +50,19 @@
 -define(Bucket8, <<"bucket8">>).
 -define(Bucket9, <<"b01012013">>). %% https://github.com/leo-project/leofs/issues/75
 -define(BucketTooShort, <<"sh">>).
--define(BucketTooLong,       <<"012345678901234567890123456789012345678901234567890123456789012">>).
 -define(BucketInvalidStart,  <<".myawsbucket">>).
+-define(BucketInvalidStart2, <<"-myawsbucket">>).
+-define(BucketInvalidStart3, <<"_myawsbucket">>).
 -define(BucketInvalidEnd,    <<"myawsbucket.">>).
+-define(BucketInvalidEnd2,   <<"myawsbucket-">>).
+-define(BucketInvalidEnd3,   <<"myawsbucket_">>).
 -define(BucketInvalidLabel,  <<"my..examplebucket">>).
 -define(BucketInvalidIPAddr, <<"192.168.1.1">>).
 -define(BucketInvalidChar1,  <<"hogeHoge">>).
--define(BucketInvalidChar2,  <<"hoge_hoge">>).
 -define(BucketValid1,        <<"my.aws.bucket">>).
 -define(BucketValid2,        <<"wsbucket.1">>).
+-define(BucketValid3,        <<"ws-bucket.1">>).
+-define(BucketValid4,        <<"ws_bucket.1">>).
 
 bucket_test_() ->
     {foreach, fun setup/0, fun teardown/1,
@@ -127,16 +131,22 @@ mnesia_suite_(_) ->
 
     %% bucket name validations
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketTooShort),
-    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketTooLong),
+    BucketTooLong = lists:seq(1, 256),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, BucketTooLong),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidStart),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidStart2),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidStart3),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidEnd),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidEnd2),
+    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidEnd3),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidLabel),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidIPAddr),
     {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidChar1),
-    {error, badarg} = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketInvalidChar2),
 
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid1),
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid2),
+    ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid3),
+    ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid4),
 
     {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid1),
     {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid2),

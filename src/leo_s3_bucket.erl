@@ -649,14 +649,20 @@ is_only_digits(String) ->
              ok | {error, badarg}).
 is_valid_bucket(Bucket) when is_list(Bucket), length(Bucket) < 3 ->
     {error, badarg};
-is_valid_bucket(Bucket) when is_list(Bucket), length(Bucket) > 62 ->
+is_valid_bucket(Bucket) when is_list(Bucket), length(Bucket) > 255 ->
     {error, badarg};
 is_valid_bucket([$.|_]) ->
+    {error, badarg};
+is_valid_bucket([$-|_]) ->
+    {error, badarg};
+is_valid_bucket([$_|_]) ->
     {error, badarg};
 is_valid_bucket([H|T]) ->
     is_valid_bucket(T, H, [H], true).
 
-is_valid_bucket([], LastChar, _LastLabel, _OnlyDigit) when LastChar == $. ->
+is_valid_bucket([], LastChar, _LastLabel, _OnlyDigit) when LastChar == $. orelse
+                                                           LastChar == $- orelse
+                                                           LastChar == $_ ->
     {error, badarg};
 is_valid_bucket([], _LastChar, LastLabel, true) ->
     case is_only_digits(LastLabel) of
@@ -676,7 +682,8 @@ is_valid_bucket([$.|T], _LastChar, LastLabel, true) ->
     end;
 is_valid_bucket([H|T], _LastChar, LastLabel, OnlyDigit) when (H >= $a andalso H =< $z) orelse
                                                              (H >= $0 andalso H =< $9) orelse
-                                                             H == $- ->
+                                                              H == $- orelse
+                                                              H == $_ ->
     is_valid_bucket(T, H, LastLabel ++ [H], OnlyDigit);
 is_valid_bucket([_|_], _LastChar, _LastLabel, _OnlyDigit) ->
     {error, badarg}.

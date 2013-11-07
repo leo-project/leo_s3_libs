@@ -392,10 +392,43 @@ auth_uri(<<>>, URI) ->
 auth_uri(Bucket, URI) ->
     case binary:match(URI, Bucket) of
         {1, _} ->
-            SkipSize = size(Bucket) + 1,
-            binary:part(URI, {SkipSize, size(URI) - SkipSize});
+            BucketLen = byte_size(Bucket),
+            BucketThresholdLen1 = BucketLen + 1,
+            BucketThresholdLen2 = BucketLen + 2,
+            URILen = byte_size(URI),
+            case URILen of
+                BucketThresholdLen1 ->
+                    %% /${Bucket} pattern are should be removed
+                    remove_dup_bucket(Bucket, URI);
+                BucketThresholdLen2 ->
+                    <<"/", Bucket:BucketLen/binary, LastChar:8>> = URI,
+                    case LastChar == $/ of
+                        true ->
+                            %% /${Bucket}/ pattern are should be removed
+                            remove_dup_bucket(Bucket, URI);
+                        false ->
+                            %% ex. /${Bucket}.
+                            URI
+                    end;
+                _ ->
+                    SegmentLen = length(binary:split(URI, <<"/">>, [global])),
+                    case SegmentLen >= 3 of
+                        true ->
+                            %% ex. /${Bucket}/path_to_file
+                            remove_dup_bucket(Bucket, URI);
+                        false ->
+                            %% /${Bucket}[^/]+ pattern are should not be removed
+                            URI
+                    end
+            end;
         _ -> URI
     end.
+
+%% @doc remove duplicated bucket's name from path
+%% @private
+remove_dup_bucket(Bucket, URI) ->
+    SkipSize = size(Bucket) + 1,
+    binary:part(URI, {SkipSize, size(URI) - SkipSize}).
 
 %% @doc Retrieve resources
 %% @private
@@ -457,3 +490,12 @@ auth_sub_resources(QueryStr) ->
                        end
                 end, <<>>, ParamList).
 
+-ifdef(TEST).
+
+auth_uri_test() ->
+    <<"">> = auth_uri(<<"bbb">>, <<"/bbb">>),
+    <<"/">> = auth_uri(<<"bbb">>, <<"/bbb/">>),
+    <<"/bbb.txt">> = auth_uri(<<"bbb">>, <<"/bbb/bbb.txt">>),
+    <<"/bbb.txt">> = auth_uri(<<"bbb">>, <<"/bbb.txt">>).
+
+-endif.

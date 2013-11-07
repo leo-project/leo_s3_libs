@@ -387,6 +387,24 @@ auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 
 %% @doc Retrieve URI
 %% @private
+%%
+%% AWS-S3 spec have two kind of path styles(bucket in a subdomain or in a URI).
+%% We MUST get rid of a bucket part when the bucket is included in a URI.
+%% There are 5 patterns to be handled by this function
+%% Details are below.
+%% +-----------------+------------------------+-------------------+
+%% | Bucket          | URI                    | Expected          |
+%% +-----------------+------------------------+-------------------+
+%% | <<"bucket">>    | <<"/bucket">>          | <<"">>            |
+%% +-----------------+------------------------+-------------------+
+%% | <<"bucket">>    | <<"/bucket/">>         | <<"/">>           |
+%% +-----------------+------------------------+-------------------+
+%% | <<"bucket">>    | <<"/bucketa">>         | <<"/bucketa">>    |
+%% +-----------------+------------------------+-------------------+
+%% | <<"bucket">>    | <<"/bucket/path">>     | <<"/path">>       |
+%% +-----------------+------------------------+-------------------+
+%% | <<"bucket">>    | <<"/bucket.ext">>      | <<"/bucket.ext">> |
+%% +-----------------+------------------------+-------------------+
 auth_uri(<<>>, URI) ->
     URI;
 auth_uri(Bucket, URI) ->

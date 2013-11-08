@@ -48,11 +48,19 @@
 -record(bucket, {
           name          :: string(), %% bucket name
           access_key    :: string(), %% access key
+          created_at =0 :: integer() %% create date and time
+         }).
+
+-record(bucket_0_16_0, {
+          name          :: string(), %% bucket name
+          access_key    :: string(), %% access key
           acls = []     :: acls(),   %% acl list
           last_synchroized_at = 0 :: integer(), %% last synchronized date and time
           created_at          = 0 :: integer(), %% created date and time
           last_modified_at    = 0 :: integer() %% modified date and time
          }).
+
+-define(BUCKET, bucket_0_16_0).
 
 -record(bucket_info, {
           type          :: atom(), %% [master | slave]

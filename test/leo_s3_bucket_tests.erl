@@ -238,9 +238,9 @@ ets_suite_(_) ->
     ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_buckets_by_id,
                                            fun(_AccessKey, _Checksum) ->
-                                                   {ok, [#bucket{name = ?Bucket3, access_key = ?ACCESS_KEY_0},
-                                                         #bucket{name = ?Bucket7, access_key = ?ACCESS_KEY_0},
-                                                         #bucket{name = ?Bucket8, access_key = ?ACCESS_KEY_0}
+                                                   {ok, [#?BUCKET{name = ?Bucket3, access_key = ?ACCESS_KEY_0},
+                                                         #?BUCKET{name = ?Bucket7, access_key = ?ACCESS_KEY_0},
+                                                         #?BUCKET{name = ?Bucket8, access_key = ?ACCESS_KEY_0}
                                                         ]}
                                            end]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, put,
@@ -269,7 +269,7 @@ ets_suite_(_) ->
     ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, head,
                                            fun(_AccessKey, _Bucket, _Checksum) ->
-                                                   {ok, #bucket{name = ?Bucket3,
+                                                   {ok, #?BUCKET{name = ?Bucket3,
                                                                 access_key = ?ACCESS_KEY_0}}
                                            end]),
     ok = leo_s3_bucket:head(?ACCESS_KEY_0, ?Bucket3),
@@ -295,7 +295,7 @@ ets_suite_(_) ->
     ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_bucket_by_name,
                                            fun(_Bucket, _CRC) ->
-                                                   {ok, #bucket{name = ?Bucket0,
+                                                   {ok, #?BUCKET{name = ?Bucket0,
                                                                 access_key = ?ACCESS_KEY_0,
                                                                 acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0, permissions = [full_control]}]}}
                                            end]),
@@ -305,7 +305,7 @@ ets_suite_(_) ->
     %% local records to be refered
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_bucket_by_name,
                                            fun(_Bucket, _CRC) ->
-                                                   {ok, #bucket{name = ?Bucket0,
+                                                   {ok, #?BUCKET{name = ?Bucket0,
                                                                 access_key = ?ACCESS_KEY_0,
                                                                 acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0, permissions = [read]}]}}
                                            end]),

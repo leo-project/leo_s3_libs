@@ -119,7 +119,7 @@ create_key(UserId) ->
                                          crypto:hash(sha, term_to_binary({UserId, Clock}))),1,20)),
             Digest1 = list_to_binary(leo_hex:binary_to_hex(
                                        crypto:hash(sha,
-                                         list_to_binary(lists:append([UserId,"/",Clock]))))),
+                                                   list_to_binary(lists:append([UserId,"/",Clock]))))),
             create_key1(UserId, Digest0, Digest1);
         [] ->
             {error, not_initialized};
@@ -198,7 +198,7 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
 
 %% @doc Generate a signature.
 %% @private
--define(SUB_RESOURCES, [<<"?acl">>, <<"?location">>, <<"?logging">>, <<"?torrent">>]).
+-define(SUB_RESOURCES, [<<"acl">>, <<"lifecycle">>, <<"location">>, <<"logging">>, <<"notification">>, <<"partNumber">>, <<"policy">>, <<"requestPayment">>, <<"torrent">>, <<"uploadId">>, <<"uploads">>, <<"versionid">>, <<"versioning">>, <<"versions">>, <<"website">>, <<"response-content-type">>, <<"response-content-language">>, <<"response-expires">>, <<"response-cache-control">>, <<"response-content-disposition">>, <<"response-content-encoding">>]).
 
 -spec(get_signature(binary(), #sign_params{}) ->
              binary()).
@@ -387,15 +387,66 @@ auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 
 %% @doc Retrieve URI
 %% @private
+%%
+%% AWS-S3 spec have two kind of path styles(bucket in a subdomain or in a URI).
+%% We MUST get rid of a bucket part when the bucket is included in a URI.
+%% There are 5 patterns to be handled by this function
+%% Details are below.
+%% +-----------------+------------------------+-------------------+
+%% | Bucket          | URI                    | Expected          |
+%% +-----------------+------------------------+-------------------+
+%% | <<"bucket">>    | <<"/bucket">>          | <<"">>            |
+%% +-----------------+------------------------+-------------------+
+%% | <<"bucket">>    | <<"/bucket/">>         | <<"/">>           |
+%% +-----------------+------------------------+-------------------+
+%% | <<"bucket">>    | <<"/bucketa">>         | <<"/bucketa">>    |
+%% +-----------------+------------------------+-------------------+
+%% | <<"bucket">>    | <<"/bucket/path">>     | <<"/path">>       |
+%% +-----------------+------------------------+-------------------+
+%% | <<"bucket">>    | <<"/bucket.ext">>      | <<"/bucket.ext">> |
+%% +-----------------+------------------------+-------------------+
 auth_uri(<<>>, URI) ->
     URI;
 auth_uri(Bucket, URI) ->
     case binary:match(URI, Bucket) of
         {1, _} ->
-            SkipSize = size(Bucket) + 1,
-            binary:part(URI, {SkipSize, size(URI) - SkipSize});
+            BucketLen = byte_size(Bucket),
+            BucketThresholdLen1 = BucketLen + 1,
+            BucketThresholdLen2 = BucketLen + 2,
+            URILen = byte_size(URI),
+            case URILen of
+                BucketThresholdLen1 ->
+                    %% /${Bucket} pattern are should be removed
+                    remove_dup_bucket(Bucket, URI);
+                BucketThresholdLen2 ->
+                    <<"/", Bucket:BucketLen/binary, LastChar:8>> = URI,
+                    case LastChar == $/ of
+                        true ->
+                            %% /${Bucket}/ pattern are should be removed
+                            remove_dup_bucket(Bucket, URI);
+                        false ->
+                            %% ex. /${Bucket}.
+                            URI
+                    end;
+                _ ->
+                    SegmentLen = length(binary:split(URI, <<"/">>, [global])),
+                    case SegmentLen >= 3 of
+                        true ->
+                            %% ex. /${Bucket}/path_to_file
+                            remove_dup_bucket(Bucket, URI);
+                        false ->
+                            %% /${Bucket}[^/]+ pattern are should not be removed
+                            URI
+                    end
+            end;
         _ -> URI
     end.
+
+%% @doc remove duplicated bucket's name from path
+%% @private
+remove_dup_bucket(Bucket, URI) ->
+    SkipSize = size(Bucket) + 1,
+    binary:part(URI, {SkipSize, size(URI) - SkipSize}).
 
 %% @doc Retrieve resources
 %% @private
@@ -423,13 +474,46 @@ auth_resources(CannonocalizedResources) ->
 
 %% @doc Retrieve sub-resources
 %% @private
+%% QueryStr must be sorted lexicographically by param name at caller
 auth_sub_resources(QueryStr) ->
-    lists:foldl(fun(Param, <<>> = Acc) ->
-                        case binary:match(QueryStr, Param) of
-                            nomatch -> Acc;
-                            _ -> Param
+    ParamList = binary:split(QueryStr, [<<"?">>, <<"&">>], [global]),
+    lists:foldl(fun(<<>>, Acc) ->
+                        %% ignore empty elements
+                        Acc;
+                   (Param, <<>>) ->
+                        %% append '?' to first param
+                        [Key|Rest] = binary:split(Param, <<"=">>),
+                        case binary:match(Key, ?SUB_RESOURCES) of
+                            nomatch -> <<>>;
+                            _ ->
+                                case Rest of
+                                    [] -> <<"?", Key/binary>>;
+                                    [Val|_] ->
+                                        DecodedVal = cowboy_http:urldecode(Val),
+                                        <<"?", Key/binary, "=", DecodedVal/binary>>
+                                end
                         end;
-                   (_, Acc) ->
-                        Acc
-                end, <<>>, ?SUB_RESOURCES).
+                   (Param, Acc) ->
+                        %% append '&' to other params
+                        [Key|Rest] = binary:split(Param, <<"=">>),
+                        case binary:match(Key, ?SUB_RESOURCES) of
+                            nomatch -> Acc;
+                            _ ->
+                                case Rest of
+                                    [] -> <<Acc/binary, "&", Key/binary>>;
+                                    [Val|_] ->
+                                        DecodedVal = cowboy_http:urldecode(Val),
+                                        <<Acc/binary, "&", Key/binary, "=", DecodedVal/binary>>
+                                end
+                        end
+                end, <<>>, ParamList).
 
+-ifdef(TEST).
+
+auth_uri_test() ->
+    <<"">> = auth_uri(<<"bbb">>, <<"/bbb">>),
+    <<"/">> = auth_uri(<<"bbb">>, <<"/bbb/">>),
+    <<"/bbb.txt">> = auth_uri(<<"bbb">>, <<"/bbb/bbb.txt">>),
+    <<"/bbb.txt">> = auth_uri(<<"bbb">>, <<"/bbb.txt">>).
+
+-endif.

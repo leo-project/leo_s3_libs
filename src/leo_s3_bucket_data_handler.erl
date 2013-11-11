@@ -78,7 +78,7 @@ find_by_name({mnesia, Table}, AccessKey0, Name, NeedAccessKey) ->
           end,
     case leo_mnesia:read(Fun) of
         {ok, [#?BUCKET{access_key = AccessKey1} = H|_]} when NeedAccessKey == false orelse
-                                                            AccessKey0 == AccessKey1 ->
+                                                             AccessKey0 == AccessKey1 ->
             {ok, H};
         {ok, _} ->
             {error, forbidden};
@@ -93,7 +93,7 @@ find_by_name({ets, Table}, AccessKey0, Name0, NeedAccessKey) ->
         [] ->
             not_found;
         [{_, #?BUCKET{access_key = AccessKey1} = Value}|_] when NeedAccessKey == false orelse
-                                                               AccessKey0 == AccessKey1 ->
+                                                                AccessKey0 == AccessKey1 ->
             {ok, Value};
         _ ->
             {error, forbidden}
@@ -137,7 +137,7 @@ insert({ets, Table}, #?BUCKET{name = Name} = Value) ->
 -spec(delete({mnesia|ets, atom()}, #?BUCKET{}) ->
              ok | {error, any()}).
 delete({mnesia, Table}, #?BUCKET{name       = Name,
-                                access_key = AccessKey}) ->
+                                 access_key = AccessKey}) ->
     Fun1 = fun() ->
                    Q = qlc:q(
                          [X || X <- mnesia:table(leo_s3_buckets),
@@ -155,7 +155,7 @@ delete({mnesia, Table}, #?BUCKET{name       = Name,
     end;
 
 delete({ets, Table}, #?BUCKET{name       = Name,
-                             access_key = _AccessKey}) ->
+                              access_key = _AccessKey}) ->
     case ets:lookup(Table, Name) of
         [Value|_] ->
             case catch ets:delete_object(Table, Value) of

@@ -119,7 +119,7 @@ create_key(UserId) ->
                                          crypto:hash(sha, term_to_binary({UserId, Clock}))),1,20)),
             Digest1 = list_to_binary(leo_hex:binary_to_hex(
                                        crypto:hash(sha,
-                                         list_to_binary(lists:append([UserId,"/",Clock]))))),
+                                                   list_to_binary(lists:append([UserId,"/",Clock]))))),
             create_key1(UserId, Digest0, Digest1);
         [] ->
             {error, not_initialized};
@@ -478,34 +478,34 @@ auth_resources(CannonocalizedResources) ->
 auth_sub_resources(QueryStr) ->
     ParamList = binary:split(QueryStr, [<<"?">>, <<"&">>], [global]),
     lists:foldl(fun(<<>>, Acc) ->
-                       %% ignore empty elements 
-                       Acc;
+                        %% ignore empty elements
+                        Acc;
                    (Param, <<>>) ->
-                       %% append '?' to first param
-                       [Key|Rest] = binary:split(Param, <<"=">>),
-                       case binary:match(Key, ?SUB_RESOURCES) of
-                           nomatch -> <<>>;
-                           _ ->
-                               case Rest of
-                                   [] -> <<"?", Key/binary>>;
-                                   [Val|_] ->
-                                       DecodedVal = cowboy_http:urldecode(Val),
-                                       <<"?", Key/binary, "=", DecodedVal/binary>>
-                               end
-                       end;
+                        %% append '?' to first param
+                        [Key|Rest] = binary:split(Param, <<"=">>),
+                        case binary:match(Key, ?SUB_RESOURCES) of
+                            nomatch -> <<>>;
+                            _ ->
+                                case Rest of
+                                    [] -> <<"?", Key/binary>>;
+                                    [Val|_] ->
+                                        DecodedVal = cowboy_http:urldecode(Val),
+                                        <<"?", Key/binary, "=", DecodedVal/binary>>
+                                end
+                        end;
                    (Param, Acc) ->
-                       %% append '&' to other params
-                       [Key|Rest] = binary:split(Param, <<"=">>),
-                       case binary:match(Key, ?SUB_RESOURCES) of
-                           nomatch -> Acc;
-                           _ ->
-                               case Rest of
-                                   [] -> <<Acc/binary, "&", Key/binary>>;
-                                   [Val|_] ->
-                                       DecodedVal = cowboy_http:urldecode(Val),
-                                       <<Acc/binary, "&", Key/binary, "=", DecodedVal/binary>>
-                               end
-                       end
+                        %% append '&' to other params
+                        [Key|Rest] = binary:split(Param, <<"=">>),
+                        case binary:match(Key, ?SUB_RESOURCES) of
+                            nomatch -> Acc;
+                            _ ->
+                                case Rest of
+                                    [] -> <<Acc/binary, "&", Key/binary>>;
+                                    [Val|_] ->
+                                        DecodedVal = cowboy_http:urldecode(Val),
+                                        <<Acc/binary, "&", Key/binary, "=", DecodedVal/binary>>
+                                end
+                        end
                 end, <<>>, ParamList).
 
 -ifdef(TEST).

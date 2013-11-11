@@ -199,8 +199,8 @@ find_all_including_owner() ->
     case find_all() of
         {ok, Buckets} ->
             Ret = lists:map(fun(#?BUCKET{name       = Name,
-                                        access_key = AccessKeyId,
-                                        created_at = CreatedAt}) ->
+                                         access_key = AccessKeyId,
+                                         created_at = CreatedAt}) ->
                                     Owner1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
                                                  {ok, Owner0} -> Owner0;
                                                  _ -> #user_credential{}
@@ -263,10 +263,10 @@ put(AccessKey, Bucket, DB) ->
                     Now = leo_date:now(),
                     leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
                                                       #?BUCKET{name       = Bucket,
-                                                              access_key = AccessKey,
-                                                              acls       = ACLs,
-                                                              created_at = Now,
-                                                              last_modified_at = Now});
+                                                               access_key = AccessKey,
+                                                               acls       = ACLs,
+                                                               created_at = Now,
+                                                               last_modified_at = Now});
                 Error ->
                     Error
             end;
@@ -301,7 +301,7 @@ delete(AccessKey, Bucket) ->
 delete(AccessKey, Bucket, DB) ->
     leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE},
                                       #?BUCKET{name = Bucket,
-                                              access_key = AccessKey}).
+                                               access_key = AccessKey}).
 
 
 %% @doc update acls in a bukcet-property
@@ -344,10 +344,10 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
             Now = leo_date:now(),
             leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
                                               #?BUCKET{name       = Bucket,
-                                                      access_key = AccessKey,
-                                                      acls       = ACLs,
-                                                      last_synchroized_at = Now,
-                                                      last_modified_at    = Now});
+                                                       access_key = AccessKey,
+                                                       acls       = ACLs,
+                                                       last_synchroized_at = Now,
+                                                       last_modified_at    = Now});
         Error ->
             Error
     end.
@@ -406,7 +406,7 @@ get_acls(Bucket) ->
             case leo_s3_bucket_data_handler:find_by_name(
                    {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
                 {ok, #?BUCKET{acls = ACLs,
-                             last_synchroized_at = LastSynchronizedAt}}
+                              last_synchroized_at = LastSynchronizedAt}}
                   when (Now - LastSynchronizedAt) < SyncInterval ->
                     %% valid local record
                     {ok, ACLs};
@@ -682,8 +682,8 @@ is_valid_bucket([$.|T], _LastChar, LastLabel, true) ->
     end;
 is_valid_bucket([H|T], _LastChar, LastLabel, OnlyDigit) when (H >= $a andalso H =< $z) orelse
                                                              (H >= $0 andalso H =< $9) orelse
-                                                              H == $- orelse
-                                                              H == $_ ->
+                                                             H == $- orelse
+                                                             H == $_ ->
     is_valid_bucket(T, H, LastLabel ++ [H], OnlyDigit);
 is_valid_bucket([_|_], _LastChar, _LastLabel, _OnlyDigit) ->
     {error, badarg}.

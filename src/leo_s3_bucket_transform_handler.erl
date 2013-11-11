@@ -30,10 +30,7 @@
 
 -include("leo_s3_libs.hrl").
 -include("leo_s3_bucket.hrl").
-
--ifdef(TEST).
 -include_lib("eunit/include/eunit.hrl").
--endif.
 
 -export([transform/0]).
 
@@ -44,9 +41,19 @@
 %%
 -spec(transform() -> ok).
 transform() ->
-    {atomic, ok} = mnesia:transform_table(?BUCKET_TABLE, fun transform/1, record_info(fields, ?BUCKET), ?BUCKET),
-    ok.
+    case mnesia:table_info(?BUCKET_TABLE, record_name) of
+        %% Stored bucket-record is 'bucket' which is old version
+        %% Then transform records to current-version
+        bucket ->
+            {atomic, ok} = mnesia:transform_table(
+                             ?BUCKET_TABLE,
+                             fun transform/1, record_info(fields, ?BUCKET), ?BUCKET),
+            ok;
+        _ ->
+            ok
+    end.
 
+%% @private
 transform(#?BUCKET{} = Bucket) ->
     Bucket;
 transform(#bucket{name       = Name,

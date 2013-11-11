@@ -32,7 +32,10 @@
 -include("leo_s3_libs.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([start/3, create_bucket_table/2, is_valid_bucket/1,
+-export([start/3,
+         create_bucket_table/2,
+         create_bucket_table_old_for_test/2,
+         is_valid_bucket/1,
          update_providers/1,
          find_bucket_by_name/1, find_bucket_by_name/2,
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
@@ -85,13 +88,26 @@ update_providers(Provider) ->
 create_bucket_table(Mode, Nodes) ->
     _ = application:start(mnesia),
     {atomic, ok} =
-        mnesia:create_table(
-          ?BUCKET_TABLE,
-          [{Mode, Nodes},
-           {type, set},
-           {record_name, ?BUCKET},
-           {attributes, record_info(fields, ?BUCKET)}
-          ]),
+        mnesia:create_table(?BUCKET_TABLE,
+                            [{Mode, Nodes},
+                             {type, set},
+                             {record_name, ?BUCKET},
+                             {attributes, record_info(fields, ?BUCKET)}
+                            ]),
+    ok.
+
+
+-spec(create_bucket_table_old_for_test(ram_copies|disc|copies, list()) ->
+             ok).
+create_bucket_table_old_for_test(Mode, Nodes) ->
+    _ = application:start(mnesia),
+    {atomic, ok} =
+        mnesia:create_table(?BUCKET_TABLE,
+                            [{Mode, Nodes},
+                             {type, set},
+                             {record_name, bucket},
+                             {attributes, record_info(fields, bucket)}
+                            ]),
     ok.
 
 

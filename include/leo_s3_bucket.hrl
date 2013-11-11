@@ -45,12 +45,15 @@
 
 -type acls() :: [#bucket_acl_info{}].
 
+
+%% - LeoFS-v0.14.9
 -record(bucket, {
-          name          :: string(), %% bucket name
-          access_key    :: string(), %% access key
-          created_at =0 :: integer() %% create date and time
+          name           :: string(), %% bucket name
+          access_key     :: string(), %% access key
+          created_at = 0 :: integer() %% create date and time
          }).
 
+%% - LeoFS-v0.16.0
 -record(bucket_0_16_0, {
           name          :: string(), %% bucket name
           access_key    :: string(), %% access key
@@ -60,7 +63,9 @@
           last_modified_at    = 0 :: integer() %% modified date and time
          }).
 
+%% Current bucket-record is 'bucket_0_16_0'
 -define(BUCKET, bucket_0_16_0).
+
 
 -record(bucket_info, {
           type          :: atom(), %% [master | slave]

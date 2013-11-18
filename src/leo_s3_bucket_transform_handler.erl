@@ -41,17 +41,10 @@
 %%
 -spec(transform() -> ok).
 transform() ->
-    case mnesia:table_info(?BUCKET_TABLE, record_name) of
-        %% Stored bucket-record is 'bucket' which is old version
-        %% Then transform records to current-version
-        bucket ->
-            {atomic, ok} = mnesia:transform_table(
-                             ?BUCKET_TABLE,
-                             fun transform/1, record_info(fields, ?BUCKET), ?BUCKET),
-            ok;
-        _ ->
-            ok
-    end.
+    {atomic, ok} = mnesia:transform_table(
+                     ?BUCKET_TABLE,
+                     fun transform/1, record_info(fields, ?BUCKET), ?BUCKET),
+    ok.
 
 %% @private
 transform(#?BUCKET{} = Bucket) ->

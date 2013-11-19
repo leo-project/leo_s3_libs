@@ -2,7 +2,7 @@
 %%
 %% Leo S3-Libs
 %%
-%% Copyright (c) 2012 Rakuten, Inc.
+%% Copyright (c) 2012-2013 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -53,7 +53,7 @@ transform(#bucket{name       = Name,
                   access_key = AccessKey,
                   created_at = CreatedAt}) ->
     #bucket_0_16_0{name                = Name,
-                   access_key          = AccessKey,
+                   access_key_id       = AccessKey,
                    acls                = [],
                    last_synchroized_at = 0,
                    created_at          = CreatedAt,

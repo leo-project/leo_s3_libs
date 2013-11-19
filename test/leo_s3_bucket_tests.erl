@@ -28,6 +28,7 @@
 -author('Yosuke Hara').
 
 -include("leo_s3_bucket.hrl").
+-include("leo_s3_libs.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 
@@ -38,17 +39,20 @@
 
 -define(ACCESS_KEY_0, <<"leofs">>).
 -define(ACCESS_KEY_1, <<"fuglen">>).
+-define(ACCESS_KEY_2, <<"elk">>).
 
--define(Bucket0, <<"bucket0">>).
--define(Bucket1, <<"bucket1">>).
--define(Bucket2, <<"bucket2">>).
--define(Bucket3, <<"bucket3">>).
--define(Bucket4, <<"bucket4">>).
--define(Bucket5, <<"bucket5">>).
--define(Bucket6, <<"bucket6">>).
--define(Bucket7, <<"bucket7">>).
--define(Bucket8, <<"bucket8">>).
--define(Bucket9, <<"b01012013">>). %% https://github.com/leo-project/leofs/issues/75
+-define(Bucket0,  <<"bucket0">>).
+-define(Bucket1,  <<"bucket1">>).
+-define(Bucket2,  <<"bucket2">>).
+-define(Bucket3,  <<"bucket3">>).
+-define(Bucket4,  <<"bucket4">>).
+-define(Bucket5,  <<"bucket5">>).
+-define(Bucket6,  <<"bucket6">>).
+-define(Bucket7,  <<"bucket7">>).
+-define(Bucket8,  <<"bucket8">>).
+-define(Bucket9,  <<"b01012013">>). %% https://github.com/leo-project/leofs/issues/75
+-define(Bucket10, <<"bucket10">>).
+
 -define(BucketTooShort, <<"sh">>).
 -define(BucketInvalidStart,  <<".myawsbucket">>).
 -define(BucketInvalidStart2, <<"-myawsbucket">>).
@@ -105,9 +109,6 @@ mnesia_suite_(_) ->
     {ok, Ret0} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
     ?assertEqual(5, length(Ret0)),
 
-    %Checksum = 2640186287,
-    %Checksum = erlang:crc32(term_to_binary(Ret0)),
-
     {ok, Ret1} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
     ?assertEqual(2, length(Ret1)),
 
@@ -119,8 +120,6 @@ mnesia_suite_(_) ->
     not_found = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
 
     5 = leo_s3_bucket_data_handler:size({mnesia, leo_s3_buckets}),
-
-    %{ok, match} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0, Checksum),
     {ok, Ret3}  = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0, 0),
     ?assertEqual(5, length(Ret3)),
 
@@ -161,17 +160,24 @@ mnesia_suite_(_) ->
 
     %% ACL related
     %% default to be private
-    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0, 
-                      permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
+    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                           permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
     leo_s3_bucket:update_acls2public_read(?ACCESS_KEY_0, ?Bucket0),
-    {ok, [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, 
-                      permissions = [read]}]} = leo_s3_bucket:get_acls(?Bucket0),
+    {ok, [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER,
+                           permissions = [read]}]} = leo_s3_bucket:get_acls(?Bucket0),
     leo_s3_bucket:update_acls2public_read_write(?ACCESS_KEY_0, ?Bucket0),
-    {ok, [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, 
-                      permissions = [read, write]}]} = leo_s3_bucket:get_acls(?Bucket0),
+    {ok, [#bucket_acl_info{user_id = ?GRANTEE_ALL_USER,
+                           permissions = [read, write]}]} = leo_s3_bucket:get_acls(?Bucket0),
     leo_s3_bucket:update_acls2authenticated_read(?ACCESS_KEY_0, ?Bucket0),
-    {ok, [#bucket_acl_info{user_id = ?GRANTEE_AUTHENTICATED_USER, 
-                      permissions = [read]}]} = leo_s3_bucket:get_acls(?Bucket0),
+    {ok, [#bucket_acl_info{user_id = ?GRANTEE_AUTHENTICATED_USER,
+                           permissions = [read]}]} = leo_s3_bucket:get_acls(?Bucket0),
+
+    %% Change owner of a bucket
+    not_found = leo_s3_bucket:change_bucket_owner(?ACCESS_KEY_2, ?Bucket10),
+    ok = leo_s3_bucket:change_bucket_owner(?ACCESS_KEY_2, ?Bucket0),
+    {ok, #?BUCKET{name = ?Bucket0,
+                  access_key_id = ?ACCESS_KEY_2}} =
+        leo_s3_bucket_data_handler:find_by_name({mnesia, ?BUCKET_TABLE}, ?Bucket0),
 
     application:stop(mnesia),
     timer:sleep(250),
@@ -221,9 +227,6 @@ ets_suite_(_) ->
     ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket5),
     ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket6),
 
-    %{ok, Ret0} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
-    %2640186287 = erlang:crc32(term_to_binary(Ret0)),
-
     {ok, Ret1} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
     ?assertEqual(2, length(Ret1)),
 
@@ -238,9 +241,9 @@ ets_suite_(_) ->
     ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_buckets_by_id,
                                            fun(_AccessKey, _Checksum) ->
-                                                   {ok, [#?BUCKET{name = ?Bucket3, access_key = ?ACCESS_KEY_0},
-                                                         #?BUCKET{name = ?Bucket7, access_key = ?ACCESS_KEY_0},
-                                                         #?BUCKET{name = ?Bucket8, access_key = ?ACCESS_KEY_0}
+                                                   {ok, [#?BUCKET{name = ?Bucket3, access_key_id = ?ACCESS_KEY_0},
+                                                         #?BUCKET{name = ?Bucket7, access_key_id = ?ACCESS_KEY_0},
+                                                         #?BUCKET{name = ?Bucket8, access_key_id = ?ACCESS_KEY_0}
                                                         ]}
                                            end]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, put,
@@ -270,7 +273,7 @@ ets_suite_(_) ->
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, head,
                                            fun(_AccessKey, _Bucket, _Checksum) ->
                                                    {ok, #?BUCKET{name = ?Bucket3,
-                                                                access_key = ?ACCESS_KEY_0}}
+                                                                 access_key_id = ?ACCESS_KEY_0}}
                                            end]),
     ok = leo_s3_bucket:head(?ACCESS_KEY_0, ?Bucket3),
 
@@ -296,25 +299,34 @@ ets_suite_(_) ->
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_bucket_by_name,
                                            fun(_Bucket, _CRC) ->
                                                    {ok, #?BUCKET{name = ?Bucket0,
-                                                                access_key = ?ACCESS_KEY_0,
-                                                                acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0, permissions = [full_control]}]}}
+                                                                 access_key_id = ?ACCESS_KEY_0,
+                                                                 acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0, permissions = [full_control]}]}}
                                            end]),
-    %% to be synced 
-    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0, 
-                      permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
+    %% to be synced
+    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                           permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
     %% local records to be refered
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_bucket_by_name,
                                            fun(_Bucket, _CRC) ->
                                                    {ok, #?BUCKET{name = ?Bucket0,
-                                                                access_key = ?ACCESS_KEY_0,
-                                                                acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0, permissions = [read]}]}}
+                                                                 access_key_id = ?ACCESS_KEY_0,
+                                                                 acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0, permissions = [read]}]}}
                                            end]),
-    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0, 
-                      permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
+    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                           permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
     timer:sleep(3500),
     %% to be synced with latest manager's ACL(read)
-    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0, 
-                      permissions = [read]}]} = leo_s3_bucket:get_acls(?Bucket0),
+    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                           permissions = [read]}]} = leo_s3_bucket:get_acls(?Bucket0),
+
+
+    %% Change owner of a bucket
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket_data_handler, [no_link]]),
+    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket_data_handler, insert,
+                                           fun(_DBInfo, _BucketData) ->
+                                                   ok
+                                           end]),
+    ok = leo_s3_bucket:change_bucket_owner(?ACCESS_KEY_2, ?Bucket0),
 
     %% update_providers
     Manager2 = list_to_atom("manager_2@" ++ Hostname),

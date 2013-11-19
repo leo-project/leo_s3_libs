@@ -43,7 +43,7 @@
          get_acls/1, update_acls/3,
          update_acls2private/2, update_acls2public_read/2,
          update_acls2public_read_write/2, update_acls2authenticated_read/2,
-         put/2, put/3, delete/2, head/2, head/4]).
+         put/2, put/3, delete/2, head/2, head/4, change_bucket_owner/2]).
 
 %%--------------------------------------------------------------------
 %% API
@@ -161,7 +161,7 @@ find_bucket_by_name(Bucket) ->
     case get_info() of
         %% Retrieve value from local-mnesia.
         {ok, #bucket_info{db = DB}} when DB == mnesia ->
-            leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, <<>>, Bucket, false);
+            leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket);
         %% Inquiry bucket-checksum to manager-nodes.
         %% If local-checksum equal provider's checksum, then return local-list,
         %% but local-checksum does NOT equal provider's checksum, then return provider's list.
@@ -214,9 +214,9 @@ find_all() ->
 find_all_including_owner() ->
     case find_all() of
         {ok, Buckets} ->
-            Ret = lists:map(fun(#?BUCKET{name       = Name,
-                                         access_key = AccessKeyId,
-                                         created_at = CreatedAt}) ->
+            Ret = lists:map(fun(#?BUCKET{name = Name,
+                                         access_key_id = AccessKeyId,
+                                         created_at    = CreatedAt}) ->
                                     Owner1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
                                                  {ok, Owner0} -> Owner0;
                                                  _ -> #user_credential{}
@@ -244,9 +244,9 @@ put(AccessKey, Bucket) ->
             case leo_s3_auth:has_credential(Provider, AccessKey) of
                 true ->
                     case rpc_call(Provider, put, [AccessKey, Bucket]) of
-                        true ->
+                        ok ->
                             put(AccessKey, Bucket, DB);
-                        false ->
+                        _ ->
                             {error, not_stored}
                     end;
                 false ->
@@ -278,9 +278,9 @@ put(AccessKey, Bucket, DB) ->
                                              permissions = [full_control]}],
                     Now = leo_date:now(),
                     leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                                      #?BUCKET{name       = Bucket,
-                                                               access_key = AccessKey,
-                                                               acls       = ACLs,
+                                                      #?BUCKET{name = Bucket,
+                                                               access_key_id = AccessKey,
+                                                               acls = ACLs,
                                                                created_at = Now,
                                                                last_modified_at = Now});
                 Error ->
@@ -301,9 +301,9 @@ delete(AccessKey, Bucket) ->
                           db   = DB,
                           provider = Provider}} ->
             case rpc_call(Provider, delete, [AccessKey, Bucket]) of
-                true ->
+                ok ->
                     delete(AccessKey, Bucket, DB);
-                false ->
+                _ ->
                     {error, not_deleted}
             end;
         {ok, #bucket_info{type = master, db = DB}} ->
@@ -317,7 +317,7 @@ delete(AccessKey, Bucket) ->
 delete(AccessKey, Bucket, DB) ->
     leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE},
                                       #?BUCKET{name = Bucket,
-                                               access_key = AccessKey}).
+                                               access_key_id = AccessKey}).
 
 
 %% @doc update acls in a bukcet-property
@@ -332,9 +332,9 @@ update_acls(AccessKey, Bucket, ACLs) ->
             case leo_s3_auth:has_credential(Provider, AccessKey) of
                 true ->
                     case rpc_call(Provider, update_acls, [AccessKey, Bucket, ACLs]) of
-                        true ->
+                        ok ->
                             update_acls(AccessKey, Bucket, ACLs, DB);
-                        false ->
+                        _ ->
                             {error, not_stored}
                     end;
                 false ->
@@ -359,9 +359,9 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
         ok ->
             Now = leo_date:now(),
             leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                              #?BUCKET{name       = Bucket,
-                                                       access_key = AccessKey,
-                                                       acls       = ACLs,
+                                              #?BUCKET{name = Bucket,
+                                                       access_key_id = AccessKey,
+                                                       acls = ACLs,
                                                        last_synchroized_at = Now,
                                                        last_modified_at    = Now});
         Error ->
@@ -419,8 +419,7 @@ get_acls(Bucket) ->
                           sync_interval = SyncInterval,
                           type = Type}} ->
             Now = leo_date:now(),
-            case leo_s3_bucket_data_handler:find_by_name(
-                   {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
+            case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
                 {ok, #?BUCKET{acls = ACLs,
                               last_synchroized_at = LastSynchronizedAt}}
                   when (Now - LastSynchronizedAt) < SyncInterval ->
@@ -484,6 +483,56 @@ head(AccessKey, Bucket, DB, Provider) ->
             Ret;
         Error ->
             Error
+    end.
+
+
+%% @doc Is exist a bucket into the db
+%%
+-spec(change_bucket_owner(binary(), binary()) ->
+             ok | not_found | {error, forbidden} | {error, any()}).
+change_bucket_owner(AccessKey, Bucket) ->
+    case get_info() of
+        {ok, #bucket_info{db       = DB,
+                          type     = Type,
+                          provider = Provider} = BucketInfo} ->
+            case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
+                {ok, Value_1} ->
+                    change_bucket_owner_1(BucketInfo, AccessKey, Value_1);
+                not_found when Type == slave->
+                    case find_bucket_by_name_1(Bucket, DB, Provider) of
+                        {ok, Value_2} ->
+                            change_bucket_owner_1(BucketInfo, AccessKey, Value_2);
+                        Other ->
+                            Other
+                    end;
+                Other ->
+                    Other
+            end;
+        Error ->
+            Error
+    end.
+
+
+change_bucket_owner_1(#bucket_info{type = Type,
+                                   db   = DB,
+                                   provider = Provider}, AccessKey, BucketData) ->
+    BucketData_1 = BucketData#?BUCKET{access_key_id = AccessKey,
+                                      last_modified_at = leo_date:now()},
+    case Type of
+        master ->
+            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, BucketData_1);
+        slave ->
+            case rpc_call(Provider, leo_s3_bucket_data_handler,
+                          insert, [{mnesia, ?BUCKET_TABLE}, BucketData]) of
+                ok ->
+                    ok;
+                not_found ->
+                    not_found;
+                _ ->
+                    {error, not_updated}
+            end;
+        _ ->
+            {error, invalid_server_type}
     end.
 
 
@@ -584,8 +633,7 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
 -spec(find_bucket_by_name_1(binary(), ets|mnesia, list()) ->
              {ok, list()} | {error, any()}).
 find_bucket_by_name_1(Bucket, DB, Providers) ->
-    Value0 = case leo_s3_bucket_data_handler:find_by_name(
-                    {DB, ?BUCKET_TABLE}, <<>>, Bucket, false) of
+    Value0 = case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
                  {ok, Val} ->
                      Val;
                  _Other ->
@@ -640,12 +688,25 @@ find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
 -spec(rpc_call(list(), atom(), list()) ->
              true | false).
 rpc_call(Provider, Function, Args) ->
+    rpc_call(Provider, leo_s3_bucket, Function, Args).
+
+-spec(rpc_call(list(), atom(), atom(), list()) ->
+             true | false).
+rpc_call(Provider, Mod, Function, Args) ->
     Ret = lists:foldl(
             fun(Node, false) ->
-                    RPCKey = rpc:async_call(Node, leo_s3_bucket, Function, Args),
+                    RPCKey = rpc:async_call(Node, Mod, Function, Args),
                     case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
-                        {value, ok} -> true;
-                        _Error      -> false
+                        {value, ok} ->
+                            ok;
+                        {value, not_found = Reply} ->
+                            Reply;
+                        {value, Error} ->
+                            Error;
+                        {badrpc, Cause} ->
+                            {error, Cause};
+                        Cause ->
+                            {error, Cause}
                     end;
                (_, true) ->
                     true

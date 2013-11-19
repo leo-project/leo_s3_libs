@@ -31,7 +31,8 @@
 -include_lib("stdlib/include/qlc.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([lookup/2, find_by_name/3, find_by_name/4, find_all/1, insert/2, delete/2, size/1]).
+-export([lookup/2, find_by_name/2, find_by_name/3, find_by_name/4,
+         find_all/1, insert/2, delete/2, size/1]).
 
 
 %% Retrieve a record by key from the table.
@@ -41,14 +42,14 @@
 lookup({mnesia, Table}, AccessKey) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table),
-                                   X#?BUCKET.access_key =:= AccessKey]),
+                                   X#?BUCKET.access_key_id =:= AccessKey]),
                   Q2 = qlc:sort(Q1, [{order, ascending}]),
                   qlc:e(Q2)
           end,
     leo_mnesia:read(Fun);
 
 lookup({ets, Table}, AccessKey0) ->
-    Ret = ets:foldl(fun({_,#?BUCKET{access_key = AccessKey1} = Bucket}, Acc) when AccessKey0 == AccessKey1 ->
+    Ret = ets:foldl(fun({_,#?BUCKET{access_key_id = AccessKey1} = Bucket}, Acc) when AccessKey0 == AccessKey1 ->
                             [Bucket|Acc];
                        (_, Acc) ->
                             Acc
@@ -60,8 +61,14 @@ lookup({ets, Table}, AccessKey0) ->
             {ok, lists:sort(Ret)}
     end.
 
+
 %% @doc Retrieve a record by name
 %%
+-spec(find_by_name({mnesia|ets, atom()}, string()) ->
+             {ok, list()} | {error, any()}).
+find_by_name(DBInfo, Name) ->
+    find_by_name(DBInfo, <<>>, Name, false).
+
 -spec(find_by_name({mnesia|ets, atom()}, string(), string()) ->
              {ok, list()} | {error, any()}).
 find_by_name(Provider, AccessKey0, Name) ->
@@ -77,8 +84,8 @@ find_by_name({mnesia, Table}, AccessKey0, Name, NeedAccessKey) ->
                   qlc:e(Q2)
           end,
     case leo_mnesia:read(Fun) of
-        {ok, [#?BUCKET{access_key = AccessKey1} = H|_]} when NeedAccessKey == false orelse
-                                                             AccessKey0 == AccessKey1 ->
+        {ok, [#?BUCKET{access_key_id = AccessKey1} = H|_]} when NeedAccessKey == false orelse
+                                                                AccessKey0 == AccessKey1 ->
             {ok, H};
         {ok, _} ->
             {error, forbidden};
@@ -92,8 +99,8 @@ find_by_name({ets, Table}, AccessKey0, Name0, NeedAccessKey) ->
             {error, Cause};
         [] ->
             not_found;
-        [{_, #?BUCKET{access_key = AccessKey1} = Value}|_] when NeedAccessKey == false orelse
-                                                                AccessKey0 == AccessKey1 ->
+        [{_, #?BUCKET{access_key_id = AccessKey1} = Value}|_] when NeedAccessKey == false orelse
+                                                                   AccessKey0 == AccessKey1 ->
             {ok, Value};
         _ ->
             {error, forbidden}
@@ -136,12 +143,12 @@ insert({ets, Table}, #?BUCKET{name = Name} = Value) ->
 %%
 -spec(delete({mnesia|ets, atom()}, #?BUCKET{}) ->
              ok | {error, any()}).
-delete({mnesia, Table}, #?BUCKET{name       = Name,
-                                 access_key = AccessKey}) ->
+delete({mnesia, Table}, #?BUCKET{name = Name,
+                                 access_key_id = AccessKey}) ->
     Fun1 = fun() ->
                    Q = qlc:q(
                          [X || X <- mnesia:table(leo_s3_buckets),
-                               X#?BUCKET.name =:= Name andalso X#?BUCKET.access_key =:= AccessKey]),
+                               X#?BUCKET.name =:= Name andalso X#?BUCKET.access_key_id =:= AccessKey]),
                    qlc:e(Q)
            end,
     case leo_mnesia:read(Fun1) of
@@ -154,8 +161,8 @@ delete({mnesia, Table}, #?BUCKET{name       = Name,
             Error
     end;
 
-delete({ets, Table}, #?BUCKET{name       = Name,
-                              access_key = _AccessKey}) ->
+delete({ets, Table}, #?BUCKET{name = Name,
+                              access_key_id = _AccessKey}) ->
     case ets:lookup(Table, Name) of
         [Value|_] ->
             case catch ets:delete_object(Table, Value) of

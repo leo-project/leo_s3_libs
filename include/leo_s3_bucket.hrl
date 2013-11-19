@@ -56,7 +56,7 @@
 %% - LeoFS-v0.16.0
 -record(bucket_0_16_0, {
           name          :: string(), %% bucket name
-          access_key    :: string(), %% access key
+          access_key_id :: binary(), %% access-key-id
           acls = []     :: acls(),   %% acl list
           last_synchroized_at = 0 :: integer(), %% last synchronized date and time
           created_at          = 0 :: integer(), %% created date and time

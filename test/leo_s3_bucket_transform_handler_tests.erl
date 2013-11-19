@@ -88,20 +88,20 @@ transform_2_(_) ->
     %% Prepare
     ok = leo_s3_bucket:create_bucket_table('ram_copies', [node()]),
     ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
-                                           #?BUCKET{name       = ?Bucket0,
-                                                    access_key = ?ACCESS_KEY_0,
+                                           #?BUCKET{name = ?Bucket0,
+                                                    access_key_id = ?ACCESS_KEY_0,
                                                     last_synchroized_at = leo_date:now(),
                                                     created_at = leo_date:now()
                                                    }),
     ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
-                                           #?BUCKET{name       = ?Bucket2,
-                                                    access_key = ?ACCESS_KEY_0,
+                                           #?BUCKET{name = ?Bucket2,
+                                                    access_key_id = ?ACCESS_KEY_0,
                                                     last_synchroized_at = leo_date:now(),
                                                     created_at = leo_date:now()
                                                    }),
     ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
-                                           #?BUCKET{name       = ?Bucket2,
-                                                    access_key = ?ACCESS_KEY_0,
+                                           #?BUCKET{name = ?Bucket2,
+                                                    access_key_id = ?ACCESS_KEY_0,
                                                     last_synchroized_at = leo_date:now(),
                                                     created_at = leo_date:now()
                                                    }),

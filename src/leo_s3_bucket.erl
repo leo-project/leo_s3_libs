@@ -695,7 +695,6 @@ rpc_call(Provider, Function, Args) ->
 rpc_call(Provider, Mod, Function, Args) ->
     rpc_call_1(Provider, Mod, Function, Args, []).
 
-
 %% @private
 rpc_call_1([],_,_,_, [Error|_]) ->
     Error;
@@ -707,11 +706,11 @@ rpc_call_1([Node|Rest], Mod, Function, Args, Acc) ->
         {value, not_found = Reply} ->
             Reply;
         {value, Error} ->
-            rpc_call_1([Node|Rest], Mod, Function, Args, [Error|Acc]);
+            rpc_call_1(Rest, Mod, Function, Args, [Error|Acc]);
         {badrpc, Cause} ->
-            rpc_call_1([Node|Rest], Mod, Function, Args, [{error, Cause}|Acc]);
+            rpc_call_1(Rest, Mod, Function, Args, [{error, Cause}|Acc]);
         Cause ->
-            rpc_call_1([Node|Rest], Mod, Function, Args, [{error, Cause}|Acc])
+            rpc_call_1(Rest, Mod, Function, Args, [{error, Cause}|Acc])
     end.
 
 

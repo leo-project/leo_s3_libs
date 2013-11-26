@@ -693,25 +693,25 @@ rpc_call(Provider, Function, Args) ->
 -spec(rpc_call(list(), atom(), atom(), list()) ->
              true | false).
 rpc_call(Provider, Mod, Function, Args) ->
-    Ret = lists:foldl(
-            fun(Node, false) ->
-                    RPCKey = rpc:async_call(Node, Mod, Function, Args),
-                    case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
-                        {value, ok} ->
-                            ok;
-                        {value, not_found = Reply} ->
-                            Reply;
-                        {value, Error} ->
-                            Error;
-                        {badrpc, Cause} ->
-                            {error, Cause};
-                        Cause ->
-                            {error, Cause}
-                    end;
-               (_, true) ->
-                    true
-            end, false, Provider),
-    Ret.
+    rpc_call_1(Provider, Mod, Function, Args, []).
+
+%% @private
+rpc_call_1([],_,_,_, [Error|_]) ->
+    Error;
+rpc_call_1([Node|Rest], Mod, Function, Args, Acc) ->
+    RPCKey = rpc:async_call(Node, Mod, Function, Args),
+    case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
+        {value, ok} ->
+            ok;
+        {value, not_found = Reply} ->
+            Reply;
+        {value, Error} ->
+            rpc_call_1(Rest, Mod, Function, Args, [Error|Acc]);
+        {badrpc, Cause} ->
+            rpc_call_1(Rest, Mod, Function, Args, [{error, Cause}|Acc]);
+        Cause ->
+            rpc_call_1(Rest, Mod, Function, Args, [{error, Cause}|Acc])
+    end.
 
 
 %% @doc validate a string if which consits of digit chars

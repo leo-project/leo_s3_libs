@@ -24,7 +24,8 @@
 %% @end
 %%======================================================================
 
-%% predefined users
+%% Predefined users
+%%
 -define(GRANTEE_ALL_USER, <<"http://acs.amazonaws.com/groups/global/AllUsers">>).
 -define(GRANTEE_AUTHENTICATED_USER, <<"http://acs.amazonaws.com/groups/global/AuthenticatedUsers">>).
 
@@ -34,6 +35,12 @@
 -define(DEF_BUCKET_PROP_SYNC_INTERVAL, 300).
 -endif.
 
+%% Permissions
+%%
+-define(CANNED_ACL_PRIVATE,            "private").
+-define(CANNED_ACL_PUBLIC_READ,        "public-read").
+-define(CANNED_ACL_PUBLIC_READ_WRITE,  "public-read-write").
+-define(CANNED_ACL_AUTHENTICATED_READ, "authenticated-read").
 
 -type permission()  :: read|write|read_acp|write_acp|full_control.
 -type permissions() :: [permission()].

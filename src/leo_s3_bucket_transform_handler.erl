@@ -46,9 +46,13 @@ transform() ->
                      fun transform/1, record_info(fields, ?BUCKET), ?BUCKET),
     ok.
 
+%% @doc the record is the current verion
 %% @private
 transform(#?BUCKET{} = Bucket) ->
     Bucket;
+
+%% @doc migrate a record from 0.16.0 to the current version
+%% @private
 transform({bucket, Name, AccessKey, CreatedAt}) ->
     #bucket_0_16_0{name                = Name,
                    access_key_id       = AccessKey,
@@ -56,6 +60,9 @@ transform({bucket, Name, AccessKey, CreatedAt}) ->
                    last_synchroized_at = 0,
                    created_at          = CreatedAt,
                    last_modified_at    = 0};
+
+%% @doc migrate a record from 0.14.x to the current version
+%% @private
 transform({bucket, Name, AccessKey, Acls,
            LastSynchronizedAt, CreatedAt, LastModifiedAt}) ->
     #bucket_0_16_0{name                = Name,

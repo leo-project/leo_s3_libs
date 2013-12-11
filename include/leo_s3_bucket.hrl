@@ -56,8 +56,8 @@
 %% - LeoFS-v0.14.9
 -record(bucket, {
           name           :: string(), %% bucket name
-          access_key     :: string(), %% access key
-          created_at = 0 :: integer() %% create date and time
+          access_key     :: binary(), %% access-key-id
+          created_at = 0 :: integer() %% created date and time
          }).
 
 %% - LeoFS-v0.16.0

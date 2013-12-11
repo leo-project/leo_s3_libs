@@ -49,13 +49,18 @@ transform() ->
 %% @private
 transform(#?BUCKET{} = Bucket) ->
     Bucket;
-transform(#bucket{name       = Name,
-                  access_key = AccessKey,
-                  created_at = CreatedAt}) ->
+transform({bucket, Name, AccessKey, CreatedAt}) ->
     #bucket_0_16_0{name                = Name,
                    access_key_id       = AccessKey,
                    acls                = [],
                    last_synchroized_at = 0,
                    created_at          = CreatedAt,
-                   last_modified_at    = 0}.
-
+                   last_modified_at    = 0};
+transform({bucket, Name, AccessKey, Acls,
+           LastSynchronizedAt, CreatedAt, LastModifiedAt}) ->
+    #bucket_0_16_0{name                = Name,
+                   access_key_id       = AccessKey,
+                   acls                = Acls,
+                   last_synchroized_at = LastSynchronizedAt,
+                   created_at          = CreatedAt,
+                   last_modified_at    = LastModifiedAt}.

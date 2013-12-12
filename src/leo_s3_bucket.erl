@@ -357,13 +357,20 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
     BucketStr = cast_binary_to_str(Bucket),
     case is_valid_bucket(BucketStr) of
         ok ->
-            Now = leo_date:now(),
-            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                              #?BUCKET{name = Bucket,
-                                                       access_key_id = AccessKey,
-                                                       acls = ACLs,
-                                                       last_synchroized_at = Now,
-                                                       last_modified_at    = Now});
+            case leo_s3_bucket_data_handler:find_by_name(
+                   {DB, ?BUCKET_TABLE}, AccessKey, Bucket, false) of
+                {ok, #?BUCKET{created_at = CreatedAt}} ->
+                    Now = leo_date:now(),
+                    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
+                                                      #?BUCKET{name = Bucket,
+                                                               access_key_id = AccessKey,
+                                                               acls = ACLs,
+                                                               last_synchroized_at = Now,
+                                                               last_modified_at    = Now,
+                                                               created_at = CreatedAt});
+                Error ->
+                    Error
+            end;
         Error ->
             Error
     end.

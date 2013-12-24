@@ -626,11 +626,25 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
               {value, not_found} ->
                   not_found;
               {value, {error, Cause}} ->
-                  {error, Cause};
+                  error_logger:error_msg("~p,~p,~p,~p~n",
+                                         [{module, ?MODULE_STRING},
+                                          {function, "find_buckets_by_id_2/5"},
+                                          {line, ?LINE}, {body, Cause}]),
+                  {ok, Value0};
               {value, {badrpc, Cause}} ->
-                  {error, Cause};
+                  error_logger:error_msg("~p,~p,~p,~p~n",
+                                         [{module, ?MODULE_STRING},
+                                          {function, "find_buckets_by_id_2/5"},
+                                          {line, ?LINE}, {body, Cause}]),
+                  {ok, Value0};
               {'EXIT', Cause} ->
-                  {error, Cause}
+                  error_logger:error_msg("~p,~p,~p,~p~n",
+                                         [{module, ?MODULE_STRING},
+                                          {function, "find_buckets_by_id_2/5"},
+                                          {line, ?LINE}, {body, Cause}]),
+                  {ok, Value0};
+              timeout ->
+                  {ok, Value0}
           end,
     Ret.
 
@@ -681,11 +695,25 @@ find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
               {value, not_found} ->
                   not_found;
               {value, {error, Cause}} ->
-                  {error, Cause};
+                  error_logger:error_msg("~p,~p,~p,~p~n",
+                                         [{module, ?MODULE_STRING},
+                                          {function, "find_bucket_by_name_2/4"},
+                                          {line, ?LINE}, {body, Cause}]),
+                  {ok, Value0};
               {value, {badrpc, Cause}} ->
-                  {error, Cause};
+                  error_logger:error_msg("~p,~p,~p,~p~n",
+                                         [{module, ?MODULE_STRING},
+                                          {function, "find_bucket_by_name_2/4"},
+                                          {line, ?LINE}, {body, Cause}]),
+                  {ok, Value0};
               {'EXIT', Cause} ->
-                  {error, Cause}
+                  error_logger:error_msg("~p,~p,~p,~p~n",
+                                         [{module, ?MODULE_STRING},
+                                          {function, "find_bucket_by_name_2/4"},
+                                          {line, ?LINE}, {body, Cause}]),
+                  {ok, Value0};
+              timeout ->
+                  {ok, Value0}
           end,
     Ret.
 

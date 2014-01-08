@@ -216,12 +216,21 @@ find_all_including_owner() ->
         {ok, Buckets} ->
             Ret = lists:map(fun(#?BUCKET{name = Name,
                                          access_key_id = AccessKeyId,
-                                         created_at    = CreatedAt}) ->
-                                    Owner1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
-                                                 {ok, Owner0} -> Owner0;
-                                                 _ -> #user_credential{}
+                                         acls = ACLs,
+                                         created_at = CreatedAt}) ->
+                                    Owner_1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
+                                                 {ok, Owner} ->
+                                                     Owner;
+                                                 _ ->
+                                                     #user_credential{}
                                              end,
-                                    {Name, Owner1, CreatedAt}
+                                    Permissions_1 =
+                                        case ACLs of
+                                            [] -> ACLs;
+                                            [#bucket_acl_info{permissions = Permissions}|_] ->
+                                                Permissions
+                                        end,
+                                    {Name, Owner_1, Permissions_1, CreatedAt}
                             end, Buckets),
             case Ret of
                 [] -> not_found;

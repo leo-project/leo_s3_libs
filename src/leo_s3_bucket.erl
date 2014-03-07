@@ -43,7 +43,7 @@
          get_acls/1, update_acls/3,
          update_acls2private/2, update_acls2public_read/2,
          update_acls2public_read_write/2, update_acls2authenticated_read/2,
-         put/2, put/3, delete/2, head/2, head/4, change_bucket_owner/2]).
+         put/2, put/3, delete/2, delete/3, head/2, head/4, change_bucket_owner/2]).
 
 %%--------------------------------------------------------------------
 %% API
@@ -248,16 +248,10 @@ find_all_including_owner() ->
 put(AccessKey, Bucket) ->
     case get_info() of
         {ok, #bucket_info{type = slave,
-                          db   = DB,
                           provider = Provider}} ->
             case leo_s3_auth:has_credential(Provider, AccessKey) of
                 true ->
-                    case rpc_call(Provider, put, [AccessKey, Bucket]) of
-                        ok ->
-                            put(AccessKey, Bucket, DB);
-                        _ ->
-                            {error, not_stored}
-                    end;
+                    rpc_call(Provider, leo_manager_api, add_bucket, [AccessKey, Bucket]);
                 false ->
                     {error, invalid_access}
             end;
@@ -274,31 +268,30 @@ put(AccessKey, Bucket) ->
 
 -spec(put(binary(), binary(), ets | mnesia) ->
              ok | {error, any()}).
+put(AccessKey, Bucket, undefined) ->
+    case get_info() of
+        {ok, #bucket_info{db = DB}} ->
+            put(AccessKey, Bucket, DB);
+        Error ->
+            Error
+    end;
 put(AccessKey, Bucket, DB) ->
-    Res = head(AccessKey, Bucket),
-
-    case (Res == ok orelse Res == not_found) of
-        true ->
-            BucketStr = cast_binary_to_str(Bucket),
-            case is_valid_bucket(BucketStr) of
-                ok ->
-                    %% ACL is set to private(default)
-                    ACLs = [#bucket_acl_info{user_id     = AccessKey,
-                                             permissions = [full_control]}],
-                    Now = leo_date:now(),
-                    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                                      #?BUCKET{name = Bucket,
-                                                               access_key_id = AccessKey,
-                                                               acls = ACLs,
-                                                               created_at = Now,
-                                                               last_modified_at = Now});
-                Error ->
-                    Error
-            end;
-        false ->
-            {error, already_has}
+    BucketStr = cast_binary_to_str(Bucket),
+    case is_valid_bucket(BucketStr) of
+        ok ->
+            %% ACL is set to private(default)
+            ACLs = [#bucket_acl_info{user_id     = AccessKey,
+                                     permissions = [full_control]}],
+            Now = leo_date:now(),
+            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
+                                              #?BUCKET{name = Bucket,
+                                                       access_key_id = AccessKey,
+                                                       acls = ACLs,
+                                                       created_at = Now,
+                                                       last_modified_at = Now});
+        Error ->
+            Error
     end.
-
 
 %% @doc delete a bucket.
 %%
@@ -307,14 +300,8 @@ put(AccessKey, Bucket, DB) ->
 delete(AccessKey, Bucket) ->
     case get_info() of
         {ok, #bucket_info{type = slave,
-                          db   = DB,
                           provider = Provider}} ->
-            case rpc_call(Provider, delete, [AccessKey, Bucket]) of
-                ok ->
-                    delete(AccessKey, Bucket, DB);
-                _ ->
-                    {error, not_deleted}
-            end;
+            rpc_call(Provider, leo_manager_api, delete_bucket, [AccessKey, Bucket]);
         {ok, #bucket_info{type = master, db = DB}} ->
             delete(AccessKey, Bucket, DB);
         Error ->
@@ -323,6 +310,13 @@ delete(AccessKey, Bucket) ->
 
 -spec(delete(binary(), binary(), ets | mnesia) ->
              ok | {error, any()}).
+delete(AccessKey, Bucket, undefined) ->
+    case get_info() of
+        {ok, #bucket_info{db = DB}} ->
+            delete(AccessKey, Bucket, DB);
+        Error ->
+            Error
+    end;
 delete(AccessKey, Bucket, DB) ->
     leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE},
                                       #?BUCKET{name = Bucket,

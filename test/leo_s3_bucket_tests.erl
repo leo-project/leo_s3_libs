@@ -147,8 +147,9 @@ mnesia_suite_(_) ->
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid3),
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid4),
 
-    {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid1),
-    {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid2),
+    % Duplication check should be done at a caller(leo_manager_api)
+    %{error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid1),
+    %{error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid2),
 
     %% Retrieve buckets including owner
     {ok, Buckets0} = leo_s3_bucket:find_all_including_owner(),
@@ -207,6 +208,18 @@ ets_suite_(_) ->
                                            end]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, delete,
                                            fun(_AccessKey, _Bucket) ->
+                                                   ok
+                                           end]),
+    ok = rpc:call(Manager1, meck, new,    [leo_manager_api, [no_link]]),
+    Me = erlang:node(),
+    ok = rpc:call(Manager1, meck, expect, [leo_manager_api, add_bucket,
+                                           fun(AccessKey, Bucket) ->
+                                                   rpc:call(Me, leo_s3_bucket, put, [AccessKey, Bucket, undefined]),
+                                                   ok
+                                           end]),
+    ok = rpc:call(Manager1, meck, expect, [leo_manager_api, delete_bucket,
+                                           fun(AccessKey, Bucket) ->
+                                                   rpc:call(Me, leo_s3_bucket, delete, [AccessKey, Bucket, undefined]),
                                                    ok
                                            end]),
 

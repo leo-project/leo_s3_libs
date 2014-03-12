@@ -43,7 +43,7 @@
          get_acls/1, update_acls/3,
          update_acls2private/2, update_acls2public_read/2,
          update_acls2public_read_write/2, update_acls2authenticated_read/2,
-         put/2, put/3, delete/2, delete/3, head/2, head/4, change_bucket_owner/2]).
+         put/2, put/3, put/4, delete/2, delete/3, head/2, head/4, change_bucket_owner/2]).
 
 %%--------------------------------------------------------------------
 %% API
@@ -246,19 +246,25 @@ find_all_including_owner() ->
 -spec(put(binary(), binary()) ->
              ok | {error, any()}).
 put(AccessKey, Bucket) ->
+    %% ACL is set to private(default)
+    put(AccessKey, Bucket, ?CANNED_ACL_PRIVATE).
+
+-spec(put(binary(), binary(), string()) ->
+             ok | {error, any()}).
+put(AccessKey, Bucket, CannedACL) ->
     case get_info() of
         {ok, #bucket_info{type = slave,
                           provider = Provider}} ->
             case leo_s3_auth:has_credential(Provider, AccessKey) of
                 true ->
-                    rpc_call(Provider, leo_manager_api, add_bucket, [AccessKey, Bucket]);
+                    rpc_call(Provider, leo_manager_api, add_bucket, [AccessKey, Bucket, CannedACL]);
                 false ->
                     {error, invalid_access}
             end;
         {ok, #bucket_info{type = master, db = DB}} ->
             case leo_s3_auth:has_credential(AccessKey) of
                 true ->
-                    put(AccessKey, Bucket, DB);
+                    put(AccessKey, Bucket, CannedACL, DB);
                 false ->
                     {error, invalid_access}
             end;
@@ -266,22 +272,20 @@ put(AccessKey, Bucket) ->
             Error
     end.
 
--spec(put(binary(), binary(), ets | mnesia) ->
+-spec(put(binary(), binary(), string, ets | mnesia) ->
              ok | {error, any()}).
-put(AccessKey, Bucket, undefined) ->
+put(AccessKey, Bucket, CannedACL, undefined) ->
     case get_info() of
         {ok, #bucket_info{db = DB}} ->
-            put(AccessKey, Bucket, DB);
+            put(AccessKey, Bucket, CannedACL, DB);
         Error ->
             Error
     end;
-put(AccessKey, Bucket, DB) ->
+put(AccessKey, Bucket, CannedACL, DB) ->
     BucketStr = cast_binary_to_str(Bucket),
     case is_valid_bucket(BucketStr) of
         ok ->
-            %% ACL is set to private(default)
-            ACLs = [#bucket_acl_info{user_id     = AccessKey,
-                                     permissions = [full_control]}],
+            ACLs = canned_acl2bucket_acl_info(AccessKey, CannedACL),
             Now = leo_date:now(),
             leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
                                               #?BUCKET{name = Bucket,
@@ -384,8 +388,7 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
 -spec(update_acls2private(binary(), #?BUCKET{}) ->
              ok | {error, any()}).
 update_acls2private(AccessKey, Bucket) ->
-    ACLs = [#bucket_acl_info{user_id     = AccessKey,
-                             permissions = [full_control]}],
+    ACLs = canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PRIVATE),
     update_acls(AccessKey, Bucket, ACLs).
 
 
@@ -394,8 +397,7 @@ update_acls2private(AccessKey, Bucket) ->
 -spec(update_acls2public_read(binary(), #?BUCKET{}) ->
              ok | {error, any()}).
 update_acls2public_read(AccessKey, Bucket) ->
-    ACLs = [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
-                             permissions = [read]}],
+    ACLs = canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PUBLIC_READ),
     update_acls(AccessKey, Bucket, ACLs).
 
 
@@ -404,8 +406,7 @@ update_acls2public_read(AccessKey, Bucket) ->
 -spec(update_acls2public_read_write(binary(), #?BUCKET{}) ->
              ok | {error, any()}).
 update_acls2public_read_write(AccessKey, Bucket) ->
-    ACLs = [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
-                             permissions = [read, write]}],
+    ACLs = canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PUBLIC_READ_WRITE),
     update_acls(AccessKey, Bucket, ACLs).
 
 
@@ -811,3 +812,14 @@ cast_binary_to_str(Bucket) ->
         true  -> binary_to_list(Bucket);
         false -> Bucket
     end.
+
+%% @doc convert a canned acl string to a bucket_acl_info record
+canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PRIVATE) ->
+    [#bucket_acl_info{user_id     = AccessKey,
+                      permissions = [full_control]}];
+canned_acl2bucket_acl_info(_AccessKey, ?CANNED_ACL_PUBLIC_READ) ->
+    [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
+                      permissions = [read]}];
+canned_acl2bucket_acl_info(_AccessKey, ?CANNED_ACL_PUBLIC_READ_WRITE) ->
+    [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
+                      permissions = [read, write]}].

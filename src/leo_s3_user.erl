@@ -111,7 +111,8 @@ add_1(UserId, Password, WithS3Keys) ->
     case leo_s3_libs_data_handler:insert(
            {mnesia, ?USERS_TABLE}, {[], #?S3_USER{id         = UserId,
                                                   password   = Digest,
-                                                  created_at = CreatedAt}}) of
+                                                  created_at = CreatedAt,
+                                                  updated_at = CreatedAt}}) of
         ok ->
             case WithS3Keys of
                 true ->
@@ -175,7 +176,9 @@ update(#?S3_USER{id       = UserId,
               {mnesia, ?USERS_TABLE}, {[], #?S3_USER{id         = UserId,
                                                      role_id    = RoleId2,
                                                      password   = Password2,
-                                                     created_at = CreatedAt}});
+                                                     created_at = CreatedAt,
+                                                     updated_at = leo_date:now()
+                                                    }});
         Error ->
             Error
     end.
@@ -195,6 +198,7 @@ delete(UserId) ->
                                                           role_id    = RoleId,
                                                           password   = Password,
                                                           created_at = CreatedAt,
+                                                          updated_at = leo_date:now(),
                                                           del        = true}}) of
                 ok ->
                     leo_s3_libs_data_handler:delete(
@@ -352,6 +356,7 @@ transform_1(#user{id = Id,
               password = Password,
               role_id  = RoleId,
               created_at = CreatedAt,
+              updated_at = CreatedAt,
               del = DelFlag}.
 
 

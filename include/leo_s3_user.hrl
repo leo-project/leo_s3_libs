@@ -43,6 +43,7 @@
           role_id = ?ROLE_GENERAL :: integer(),
           cluster_id              :: atom(),
           created_at = 0          :: integer(),
+          updated_at = 0          :: integer(),
           del = false             :: boolean()
          }).
 -define(S3_USER, 'user_1').

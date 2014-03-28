@@ -43,7 +43,9 @@
          get_acls/1, update_acls/3,
          update_acls2private/2, update_acls2public_read/2,
          update_acls2public_read_write/2, update_acls2authenticated_read/2,
-         put/2, put/3, put/4, delete/2, delete/3, head/2, head/4, change_bucket_owner/2]).
+         put/2, put/3, put/4, put/5,
+         delete/2, delete/3, head/2, head/4,
+         change_bucket_owner/2]).
 
 %%--------------------------------------------------------------------
 %% API
@@ -247,11 +249,16 @@ find_all_including_owner() ->
              ok | {error, any()}).
 put(AccessKey, Bucket) ->
     %% ACL is set to private(default)
-    put(AccessKey, Bucket, ?CANNED_ACL_PRIVATE).
+    put(AccessKey, Bucket, ?CANNED_ACL_PRIVATE, undefined).
 
 -spec(put(binary(), binary(), string()) ->
              ok | {error, any()}).
 put(AccessKey, Bucket, CannedACL) ->
+    put(AccessKey, Bucket, CannedACL, undefined).
+
+-spec(put(binary(), binary(), string(), atom()) ->
+             ok | {error, any()}).
+put(AccessKey, Bucket, CannedACL, ClusterId) ->
     case get_info() of
         {ok, #bucket_info{type = slave,
                           provider = Provider}} ->
@@ -264,7 +271,7 @@ put(AccessKey, Bucket, CannedACL) ->
         {ok, #bucket_info{type = master, db = DB}} ->
             case leo_s3_auth:has_credential(AccessKey) of
                 true ->
-                    put(AccessKey, Bucket, CannedACL, DB);
+                    put(AccessKey, Bucket, CannedACL, ClusterId, DB);
                 false ->
                     {error, invalid_access}
             end;
@@ -272,16 +279,16 @@ put(AccessKey, Bucket, CannedACL) ->
             Error
     end.
 
--spec(put(binary(), binary(), string, ets | mnesia) ->
+-spec(put(binary(), binary(), string(), atom(), ets | mnesia) ->
              ok | {error, any()}).
-put(AccessKey, Bucket, CannedACL, undefined) ->
+put(AccessKey, Bucket, CannedACL, ClusterId, undefined) ->
     case get_info() of
         {ok, #bucket_info{db = DB}} ->
-            put(AccessKey, Bucket, CannedACL, DB);
+            put(AccessKey, Bucket, CannedACL, ClusterId, DB);
         Error ->
             Error
     end;
-put(AccessKey, Bucket, CannedACL, DB) ->
+put(AccessKey, Bucket, CannedACL, ClusterId, DB) ->
     BucketStr = cast_binary_to_str(Bucket),
     case is_valid_bucket(BucketStr) of
         ok ->
@@ -291,6 +298,7 @@ put(AccessKey, Bucket, CannedACL, DB) ->
                                               #?BUCKET{name = Bucket,
                                                        access_key_id = AccessKey,
                                                        acls = ACLs,
+                                                       cluster_id = ClusterId,
                                                        created_at = Now,
                                                        last_modified_at = Now});
         Error ->

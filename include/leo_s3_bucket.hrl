@@ -60,7 +60,7 @@
           created_at = 0 :: integer() %% created date and time
          }).
 
-%% - LeoFS-v0.16.0
+%% - LeoFS-v0.16.0 - v1.0.0-pre3
 -record(bucket_0_16_0, {
           name          :: string(), %% bucket name
           access_key_id :: binary(), %% access-key-id
@@ -70,8 +70,20 @@
           last_modified_at    = 0 :: integer() %% modified date and time
          }).
 
-%% Current bucket-record is 'bucket_0_16_0'
--define(BUCKET, bucket_0_16_0).
+%% - LeoFS-v1.0.0 -
+-record(bucket_1, {
+          name          :: string(), %% bucket name
+          access_key_id :: binary(), %% access-key-id
+          acls = []     :: acls(),   %% acl list
+          cluster_id    :: atom(),   %% cluster_id
+          last_synchroized_at = 0 :: integer(), %% last synchronized date and time
+          created_at          = 0 :: integer(), %% created date and time
+          last_modified_at    = 0 :: integer() %% modified date and time
+         }).
+
+
+%% Current bucket-record is 'bucket_1'
+-define(BUCKET, bucket_1).
 
 
 -record(bucket_info, {

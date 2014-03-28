@@ -211,15 +211,18 @@ ets_suite_(_) ->
                                                    ok
                                            end]),
     ok = rpc:call(Manager1, meck, new,    [leo_manager_api, [no_link]]),
+
     Me = erlang:node(),
     ok = rpc:call(Manager1, meck, expect, [leo_manager_api, add_bucket,
                                            fun(AccessKey, Bucket, CannedACL) ->
-                                                   rpc:call(Me, leo_s3_bucket, put, [AccessKey, Bucket, CannedACL, undefined]),
+                                                   rpc:call(Me, leo_s3_bucket, put,
+                                                            [AccessKey, Bucket, CannedACL, undefined, undefined]),
                                                    ok
                                            end]),
     ok = rpc:call(Manager1, meck, expect, [leo_manager_api, delete_bucket,
                                            fun(AccessKey, Bucket) ->
-                                                   rpc:call(Me, leo_s3_bucket, delete, [AccessKey, Bucket, undefined]),
+                                                   rpc:call(Me, leo_s3_bucket, delete,
+                                                            [AccessKey, Bucket, undefined]),
                                                    ok
                                            end]),
 

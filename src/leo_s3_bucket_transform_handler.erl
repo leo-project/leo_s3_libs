@@ -54,20 +54,33 @@ transform(#?BUCKET{} = Bucket) ->
 %% @doc migrate a record from 0.16.0 to the current version
 %% @private
 transform({bucket, Name, AccessKey, CreatedAt}) ->
-    #bucket_0_16_0{name                = Name,
-                   access_key_id       = AccessKey,
-                   acls                = [],
-                   last_synchroized_at = 0,
-                   created_at          = CreatedAt,
-                   last_modified_at    = 0};
+    #?BUCKET{name                = Name,
+             access_key_id       = AccessKey,
+             acls                = [],
+             last_synchroized_at = 0,
+             created_at          = CreatedAt,
+             last_modified_at    = 0};
 
 %% @doc migrate a record from 0.14.x to the current version
 %% @private
 transform({bucket, Name, AccessKey, Acls,
            LastSynchronizedAt, CreatedAt, LastModifiedAt}) ->
-    #bucket_0_16_0{name                = Name,
-                   access_key_id       = AccessKey,
-                   acls                = Acls,
-                   last_synchroized_at = LastSynchronizedAt,
-                   created_at          = CreatedAt,
-                   last_modified_at    = LastModifiedAt}.
+    #?BUCKET{name                = Name,
+             access_key_id       = AccessKey,
+             acls                = Acls,
+             last_synchroized_at = LastSynchronizedAt,
+             created_at          = CreatedAt,
+             last_modified_at    = LastModifiedAt};
+
+transform(#bucket_0_16_0{name                = Name,
+                         access_key_id       = AccessKey,
+                         acls                = Acls,
+                         last_synchroized_at = LastSynchronizedAt,
+                         created_at          = CreatedAt,
+                         last_modified_at    = LastModifiedAt}) ->
+    #?BUCKET{name                = Name,
+             access_key_id       = AccessKey,
+             acls                = Acls,
+             last_synchroized_at = LastSynchronizedAt,
+             created_at          = CreatedAt,
+             last_modified_at    = LastModifiedAt}.

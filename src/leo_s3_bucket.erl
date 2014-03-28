@@ -46,6 +46,8 @@
          put/2, put/3, put/4, put/5,
          delete/2, delete/3, head/2, head/4,
          change_bucket_owner/2]).
+-export([transform/0, transform/1]).
+
 
 %%--------------------------------------------------------------------
 %% API
@@ -837,3 +839,76 @@ canned_acl2bucket_acl_info(_AccessKey, ?CANNED_ACL_PUBLIC_READ) ->
 canned_acl2bucket_acl_info(_AccessKey, ?CANNED_ACL_PUBLIC_READ_WRITE) ->
     [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
                       permissions = [read, write]}].
+
+
+%%--------------------------------------------------------------------
+%% Transform API
+%%--------------------------------------------------------------------
+%% @doc The table schema migrate to the new one by using mnesia:transform_table
+%%
+-spec(transform() -> ok).
+transform() ->
+    {atomic, ok} = mnesia:transform_table(
+                     ?BUCKET_TABLE,
+                     fun transform_1/1, record_info(fields, ?BUCKET), ?BUCKET),
+    ok.
+
+
+%% @doc the record is the current verion
+%% @private
+transform_1(#?BUCKET{} = Bucket) ->
+    Bucket;
+
+%% @doc migrate a record from 0.16.0 to the current version
+%% @private
+transform_1({bucket, Name, AccessKey, CreatedAt}) ->
+    #?BUCKET{name                = Name,
+             access_key_id       = AccessKey,
+             acls                = [],
+             last_synchroized_at = 0,
+             created_at          = CreatedAt,
+             last_modified_at    = 0};
+
+%% @doc migrate a record from 0.14.x to the current version
+%% @private
+transform_1({bucket, Name, AccessKey, Acls,
+             LastSynchronizedAt, CreatedAt, LastModifiedAt}) ->
+    #?BUCKET{name                = Name,
+             access_key_id       = AccessKey,
+             acls                = Acls,
+             last_synchroized_at = LastSynchronizedAt,
+             created_at          = CreatedAt,
+             last_modified_at    = LastModifiedAt};
+
+transform_1(#bucket_0_16_0{name                = Name,
+                           access_key_id       = AccessKey,
+                           acls                = Acls,
+                           last_synchroized_at = LastSynchronizedAt,
+                           created_at          = CreatedAt,
+                           last_modified_at    = LastModifiedAt}) ->
+    #?BUCKET{name                = Name,
+             access_key_id       = AccessKey,
+             acls                = Acls,
+             last_synchroized_at = LastSynchronizedAt,
+             created_at          = CreatedAt,
+             last_modified_at    = LastModifiedAt}.
+
+
+%% @doc Transform data
+%%
+transform(ClusterId) ->
+    case find_all() of
+        {ok, RetL} ->
+            transform_2(RetL, ClusterId);
+        _ ->
+            ok
+    end.
+
+transform_2([],_ClusterId) ->
+    ok;
+transform_2([#?BUCKET{cluster_id = undefined} = Bucket|Rest], ClusterId) ->
+    leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
+                                      Bucket#?BUCKET{cluster_id = ClusterId}),
+    transform_2(Rest, ClusterId);
+transform_2([_|Rest], ClusterId) ->
+    transform_2(Rest, ClusterId).

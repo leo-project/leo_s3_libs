@@ -29,7 +29,9 @@
 
 -include("leo_s3_auth.hrl").
 -include("leo_s3_user.hrl").
+-include("leo_s3_libs.hrl").
 -include_lib("eunit/include/eunit.hrl").
+-include_lib("stdlib/include/qlc.hrl").
 
 
 %%--------------------------------------------------------------------
@@ -77,8 +79,8 @@ suite_(_) ->
 
     %% %% find-by-id
     {ok, Res1} = leo_s3_user:find_by_id(UserId),
-    ?assertEqual(UserId, Res1#user.id),
-    ?debugVal(Res1#user.password),
+    ?assertEqual(UserId, Res1#?S3_USER.id),
+    ?debugVal(Res1#?S3_USER.password),
 
     %% %% find_by_access_key_id
     {ok, Res2} = leo_s3_user:find_by_access_key_id(AccessKeyId),
@@ -104,16 +106,38 @@ suite_(_) ->
     {error,invalid_values} = leo_s3_user:auth(UserId, <<>>),
 
     %% update
-    ok = leo_s3_user:update(#user{id      = UserId,
-                                  role_id = 9}),
+    ok = leo_s3_user:update(#?S3_USER{id      = UserId,
+                                      role_id = 9}),
     {ok, Res3} = leo_s3_user:find_by_id(UserId),
-    ?assertEqual(UserId, Res3#user.id),
-    ?assertEqual(9,      Res3#user.role_id),
+    ?assertEqual(UserId, Res3#?S3_USER.id),
+    ?assertEqual(9,      Res3#?S3_USER.role_id),
 
     %% delete
     ok = leo_s3_user:delete(UserId),
     not_found = leo_s3_user:find_by_id(UserId),
+
+
+    ok = leo_s3_user:transform('leofs_99'),
+    Fun = fun() ->
+                  Q1 = qlc:q([X || X <- mnesia:table(?USERS_TABLE)]),
+                  Q2 = qlc:sort(Q1, [{order, ascending}]),
+                  qlc:e(Q2)
+          end,
+    case leo_mnesia:read(Fun) of
+        {ok, RetL} ->
+            transform_1(RetL);
+        _ ->
+            ok
+    end,
     ok.
+
+%% @private
+transform_1([]) ->
+    ok;
+transform_1([User|Rest]) ->
+    ?assertEqual(true, is_record(User, ?S3_USER)),
+    ?assertEqual('leofs_99', User#?S3_USER.cluster_id),
+    transform_1(Rest).
 
 -endif.
 

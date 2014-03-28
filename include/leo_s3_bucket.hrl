@@ -78,7 +78,7 @@
           cluster_id    :: atom(),   %% cluster_id
           last_synchroized_at = 0 :: integer(), %% last synchronized date and time
           created_at          = 0 :: integer(), %% created date and time
-          last_modified_at    = 0 :: integer() %% modified date and time
+          last_modified_at    = 0 :: integer()  %% modified date and time
          }).
 %% Current bucket-record is 'bucket_1'
 -define(BUCKET, bucket_1).

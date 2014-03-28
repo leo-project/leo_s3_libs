@@ -216,24 +216,30 @@ find_all() ->
 find_all_including_owner() ->
     case find_all() of
         {ok, Buckets} ->
-            Ret = lists:map(fun(#?BUCKET{name = Name,
-                                         access_key_id = AccessKeyId,
-                                         acls = ACLs,
-                                         created_at = CreatedAt}) ->
-                                    Owner_1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
-                                                 {ok, Owner} ->
-                                                     Owner;
-                                                 _ ->
-                                                     #user_credential{}
-                                             end,
-                                    Permissions_1 =
-                                        case ACLs of
-                                            [] -> ACLs;
-                                            [#bucket_acl_info{permissions = Permissions}|_] ->
-                                                Permissions
-                                        end,
-                                    {Name, Owner_1, Permissions_1, CreatedAt}
-                            end, Buckets),
+            Ret = lists:map(
+                    fun(#?BUCKET{name = Name,
+                                 access_key_id = AccessKeyId,
+                                 acls = ACLs,
+                                 cluster_id = ClusterId,
+                                 created_at = CreatedAt}) ->
+                            Owner_1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
+                                          {ok, Owner} ->
+                                              Owner;
+                                          _ ->
+                                              #user_credential{}
+                                      end,
+                            Permissions_1 =
+                                case ACLs of
+                                    [] -> ACLs;
+                                    [#bucket_acl_info{permissions = Permissions}|_] ->
+                                        Permissions
+                                end,
+                            #bucket_dto{name       = Name,
+                                        owner      = Owner_1,
+                                        acls       = Permissions_1,
+                                        cluster_id = ClusterId,
+                                        created_at = CreatedAt}
+                    end, Buckets),
             case Ret of
                 [] -> not_found;
                 _  -> {ok, Ret}

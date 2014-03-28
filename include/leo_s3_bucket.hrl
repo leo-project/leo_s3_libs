@@ -80,8 +80,6 @@
           created_at          = 0 :: integer(), %% created date and time
           last_modified_at    = 0 :: integer() %% modified date and time
          }).
-
-
 %% Current bucket-record is 'bucket_1'
 -define(BUCKET, bucket_1).
 
@@ -91,4 +89,13 @@
           db            :: atom(), %% db-type:[ets | mnesia]
           provider = [] :: list(), %% auth-info provides
           sync_interval :: pos_integer() %% interval in seconrd to use syncing local records with manager's
+         }).
+
+%% {Name, Owner_1, Permissions_1, CreatedAt}
+-record(bucket_dto, {
+          name          :: string(),  %% bucket name
+          owner         :: string(),  %% owner name
+          acls = []     :: acls(),    %% acl list
+          cluster_id    :: atom(),    %% cluster_id
+          created_at = 0 :: integer() %% created date and time
          }).

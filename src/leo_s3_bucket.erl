@@ -337,10 +337,20 @@ delete(AccessKey, Bucket, undefined) ->
         Error ->
             Error
     end;
-delete(AccessKey, Bucket, DB) ->
-    leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE},
-                                      #?BUCKET{name = Bucket,
-                                               access_key_id = AccessKey}).
+delete(AccessKey, BucketName, DB) ->
+    Table = ?BUCKET_TABLE,
+    case leo_s3_bucket_data_handler:find_by_name(
+           {DB, Table}, AccessKey, BucketName, true) of
+        {ok, Bucket} ->
+            leo_s3_bucket_data_handler:insert(
+              {DB, ?BUCKET_TABLE},
+              Bucket#?BUCKET{del = true,
+                             last_modified_at = leo_date:now()});
+        not_found ->
+            ok;
+        Error ->
+            Error
+    end.
 
 
 %% @doc update acls in a bukcet-property

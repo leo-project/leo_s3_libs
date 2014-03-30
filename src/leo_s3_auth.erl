@@ -38,7 +38,7 @@
          update_providers/1,
          create_key/1, get_credential/1, has_credential/1, has_credential/2,
          authenticate/3, get_signature/2,
-         checksum/0
+         find_all/0, checksum/0
         ]).
 
 
@@ -198,18 +198,6 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
     end.
 
 
-%% @doc Retrieve checksum of the table
--spec(checksum() ->
-             {ok, pos_integer()} | not_found | {error, any()}).
-checksum() ->
-    case leo_s3_libs_data_handler:all({mnesia, ?AUTH_TABLE}) of
-        {ok, RetL} ->
-            {ok, erlang:crc32(term_to_binary(RetL))};
-        Error ->
-            Error
-    end.
-
-
 %% @doc Generate a signature.
 %% @private
 -define(SUB_RESOURCES, [<<"acl">>,
@@ -264,6 +252,30 @@ get_signature(SecretAccessKey, SignParams) ->
     Signature = base64:encode(Mac),
     %% ?debugVal(Signature),
     Signature.
+
+
+%% @doc Retrieve all records
+-spec(find_all() ->
+             {ok, list(#credential{})} | not_found | {error, any()}).
+find_all() ->
+    case leo_s3_libs_data_handler:all({mnesia, ?AUTH_TABLE}) of
+        {ok, RetL} ->
+            {ok, RetL};
+        Error ->
+            Error
+    end.
+
+
+%% @doc Retrieve checksum of the table
+-spec(checksum() ->
+             {ok, pos_integer()} | not_found | {error, any()}).
+checksum() ->
+    case find_all() of
+        {ok, RetL} ->
+            {ok, erlang:crc32(term_to_binary(RetL))};
+        Error ->
+            Error
+    end.
 
 
 %%--------------------------------------------------------------------

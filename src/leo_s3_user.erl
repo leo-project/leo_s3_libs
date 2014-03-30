@@ -35,7 +35,7 @@
 
 -export([create_table/2,
          add/3, update/1, delete/1,
-         find_by_id/1,
+         find_by_id/1, find_all/0,
          auth/2, checksum/0,
          transform/0, transform/1
         ]).
@@ -187,6 +187,18 @@ find_by_id(UserId) ->
     end.
 
 
+%% @doc Retrieve all records
+-spec(find_all() ->
+             {ok, list(#?S3_USER{})} | not_found | {error, any()}).
+find_all() ->
+    case leo_s3_bucket_data_handler:find_all({mnesia, ?USERS_TABLE}) of
+        {ok, RetL} ->
+            {ok, RetL};
+        Error ->
+            Error
+    end.   
+
+
 %% @doc Retrieve owners (omit secret_key)
 %%
 -spec(auth(binary(), binary()) ->
@@ -218,7 +230,7 @@ auth(UserId, PW0) ->
 -spec(checksum() ->
              {ok, pos_integer()} | not_found | {error, any()}).
 checksum() ->
-    case leo_s3_bucket_data_handler:find_all({mnesia, ?USERS_TABLE}) of
+    case find_all() of
         {ok, RetL} ->
             {ok, erlang:crc32(term_to_binary(RetL))};
         Error ->

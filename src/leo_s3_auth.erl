@@ -33,10 +33,12 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
--export([start/2, create_credential_table/2,
+-export([start/2,
+         create_table/2,
          update_providers/1,
          create_key/1, get_credential/1, has_credential/1, has_credential/2,
-         authenticate/3, get_signature/2
+         authenticate/3, get_signature/2,
+         checksum/0
         ]).
 
 
@@ -82,9 +84,9 @@ update_providers(Provider) ->
 
 %% @doc Create credential table(mnesia)
 %%
--spec(create_credential_table(ram_copies|disc_copies, list()) ->
+-spec(create_table(ram_copies|disc_copies, list()) ->
              ok).
-create_credential_table(Mode, Nodes) ->
+create_table(Mode, Nodes) ->
     catch application:start(mnesia),
     {atomic, ok} =
         mnesia:create_table(
@@ -94,10 +96,10 @@ create_credential_table(Mode, Nodes) ->
            {record_name, credential},
            {attributes, record_info(fields, credential)},
            {user_properties,
-            [{access_key_id,     {binary, undefined},  false, primary,   undefined, identity,  binary},
-             {secret_access_key, {binary, undefined},  false, undefined, undefined, undefined, binary},
-             {user_id,           {binary, undefined},  false, undefined, undefined, undefined, binary},
-             {created_at,        {integer, undefined}, false, undefined, undefined, undefined, integer}
+            [{access_key_id,     binary,  primary},
+             {secret_access_key, binary,  false},
+             {user_id,           binary,  false},
+             {created_at,        integer, false}
             ]}
           ]),
     ok.
@@ -196,9 +198,41 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
     end.
 
 
+%% @doc Retrieve checksum of the table
+-spec(checksum() ->
+             {ok, pos_integer()} | not_found | {error, any()}).
+checksum() ->
+    case leo_s3_libs_data_handler:all({mnesia, ?AUTH_TABLE}) of
+        {ok, RetL} ->
+            {ok, erlang:crc32(term_to_binary(RetL))};
+        Error ->
+            Error
+    end.
+
+
 %% @doc Generate a signature.
 %% @private
--define(SUB_RESOURCES, [<<"acl">>, <<"lifecycle">>, <<"location">>, <<"logging">>, <<"notification">>, <<"partNumber">>, <<"policy">>, <<"requestPayment">>, <<"torrent">>, <<"uploadId">>, <<"uploads">>, <<"versionid">>, <<"versioning">>, <<"versions">>, <<"website">>, <<"response-content-type">>, <<"response-content-language">>, <<"response-expires">>, <<"response-cache-control">>, <<"response-content-disposition">>, <<"response-content-encoding">>]).
+-define(SUB_RESOURCES, [<<"acl">>,
+                        <<"lifecycle">>,
+                        <<"location">>,
+                        <<"logging">>,
+                        <<"notification">>,
+                        <<"partNumber">>,
+                        <<"policy">>,
+                        <<"requestPayment">>,
+                        <<"torrent">>,
+                        <<"uploadId">>,
+                        <<"uploads">>,
+                        <<"versionid">>,
+                        <<"versioning">>,
+                        <<"versions">>,
+                        <<"website">>,
+                        <<"response-content-type">>,
+                        <<"response-content-language">>,
+                        <<"response-expires">>,
+                        <<"response-cache-control">>,
+                        <<"response-content-disposition">>,
+                        <<"response-content-encoding">>]).
 
 -spec(get_signature(binary(), #sign_params{}) ->
              binary()).

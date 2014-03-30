@@ -58,9 +58,9 @@ teardown(_) ->
 
 
 suite_(_) ->
-    ok = leo_s3_user:create_user_table(ram_copies, [node()]),
-    ok = leo_s3_user:create_user_credential_table(ram_copies, [node()]),
-    ok = leo_s3_auth:create_credential_table(ram_copies, [node()]),
+    ok = leo_s3_user:create_table(ram_copies, [node()]),
+    ok = leo_s3_user_credential:create_table(ram_copies, [node()]),
+    ok = leo_s3_auth:create_table(ram_copies, [node()]),
 
     UserId    = "Name is Leo",
     Password0 = <<"Type is FS">>,
@@ -83,7 +83,7 @@ suite_(_) ->
     ?debugVal(Res1#?S3_USER.password),
 
     %% %% find_by_access_key_id
-    {ok, Res2} = leo_s3_user:find_by_access_key_id(AccessKeyId),
+    {ok, Res2} = leo_s3_user_credential:find_by_access_key_id(AccessKeyId),
     ?assertEqual(UserId,      Res2#user_credential.user_id),
     ?assertEqual(AccessKeyId, Res2#user_credential.access_key_id),
 
@@ -92,12 +92,12 @@ suite_(_) ->
     {ok, _} = leo_s3_user:add(UserId ++ "_2", Password0, true),
     {ok, _} = leo_s3_user:add(UserId ++ "_3", Password0, true),
     {ok, _} = leo_s3_user:add(UserId ++ "_4", Password0, true),
-    {ok, Users} = leo_s3_user:find_all(),
+    {ok, Users} = leo_s3_user_credential:find_all(),
     ?debugVal(Users),
     ?assertEqual(5, length(Users)),
 
     %% %% get_credential_by_id
-    {ok, Credential} = leo_s3_user:get_credential_by_id(UserId),
+    {ok, Credential} = leo_s3_user_credential:get_credential_by_user_id(UserId),
     ?assertEqual(AccessKeyId,     leo_misc:get_value(access_key_id, Credential)),
     ?assertEqual(SecretAccessKey, leo_misc:get_value(secret_access_key, Credential)),
 
@@ -129,6 +129,13 @@ suite_(_) ->
         _ ->
             ok
     end,
+
+    %% check checksum
+    {ok, Checksum_1} = leo_s3_user:checksum(),
+    {ok, Checksum_2} = leo_s3_user_credential:checksum(),
+    ?assertEqual(true, Checksum_1 > 0),
+    ?assertEqual(true, Checksum_2 > 0),
+
     ok.
 
 %% @private

@@ -33,8 +33,8 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -export([start/3,
-         create_bucket_table/2,
-         create_bucket_table_old_for_test/2,
+         create_table/2,
+         create_table_old_for_test/2,
          is_valid_bucket/1,
          update_providers/1,
          find_bucket_by_name/1, find_bucket_by_name/2,
@@ -45,7 +45,9 @@
          update_acls2public_read_write/2, update_acls2authenticated_read/2,
          put/2, put/3, put/4, put/5,
          delete/2, delete/3, head/2, head/4,
-         change_bucket_owner/2]).
+         change_bucket_owner/2,
+         checksum/0
+        ]).
 -export([transform/0, transform/1]).
 
 
@@ -87,9 +89,9 @@ update_providers(Provider) ->
 
 %% Create bucket table(mnesia)
 %%
--spec(create_bucket_table(ram_copies|disc|copies, list()) ->
+-spec(create_table(ram_copies|disc|copies, list()) ->
              ok).
-create_bucket_table(Mode, Nodes) ->
+create_table(Mode, Nodes) ->
     _ = application:start(mnesia),
     {atomic, ok} =
         mnesia:create_table(?BUCKET_TABLE,
@@ -101,9 +103,9 @@ create_bucket_table(Mode, Nodes) ->
     ok.
 
 
--spec(create_bucket_table_old_for_test(ram_copies|disc|copies, list()) ->
+-spec(create_table_old_for_test(ram_copies|disc|copies, list()) ->
              ok).
-create_bucket_table_old_for_test(Mode, Nodes) ->
+create_table_old_for_test(Mode, Nodes) ->
     _ = application:start(mnesia),
     {atomic, ok} =
         mnesia:create_table(?BUCKET_TABLE,
@@ -224,7 +226,7 @@ find_all_including_owner() ->
                                  acls = ACLs,
                                  cluster_id = ClusterId,
                                  created_at = CreatedAt}) ->
-                            Owner_1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
+                            Owner_1 = case leo_s3_user_credential:find_by_access_key_id(AccessKeyId) of
                                           {ok, Owner} ->
                                               Owner;
                                           _ ->
@@ -570,6 +572,19 @@ change_bucket_owner_1(#bucket_info{type = Type,
             end;
         _ ->
             {error, invalid_server_type}
+    end.
+
+
+%% @doc Retrieve checksum of the table
+%%
+-spec(checksum() ->
+             {ok, pos_integer()} | not_found | {error, any()}).
+checksum() ->
+    case leo_s3_bucket_data_handler:find_all({mnesia, ?BUCKET_TABLE}) of
+        {ok, RetL} ->
+            {ok, erlang:crc32(term_to_binary(RetL))};
+        Error ->
+            Error
     end.
 
 

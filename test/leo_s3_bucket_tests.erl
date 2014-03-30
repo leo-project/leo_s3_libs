@@ -96,7 +96,7 @@ mnesia_suite_(_) ->
                 fun(_) -> {ok, <<"leofs">>} end),
 
     ok = leo_s3_bucket:start(master, [], 3),
-    ok = leo_s3_bucket:create_bucket_table('ram_copies', [node()]),
+    ok = leo_s3_bucket:create_table('ram_copies', [node()]),
 
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket0),
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket1),
@@ -185,7 +185,11 @@ mnesia_suite_(_) ->
     %% transform (set cluster-id to every records)
     ok = leo_s3_bucket:transform('leofs_99'),
     {ok, Ret_2} = leo_s3_bucket_data_handler:lookup({mnesia, ?BUCKET_TABLE}, ?ACCESS_KEY_0),
-    transform_1_2(Ret_2),    
+    transform_1_2(Ret_2),
+
+    %% check checksum
+    {ok, Checksum} = leo_s3_bucket:checksum(),
+    ?assertEqual(true, Checksum > 0),
 
     application:stop(mnesia),
     timer:sleep(250),
@@ -390,7 +394,7 @@ bucket_transform_teardown(_) ->
 
 transform_1_(_) ->
     %% Prepare
-    ok = leo_s3_bucket:create_bucket_table_old_for_test('ram_copies', [node()]),
+    ok = leo_s3_bucket:create_table_old_for_test('ram_copies', [node()]),
     ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
                                            #bucket{name       = ?Bucket0,
                                                    access_key = ?ACCESS_KEY_0}),
@@ -425,7 +429,7 @@ transform_1_2([Bucket|Rest]) ->
 
 transform_2_(_) ->
     %% Prepare
-    ok = leo_s3_bucket:create_bucket_table('ram_copies', [node()]),
+    ok = leo_s3_bucket:create_table('ram_copies', [node()]),
     ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
                                            #?BUCKET{name = ?Bucket0,
                                                     access_key_id = ?ACCESS_KEY_0,

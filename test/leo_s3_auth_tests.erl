@@ -77,7 +77,7 @@ mnesia_suite_(_) ->
                      end),
 
     ok = leo_s3_auth:start(master, []),
-    ok = leo_s3_auth:create_credential_table(ram_copies, [node()]),
+    ok = leo_s3_auth:create_table(ram_copies, [node()]),
 
     {ok, Keys} = leo_s3_auth:create_key(?USER_ID),
     AccessKeyId     = proplists:get_value(access_key_id,     Keys),
@@ -141,6 +141,9 @@ mnesia_suite_(_) ->
 
     {ok, AccessKeyId} = leo_s3_auth:authenticate(Authorization2, SignParams1, false),
 
+    %% check checksum
+    {ok, Checksum} = leo_s3_auth:checksum(),
+    ?assertEqual(true, Checksum > 0),
 
     application:stop(mnesia),
     timer:sleep(250),

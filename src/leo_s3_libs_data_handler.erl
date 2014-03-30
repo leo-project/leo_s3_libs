@@ -45,10 +45,7 @@ all({mnesia, Table}) ->
         [] ->
             not_found;
         List ->
-            NewList = lists:map(fun(Item) ->
-                                        Item
-                                end, List),
-            {ok, NewList}
+            {ok, lists:sort(List)}
     end;
 all({ets, Table}) ->
     case catch ets:tab2list(Table) of
@@ -57,10 +54,7 @@ all({ets, Table}) ->
         [] ->
             not_found;
         List ->
-            NewList = lists:map(fun({_, Item}) ->
-                                        Item
-                                end, List),
-            {ok, NewList}
+            {ok, lists:sort(List)}
     end.
 
 

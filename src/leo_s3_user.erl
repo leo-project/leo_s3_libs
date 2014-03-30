@@ -33,10 +33,10 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
--export([create_user_table/2, create_user_credential_table/2,
+-export([create_table/2,
          add/3, update/1, delete/1,
-         find_by_id/1, find_by_access_key_id/1, find_all/0,
-         get_credential_by_id/1, auth/2,
+         find_by_id/1,
+         auth/2, checksum/0,
          transform/0, transform/1
         ]).
 
@@ -45,9 +45,9 @@
 %%--------------------------------------------------------------------
 %% @doc Create user table(mnesia)
 %%
--spec(create_user_table(ram_copies|disc_copies, list()) ->
+-spec(create_table(ram_copies|disc_copies, list()) ->
              ok).
-create_user_table(Mode, Nodes) ->
+create_table(Mode, Nodes) ->
     {atomic, ok} =
         mnesia:create_table(
           ?USERS_TABLE,
@@ -56,32 +56,11 @@ create_user_table(Mode, Nodes) ->
            {record_name, ?S3_USER},
            {attributes, record_info(fields, ?S3_USER)},
            {user_properties,
-            [{id,         {binary,  undefined}, false, primary,   undefined, identity,  binary },
-             {password,   {binary,  undefined}, false, undefined, undefined, undefined, binary },
-             {role_id,    {integer, undefined}, false, undefined, undefined, undefined, integer},
-             {created_at, {integer, undefined}, false, undefined, undefined, undefined, integer},
-             {del,        {boolean, undefined}, false, undefined, undefined, undefined, boolean}
-            ]}
-          ]),
-    ok.
-
-
-%% @doc Create user-credential table(mnesia)
-%%
--spec(create_user_credential_table(ram_copies|disc_copies, list()) ->
-             ok).
-create_user_credential_table(Mode, Nodes) ->
-    {atomic, ok} =
-        mnesia:create_table(
-          ?USER_CREDENTIAL_TABLE,
-          [{Mode, Nodes},
-           {type, set},
-           {record_name, user_credential},
-           {attributes, record_info(fields, user_credential)},
-           {user_properties,
-            [
-             {user_id,       {binary, undefined}, false, primary,   undefined, identity,  binary},
-             {access_key_id, {binary, undefined}, false, undefined, undefined, undefined, binary}
+            [{id,         binary,  primary},
+             {password,   binary,  fasle},
+             {role_id,    integer, false},
+             {created_at, integer, false},
+             {del,        boolean, false}
             ]}
           ]),
     ok.
@@ -108,43 +87,17 @@ add_1(UserId, Password, WithS3Keys) ->
     CreatedAt = leo_date:now(),
     Digest = hash_and_salt_password(Password, CreatedAt),
 
-    case leo_s3_libs_data_handler:insert(
-           {mnesia, ?USERS_TABLE}, {[], #?S3_USER{id         = UserId,
-                                                  password   = Digest,
-                                                  created_at = CreatedAt,
-                                                  updated_at = CreatedAt}}) of
+    case leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
+                                         {[], #?S3_USER{id         = UserId,
+                                                        password   = Digest,
+                                                        created_at = CreatedAt,
+                                                        updated_at = CreatedAt}}) of
         ok ->
             case WithS3Keys of
                 true ->
-                    add_2(UserId, CreatedAt);
+                    leo_s3_user_credential:add(UserId, CreatedAt);
                 false ->
                     {ok, []}
-            end;
-        Error ->
-            Error
-    end.
-
-%% @doc Create a user account w/access-key-id/secret-access-key
-%% @private
-add_2(UserId0, CreatedAt) ->
-    UserId1 = case is_binary(UserId0) of
-                  true  -> binary_to_list(UserId0);
-                  false -> UserId0
-              end,
-
-    case leo_s3_auth:create_key(UserId1) of
-        {ok, Keys} ->
-            AccessKeyId = leo_misc:get_value(access_key_id, Keys),
-
-            case leo_s3_libs_data_handler:insert(
-                   {mnesia, ?USER_CREDENTIAL_TABLE},
-                   {[], #user_credential{user_id       = UserId1,
-                                         access_key_id = AccessKeyId,
-                                         created_at    = CreatedAt}}) of
-                ok ->
-                    {ok, Keys};
-                Error ->
-                    Error
             end;
         Error ->
             Error
@@ -172,13 +125,13 @@ update(#?S3_USER{id       = UserId,
                             false -> hash_and_salt_password(Password0, CreatedAt)
                         end,
 
-            leo_s3_libs_data_handler:insert(
-              {mnesia, ?USERS_TABLE}, {[], #?S3_USER{id         = UserId,
-                                                     role_id    = RoleId2,
-                                                     password   = Password2,
-                                                     created_at = CreatedAt,
-                                                     updated_at = leo_date:now()
-                                                    }});
+            leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
+                                            {[], #?S3_USER{id         = UserId,
+                                                           role_id    = RoleId2,
+                                                           password   = Password2,
+                                                           created_at = CreatedAt,
+                                                           updated_at = leo_date:now()
+                                                          }});
         Error ->
             Error
     end.
@@ -193,13 +146,13 @@ delete(UserId) ->
         {ok, #?S3_USER{role_id    = RoleId,
                        password   = Password,
                        created_at = CreatedAt}} ->
-            case leo_s3_libs_data_handler:insert(
-                   {mnesia, ?USERS_TABLE}, {[], #?S3_USER{id         = UserId,
-                                                          role_id    = RoleId,
-                                                          password   = Password,
-                                                          created_at = CreatedAt,
-                                                          updated_at = leo_date:now(),
-                                                          del        = true}}) of
+            case leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
+                                                 {[], #?S3_USER{id         = UserId,
+                                                                role_id    = RoleId,
+                                                                password   = Password,
+                                                                created_at = CreatedAt,
+                                                                updated_at = leo_date:now(),
+                                                                del        = true}}) of
                 ok ->
                     leo_s3_libs_data_handler:delete(
                       {mnesia, ?USER_CREDENTIAL_TABLE}, UserId);
@@ -234,80 +187,6 @@ find_by_id(UserId) ->
     end.
 
 
-%% @doc Retrieve a use by access-key-id
-%%
--spec(find_by_access_key_id(binary()) ->
-             {ok, #user_credential{}} | not_found | {error, any()}).
-find_by_access_key_id(AccessKeyId) ->
-    F = fun() ->
-                Q = qlc:q([X || X <- mnesia:table(?USER_CREDENTIAL_TABLE),
-                                X#user_credential.access_key_id =:= AccessKeyId]),
-                qlc:e(Q)
-        end,
-    case leo_mnesia:read(F) of
-        {ok, [UserCredential|_]} ->
-            {ok, UserCredential};
-        Other ->
-            Other
-    end.
-
-
-%% @doc Retrieve owners (omit secret_key)
-%%
--spec(find_all() ->
-             {ok, list(#user_credential{})} | {error, any()}).
-find_all() ->
-    Fun = fun() ->
-                  Q1 = qlc:q([X || X <- mnesia:table(?USER_CREDENTIAL_TABLE)]),
-                  Q2 = qlc:sort(Q1, [{order, ascending}]),
-                  qlc:e(Q2)
-          end,
-    case leo_mnesia:read(Fun) of
-        {error, Cause} ->
-            {error, Cause};
-        not_found ->
-            not_found;
-        {ok, Users0} ->
-            Users1 = lists:map(fun(#user_credential{user_id = UserId,
-                                                    access_key_id = AccessKeyId,
-                                                    created_at = CretedAt}) ->
-                                       {ok, #?S3_USER{role_id = RoleId}} = find_by_id(UserId),
-                                       [{user_id, UserId}, {role_id, RoleId},
-                                        {access_key_id, AccessKeyId}, {created_at, CretedAt}]
-                               end, Users0),
-            {ok, Users1}
-    end.
-
-
-%% @doc Retrieve credential by user-id
-%%
--spec(get_credential_by_id(binary()) ->
-             {ok, list(tuple())} | not_found | {error, any()}).
-get_credential_by_id(UserId) ->
-    F = fun() ->
-                Q = qlc:q([X || X <- mnesia:table(?USER_CREDENTIAL_TABLE),
-                                X#user_credential.user_id =:= UserId]),
-                qlc:e(Q)
-        end,
-    case leo_mnesia:read(F) of
-        {ok, [#user_credential{user_id       = UserId,
-                               access_key_id = AccessKeyId,
-                               created_at    = CreatedAt}|_]} ->
-            case leo_s3_auth:get_credential(AccessKeyId) of
-                {ok, Credential} ->
-                    {ok, [{user_id,           UserId},
-                          {access_key_id,     AccessKeyId},
-                          {secret_access_key, Credential#credential.secret_access_key},
-                          {created_at,        CreatedAt}]};
-                Other ->
-                    Other
-            end;
-        Other ->
-            Other
-    end.
-
-
-
 %% @doc Retrieve owners (omit secret_key)
 %%
 -spec(auth(binary(), binary()) ->
@@ -331,6 +210,19 @@ auth(UserId, PW0) ->
             end;
         _Other ->
             {error, invalid_values}
+    end.
+
+
+%% @doc Retrieve checksum of the table
+%%
+-spec(checksum() ->
+             {ok, pos_integer()} | not_found | {error, any()}).
+checksum() ->
+    case leo_s3_bucket_data_handler:find_all({mnesia, ?USERS_TABLE}) of
+        {ok, RetL} ->
+            {ok, erlang:crc32(term_to_binary(RetL))};
+        Error ->
+            Error
     end.
 
 

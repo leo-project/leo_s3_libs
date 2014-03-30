@@ -54,7 +54,10 @@ all({ets, Table}) ->
         [] ->
             not_found;
         List ->
-            {ok, lists:sort(List)}
+            List_1 = lists:map(fun({_, Item}) ->
+                                       Item
+                               end, List),
+            {ok, lists:sort(List_1)}
     end.
 
 

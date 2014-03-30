@@ -33,7 +33,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
--export([create_table/2, add/1, add/2,
+-export([create_table/2, put/1, put/2,
          delete/1,
          find_by_access_key_id/1,
          find_all/0, find_all_with_role/0,
@@ -63,18 +63,20 @@ create_table(Mode, Nodes) ->
     ok.
 
 
-
 %% @doc Create a user account w/access-key-id/secret-access-key
 %%
--spec(add(binary()) ->
+-spec(put(#user_credential{} | binary()) ->
              {ok, string()} | {error, any()}).
-add(UserId) ->
-    add(UserId, leo_date:now()).
+put(UserCredential) when is_record(UserCredential, user_credential) ->
+    leo_s3_libs_data_handler:insert({mnesia, ?USER_CREDENTIAL_TABLE},
+                                    {[], UserCredential});
+put(UserId) ->
+    ?MODULE:put(UserId, leo_date:now()).
 
 
 %% @doc Create a user account w/access-key-id/secret-access-key
 %%
-add(UserId, CreatedAt) ->
+put(UserId, CreatedAt) ->
     UserId_1 = case is_binary(UserId) of
                    true  -> binary_to_list(UserId);
                    false -> UserId

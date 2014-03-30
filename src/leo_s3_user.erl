@@ -34,7 +34,7 @@
 -include_lib("stdlib/include/qlc.hrl").
 
 -export([create_table/2,
-         add/3, update/1, delete/1,
+         put/1, put/3, update/1, delete/1,
          find_by_id/1, find_all/0,
          auth/2, checksum/0,
          transform/0, transform/1
@@ -66,14 +66,23 @@ create_table(Mode, Nodes) ->
     ok.
 
 
+%% @doc Insert a user
+%%
+-spec(put(#?S3_USER{})  ->
+             ok | {error, any()}).
+put(#?S3_USER{} = User) ->
+    leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
+                                    {[], User}).
+
+
 %% @doc Create a user account
 %%
--spec(add(binary(), binary(), boolean()) ->
+-spec(put(binary(), binary(), boolean()) ->
              {ok, list(tuple())} | {error, any()}).
-add(UserId, Password, WithS3Keys) ->
+put(UserId, Password, WithS3Keys) ->
     case find_by_id(UserId) of
         not_found ->
-            add_1(UserId, Password, WithS3Keys);
+            put_1(UserId, Password, WithS3Keys);
         {ok, _} ->
             {error, already_exists};
         {error, Cause} ->
@@ -83,7 +92,7 @@ add(UserId, Password, WithS3Keys) ->
 
 %% @doc Create a user account w/access-key-id/secret-access-key
 %% @private
-add_1(UserId, Password, WithS3Keys) ->
+put_1(UserId, Password, WithS3Keys) ->
     CreatedAt = leo_date:now(),
     Digest = hash_and_salt_password(Password, CreatedAt),
 
@@ -95,7 +104,7 @@ add_1(UserId, Password, WithS3Keys) ->
         ok ->
             case WithS3Keys of
                 true ->
-                    leo_s3_user_credential:add(UserId, CreatedAt);
+                    leo_s3_user_credential:put(UserId, CreatedAt);
                 false ->
                     {ok, []}
             end;
@@ -196,7 +205,7 @@ find_all() ->
             {ok, RetL};
         Error ->
             Error
-    end.   
+    end.
 
 
 %% @doc Retrieve owners (omit secret_key)

@@ -43,7 +43,7 @@
          get_acls/1, update_acls/3,
          update_acls2private/2, update_acls2public_read/2,
          update_acls2public_read_write/2, update_acls2authenticated_read/2,
-         put/2, put/3, put/4, put/5,
+         put/1, put/2, put/3, put/4, put/5,
          delete/2, delete/3, head/2, head/4,
          change_bucket_owner/2,
          checksum/0
@@ -255,33 +255,46 @@ find_all_including_owner() ->
 
 %% @doc put a bucket.
 %%
+-spec(put(#?BUCKET{}) ->
+             ok | {error, any()}).
+put(Bucket) ->
+    DB_1 = case get_info() of
+               {ok, #bucket_info{db = DB}} ->
+                   DB;
+               _ ->
+                   mnesia
+           end,
+    leo_s3_bucket_data_handler:insert({DB_1, ?BUCKET_TABLE}, Bucket).
+
+
 -spec(put(binary(), binary()) ->
              ok | {error, any()}).
-put(AccessKey, Bucket) ->
+put(AccessKey, BucketName) ->
     %% ACL is set to private(default)
-    put(AccessKey, Bucket, ?CANNED_ACL_PRIVATE, undefined).
+    put(AccessKey, BucketName, ?CANNED_ACL_PRIVATE, undefined).
 
 -spec(put(binary(), binary(), string()) ->
              ok | {error, any()}).
-put(AccessKey, Bucket, CannedACL) ->
-    put(AccessKey, Bucket, CannedACL, undefined).
+put(AccessKey, BucketName, CannedACL) ->
+    put(AccessKey, BucketName, CannedACL, undefined).
 
 -spec(put(binary(), binary(), string(), atom()) ->
              ok | {error, any()}).
-put(AccessKey, Bucket, CannedACL, ClusterId) ->
+put(AccessKey, BucketName, CannedACL, ClusterId) ->
     case get_info() of
         {ok, #bucket_info{type = slave,
                           provider = Provider}} ->
             case leo_s3_auth:has_credential(Provider, AccessKey) of
                 true ->
-                    rpc_call(Provider, leo_manager_api, add_bucket, [AccessKey, Bucket, CannedACL]);
+                    rpc_call(Provider, leo_manager_api, add_bucket,
+                             [AccessKey, BucketName, CannedACL]);
                 false ->
                     {error, invalid_access}
             end;
         {ok, #bucket_info{type = master, db = DB}} ->
             case leo_s3_auth:has_credential(AccessKey) of
                 true ->
-                    put(AccessKey, Bucket, CannedACL, ClusterId, DB);
+                    put(AccessKey, BucketName, CannedACL, ClusterId, DB);
                 false ->
                     {error, invalid_access}
             end;
@@ -291,21 +304,21 @@ put(AccessKey, Bucket, CannedACL, ClusterId) ->
 
 -spec(put(binary(), binary(), string(), atom(), ets | mnesia) ->
              ok | {error, any()}).
-put(AccessKey, Bucket, CannedACL, ClusterId, undefined) ->
+put(AccessKey, BucketName, CannedACL, ClusterId, undefined) ->
     case get_info() of
         {ok, #bucket_info{db = DB}} ->
-            put(AccessKey, Bucket, CannedACL, ClusterId, DB);
+            put(AccessKey, BucketName, CannedACL, ClusterId, DB);
         Error ->
             Error
     end;
-put(AccessKey, Bucket, CannedACL, ClusterId, DB) ->
-    BucketStr = cast_binary_to_str(Bucket),
-    case is_valid_bucket(BucketStr) of
+put(AccessKey, BucketName, CannedACL, ClusterId, DB) ->
+    BucketNameStr = cast_binary_to_str(BucketName),
+    case is_valid_bucket(BucketNameStr) of
         ok ->
             ACLs = canned_acl2bucket_acl_info(AccessKey, CannedACL),
             Now = leo_date:now(),
             leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                              #?BUCKET{name = Bucket,
+                                              #?BUCKET{name = BucketName,
                                                        access_key_id = AccessKey,
                                                        acls = ACLs,
                                                        cluster_id = ClusterId,

@@ -66,7 +66,7 @@ suite_(_) ->
     Password0 = <<"Type is FS">>,
 
     %% %% create-user
-    {ok, Keys} = leo_s3_user:add(UserId, Password0, true),
+    {ok, Keys} = leo_s3_user:put(UserId, Password0, true),
     AccessKeyId     = leo_misc:get_value('access_key_id',     Keys),
     SecretAccessKey = leo_misc:get_value('secret_access_key', Keys),
 
@@ -75,7 +75,7 @@ suite_(_) ->
     ?assertEqual(true, SecretAccessKey /= <<>>),
 
     {error,already_exists} =
-        leo_s3_user:add(UserId, Password0, true),
+        leo_s3_user:put(UserId, Password0, true),
 
     %% %% find-by-id
     {ok, Res1} = leo_s3_user:find_by_id(UserId),
@@ -88,10 +88,10 @@ suite_(_) ->
     ?assertEqual(AccessKeyId, Res2#user_credential.access_key_id),
 
     %% %% find_all
-    {ok, _} = leo_s3_user:add(UserId ++ "_1", Password0, true),
-    {ok, _} = leo_s3_user:add(UserId ++ "_2", Password0, true),
-    {ok, _} = leo_s3_user:add(UserId ++ "_3", Password0, true),
-    {ok, _} = leo_s3_user:add(UserId ++ "_4", Password0, true),
+    {ok, _} = leo_s3_user:put(UserId ++ "_1", Password0, true),
+    {ok, _} = leo_s3_user:put(UserId ++ "_2", Password0, true),
+    {ok, _} = leo_s3_user:put(UserId ++ "_3", Password0, true),
+    {ok, _} = leo_s3_user:put(UserId ++ "_4", Password0, true),
     {ok, Users} = leo_s3_user_credential:find_all(),
     ?debugVal(Users),
     ?assertEqual(5, length(Users)),

@@ -712,12 +712,14 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
                     fun(Bucket) ->
                             case DB of
                                 mnesia ->
-                                    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                                                      Bucket#?BUCKET{del = true,
-                                                                                     last_modified_at = leo_date:now()
-                                                                                    });
+                                    leo_s3_bucket_data_handler:insert(
+                                      {DB, ?BUCKET_TABLE},
+                                      Bucket#?BUCKET{del = true,
+                                                     last_modified_at = leo_date:now()
+                                                    });
                                 _ ->
-                                    leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Bucket)
+                                    leo_s3_bucket_data_handler:delete(
+                                      {DB, ?BUCKET_TABLE}, Bucket)
                             end
                     end, Value0),
                   ok = put_all_values(ets, Value1),
@@ -790,12 +792,14 @@ find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
                   NewBucketVal = Value1#?BUCKET{last_synchroized_at = leo_date:now()},
                   case DB of
                       mnesia ->
-                          catch leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                                                  Value0#?BUCKET{del = true,
-                                                                                 last_modified_at = leo_date:now()
-                                                                                });
+                          catch leo_s3_bucket_data_handler:insert(
+                                  {DB, ?BUCKET_TABLE},
+                                  Value0#?BUCKET{del = true,
+                                                 last_modified_at = leo_date:now()
+                                                });
                       _ ->
-                          catch leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Value0)
+                          catch leo_s3_bucket_data_handler:delete(
+                                  {DB, ?BUCKET_TABLE}, Value0)
                   end,
                   leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
                   {ok, NewBucketVal};

@@ -56,7 +56,7 @@ teardown(_) ->
 mnesia_suite_(_) ->
     ok = leo_s3_endpoint:start(master, []),
 
-    ok = leo_s3_endpoint:create_endpoint_table(ram_copies, [node()]),
+    ok = leo_s3_endpoint:create_table(ram_copies, [node()]),
     not_found = leo_s3_endpoint:get_endpoints(),
 
     ok = leo_s3_endpoint:set_endpoint("photo.leofs.org"),
@@ -69,6 +69,8 @@ mnesia_suite_(_) ->
     {ok, EndPoints1} = leo_s3_endpoint:get_endpoints(),
     ?assertEqual(1, length(EndPoints1)),
 
+    {ok, Checksum} = leo_s3_endpoint:checksum(),
+    ?assertEqual(true, Checksum > 0),
 
     application:stop(mnesia),
     timer:sleep(250),

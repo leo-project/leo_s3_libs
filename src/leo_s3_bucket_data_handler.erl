@@ -42,14 +42,18 @@
 lookup({mnesia, Table}, AccessKey) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table),
-                                   X#?BUCKET.access_key_id =:= AccessKey]),
+                                   (X#?BUCKET.access_key_id =:= AccessKey andalso
+                                    X#?BUCKET.del =:= false)]),
                   Q2 = qlc:sort(Q1, [{order, ascending}]),
                   qlc:e(Q2)
           end,
     leo_mnesia:read(Fun);
 
 lookup({ets, Table}, AccessKey0) ->
-    Ret = ets:foldl(fun({_,#?BUCKET{access_key_id = AccessKey1} = Bucket}, Acc) when AccessKey0 == AccessKey1 ->
+    Ret = ets:foldl(fun({_,#?BUCKET{access_key_id = AccessKey1,
+                                    del = Del} = Bucket}, Acc)
+                          when AccessKey0 == AccessKey1 andalso
+                               Del == false ->
                             [Bucket|Acc];
                        (_, Acc) ->
                             Acc
@@ -79,7 +83,8 @@ find_by_name(Provider, AccessKey0, Name) ->
 find_by_name({mnesia, Table}, AccessKey0, Name, NeedAccessKey) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table),
-                                   X#?BUCKET.name =:= Name]),
+                                   (X#?BUCKET.name =:= Name andalso
+                                    X#?BUCKET.del  =:= false)]),
                   Q2 = qlc:sort(Q1, [{order, ascending}]),
                   qlc:e(Q2)
           end,
@@ -148,7 +153,8 @@ delete({mnesia, Table}, #?BUCKET{name = Name,
     Fun1 = fun() ->
                    Q = qlc:q(
                          [X || X <- mnesia:table(leo_s3_buckets),
-                               X#?BUCKET.name =:= Name andalso X#?BUCKET.access_key_id =:= AccessKey]),
+                               (X#?BUCKET.name =:= Name andalso
+                                X#?BUCKET.access_key_id =:= AccessKey)]),
                    qlc:e(Q)
            end,
     case leo_mnesia:read(Fun1) of

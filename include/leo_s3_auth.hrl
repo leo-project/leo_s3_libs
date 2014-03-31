@@ -23,13 +23,14 @@
 %% @doc
 %% @end
 %%======================================================================
-%% @doc Credential data
+%% @doc Credential data - [- LeoFS v1.0.0]
 %%
 -record(credential, {
           access_key_id     :: binary(),
           secret_access_key :: binary(),
           created_at        :: integer()
          }).
+
 
 %% @doc Authentication Info
 %%

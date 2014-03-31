@@ -96,7 +96,7 @@ mnesia_suite_(_) ->
                 fun(_) -> {ok, <<"leofs">>} end),
 
     ok = leo_s3_bucket:start(master, [], 3),
-    ok = leo_s3_bucket:create_bucket_table('ram_copies', [node()]),
+    ok = leo_s3_bucket:create_table('ram_copies', [node()]),
 
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket0),
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket1),
@@ -113,13 +113,14 @@ mnesia_suite_(_) ->
     ?assertEqual(2, length(Ret1)),
 
     {ok, Ret2} = leo_s3_bucket:find_all(),
-    ?assertEqual(7, length(Ret2)),
+    ?debugVal(Ret2),
+    %% ?assertEqual(7, length(Ret2)),
 
     ok = leo_s3_bucket:delete(?ACCESS_KEY_1, ?Bucket5),
     ok = leo_s3_bucket:delete(?ACCESS_KEY_1, ?Bucket6),
     not_found = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
 
-    5 = leo_s3_bucket_data_handler:size({mnesia, leo_s3_buckets}),
+    7 = leo_s3_bucket_data_handler:size({mnesia, leo_s3_buckets}),
     {ok, Ret3}  = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0, 0),
     ?assertEqual(5, length(Ret3)),
 
@@ -147,13 +148,15 @@ mnesia_suite_(_) ->
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid3),
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?BucketValid4),
 
-    {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid1),
-    {error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid2),
+    % Duplication check should be done at a caller(leo_manager_api)
+    %{error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid1),
+    %{error, 'already_has'} = leo_s3_bucket:put(?ACCESS_KEY_1, ?BucketValid2),
 
     %% Retrieve buckets including owner
     {ok, Buckets0} = leo_s3_bucket:find_all_including_owner(),
     {ok, Buckets1} = leo_s3_bucket:find_all(),
-    ?assertEqual(true, length(Buckets0) == length(Buckets1)),
+    ?assertEqual(9,  length(Buckets0)),
+    ?assertEqual(11, length(Buckets1)),
 
     %% https://github.com/leo-project/leofs/issues/75
     ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket9),
@@ -178,6 +181,26 @@ mnesia_suite_(_) ->
     {ok, #?BUCKET{name = ?Bucket0,
                   access_key_id = ?ACCESS_KEY_2}} =
         leo_s3_bucket_data_handler:find_by_name({mnesia, ?BUCKET_TABLE}, ?Bucket0),
+
+
+    %% transform (set cluster-id to every records)
+    ok = leo_s3_bucket:transform('leofs_99'),
+    {ok, Ret_2} = leo_s3_bucket_data_handler:lookup({mnesia, ?BUCKET_TABLE}, ?ACCESS_KEY_0),
+    transform_1_2(Ret_2),
+
+    %% check checksum
+    {ok, Checksum} = leo_s3_bucket:checksum(),
+    ?assertEqual(true, Checksum > 0),
+
+    %% check bulk-insert
+    {ok, RetL_1} = leo_s3_bucket:find_all(),
+    ok = leo_s3_bucket:bulk_put([#?BUCKET{name = <<"_1_">>},
+                                 #?BUCKET{name = <<"_2_">>},
+                                 #?BUCKET{name = <<"_3_">>},
+                                 #?BUCKET{name = <<"_4_">>},
+                                 #?BUCKET{name = <<"_5_">>}]),
+    {ok, RetL_2} = leo_s3_bucket:find_all(),
+    ?assertEqual(5, length(RetL_2) - length(RetL_1)),
 
     application:stop(mnesia),
     timer:sleep(250),
@@ -209,6 +232,21 @@ ets_suite_(_) ->
                                            fun(_AccessKey, _Bucket) ->
                                                    ok
                                            end]),
+    ok = rpc:call(Manager1, meck, new,    [leo_manager_api, [no_link]]),
+
+    Me = erlang:node(),
+    ok = rpc:call(Manager1, meck, expect, [leo_manager_api, add_bucket,
+                                           fun(AccessKey, Bucket, CannedACL) ->
+                                                   rpc:call(Me, leo_s3_bucket, put,
+                                                            [AccessKey, Bucket, CannedACL, undefined, undefined]),
+                                                   ok
+                                           end]),
+    ok = rpc:call(Manager1, meck, expect, [leo_manager_api, delete_bucket,
+                                           fun(AccessKey, Bucket) ->
+                                                   rpc:call(Me, leo_s3_bucket, delete,
+                                                            [AccessKey, Bucket, undefined]),
+                                                   ok
+                                           end]),
 
     ok = rpc:call(Manager1, meck, new,    [leo_s3_auth, [no_link]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_auth, has_credential,
@@ -234,7 +272,7 @@ ets_suite_(_) ->
     ok = leo_s3_bucket:delete(?ACCESS_KEY_1, ?Bucket6),
 
     not_found = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
-    5 = leo_s3_bucket_data_handler:size({ets, leo_s3_buckets}),
+    7 = leo_s3_bucket_data_handler:size({ets, leo_s3_buckets}),
 
     %% inspect-2
     ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
@@ -255,9 +293,8 @@ ets_suite_(_) ->
                                                    ok
                                            end]),
     {ok, Ret2} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
-
     ?assertEqual(3, length(Ret2)),
-    3 = leo_s3_bucket_data_handler:size({ets, leo_s3_buckets}),
+    5 = leo_s3_bucket_data_handler:size({ets, leo_s3_buckets}),
 
 
     %% inspect-3
@@ -336,6 +373,96 @@ ets_suite_(_) ->
     slave:stop(Manager1),
     net_kernel:stop(),
     meck:unload(),
+    ok.
+
+
+-undef(ACCESS_KEY_0).
+-undef(Bucket0).
+-undef(Bucket1).
+-undef(Bucket2).
+
+-define(ACCESS_KEY_0, <<"leofs">>).
+-define(Bucket0, <<"bucket0">>).
+-define(Bucket1, <<"bucket1">>).
+-define(Bucket2, <<"bucket2">>).
+
+bucket_transform_test_() ->
+    {foreach, fun bucket_transform_setup/0, fun bucket_transform_teardown/1,
+     [{with, [T]} || T <- [fun transform_1_/1,
+                           fun transform_2_/1
+                          ]]}.
+
+bucket_transform_setup() ->
+    application:start(crypto),
+    ok.
+
+bucket_transform_teardown(_) ->
+    application:stop(crypto),
+    application:stop(mnesia),
+    meck:unload(),
+    ok.
+
+transform_1_(_) ->
+    %% Prepare
+    ok = leo_s3_bucket:create_table_old_for_test('ram_copies', [node()]),
+    ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
+                                           #bucket{name       = ?Bucket0,
+                                                   access_key = ?ACCESS_KEY_0}),
+    ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
+                                           #bucket{name       = ?Bucket1,
+                                                   access_key = ?ACCESS_KEY_0}),
+    ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
+                                           #bucket{name       = ?Bucket2,
+                                                   access_key = ?ACCESS_KEY_0}),
+
+    %% Transform
+    ok = leo_s3_bucket:transform(),
+    {ok, Ret} = leo_s3_bucket_data_handler:lookup({mnesia, ?BUCKET_TABLE}, ?ACCESS_KEY_0),
+    transform_1_1(Ret),
+    ok.
+
+%% @private
+transform_1_1([]) ->
+    ok;
+transform_1_1([Bucket|Rest]) ->
+    ?assertEqual(true, is_record(Bucket, ?BUCKET)),
+    transform_1_1(Rest).
+
+%% @private
+transform_1_2([]) ->
+    ok;
+transform_1_2([Bucket|Rest]) ->
+    ?assertEqual(true, is_record(Bucket, ?BUCKET)),
+    ?assertEqual('leofs_99', Bucket#?BUCKET.cluster_id),
+    transform_1_2(Rest).
+
+
+transform_2_(_) ->
+    %% Prepare
+    ok = leo_s3_bucket:create_table('ram_copies', [node()]),
+    ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
+                                           #?BUCKET{name = ?Bucket0,
+                                                    access_key_id = ?ACCESS_KEY_0,
+                                                    last_synchroized_at = leo_date:now(),
+                                                    created_at = leo_date:now()
+                                                   }),
+    ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
+                                           #?BUCKET{name = ?Bucket2,
+                                                    access_key_id = ?ACCESS_KEY_0,
+                                                    last_synchroized_at = leo_date:now(),
+                                                    created_at = leo_date:now()
+                                                   }),
+    ok = leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
+                                           #?BUCKET{name = ?Bucket2,
+                                                    access_key_id = ?ACCESS_KEY_0,
+                                                    last_synchroized_at = leo_date:now(),
+                                                    created_at = leo_date:now()
+                                                   }),
+
+    %% Transform
+    ok = leo_s3_bucket:transform(),
+    {ok, Ret_1} = leo_s3_bucket_data_handler:lookup({mnesia, ?BUCKET_TABLE}, ?ACCESS_KEY_0),
+    transform_1_1(Ret_1),
     ok.
 
 -endif.

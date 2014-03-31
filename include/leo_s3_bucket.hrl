@@ -60,7 +60,7 @@
           created_at = 0 :: integer() %% created date and time
          }).
 
-%% - LeoFS-v0.16.0
+%% - LeoFS-v0.16.0 - v1.0.0-pre3
 -record(bucket_0_16_0, {
           name          :: string(), %% bucket name
           access_key_id :: binary(), %% access-key-id
@@ -70,8 +70,32 @@
           last_modified_at    = 0 :: integer() %% modified date and time
          }).
 
-%% Current bucket-record is 'bucket_0_16_0'
--define(BUCKET, bucket_0_16_0).
+%% - LeoFS-v1.0.0 -
+-ifdef(TEST).
+-record(bucket_1, {
+          name          :: string(), %% bucket name
+          access_key_id :: binary(), %% access-key-id
+          acls = []     :: acls(),   %% acl list
+          cluster_id    :: atom(),   %% cluster_id
+          last_synchroized_at = 0 :: integer(), %% last synchronized date and time
+          created_at       = 0 :: integer(), %% created date and time
+          last_modified_at = 0 :: integer(), %% modified date and time
+          del = false :: boolean()   %% delete-flag
+         }).
+-else.
+-record(bucket_1, {
+          name          :: string(), %% bucket name
+          access_key_id :: binary(), %% access-key-id
+          acls = []     :: acls(),   %% acl list
+          cluster_id    :: atom(),   %% cluster_id
+          last_synchroized_at = 0 :: integer(), %% last synchronized date and time
+          created_at       = leo_date:now() :: integer(), %% created date and time
+          last_modified_at = leo_date:now() :: integer(), %% modified date and time
+          del = false :: boolean()   %% delete-flag
+         }).
+-endif.
+%% Current bucket-record is 'bucket_1'
+-define(BUCKET, bucket_1).
 
 
 -record(bucket_info, {
@@ -79,4 +103,13 @@
           db            :: atom(), %% db-type:[ets | mnesia]
           provider = [] :: list(), %% auth-info provides
           sync_interval :: pos_integer() %% interval in seconrd to use syncing local records with manager's
+         }).
+
+%% {Name, Owner_1, Permissions_1, CreatedAt}
+-record(bucket_dto, {
+          name          :: string(),  %% bucket name
+          owner         :: string(),  %% owner name
+          acls = []     :: acls(),    %% acl list
+          cluster_id    :: atom(),    %% cluster_id
+          created_at = 0 :: integer() %% created date and time
          }).

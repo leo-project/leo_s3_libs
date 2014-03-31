@@ -33,8 +33,8 @@
 -include_lib("eunit/include/eunit.hrl").
 
 -export([start/3,
-         create_bucket_table/2,
-         create_bucket_table_old_for_test/2,
+         create_table/2,
+         create_table_old_for_test/2,
          is_valid_bucket/1,
          update_providers/1,
          find_bucket_by_name/1, find_bucket_by_name/2,
@@ -43,7 +43,13 @@
          get_acls/1, update_acls/3,
          update_acls2private/2, update_acls2public_read/2,
          update_acls2public_read_write/2, update_acls2authenticated_read/2,
-         put/2, put/3, delete/2, head/2, head/4, change_bucket_owner/2]).
+         put/1, put/2, put/3, put/4, put/5, bulk_put/1,
+         delete/2, delete/3, head/2, head/4,
+         change_bucket_owner/2,
+         checksum/0
+        ]).
+-export([transform/0, transform/1]).
+
 
 %%--------------------------------------------------------------------
 %% API
@@ -83,9 +89,9 @@ update_providers(Provider) ->
 
 %% Create bucket table(mnesia)
 %%
--spec(create_bucket_table(ram_copies|disc|copies, list()) ->
+-spec(create_table(ram_copies|disc|copies, list()) ->
              ok).
-create_bucket_table(Mode, Nodes) ->
+create_table(Mode, Nodes) ->
     _ = application:start(mnesia),
     {atomic, ok} =
         mnesia:create_table(?BUCKET_TABLE,
@@ -97,9 +103,9 @@ create_bucket_table(Mode, Nodes) ->
     ok.
 
 
--spec(create_bucket_table_old_for_test(ram_copies|disc|copies, list()) ->
+-spec(create_table_old_for_test(ram_copies|disc|copies, list()) ->
              ok).
-create_bucket_table_old_for_test(Mode, Nodes) ->
+create_table_old_for_test(Mode, Nodes) ->
     _ = application:start(mnesia),
     {atomic, ok} =
         mnesia:create_table(?BUCKET_TABLE,
@@ -214,57 +220,97 @@ find_all() ->
 find_all_including_owner() ->
     case find_all() of
         {ok, Buckets} ->
-            Ret = lists:map(fun(#?BUCKET{name = Name,
-                                         access_key_id = AccessKeyId,
-                                         acls = ACLs,
-                                         created_at = CreatedAt}) ->
-                                    Owner_1 = case leo_s3_user:find_by_access_key_id(AccessKeyId) of
-                                                 {ok, Owner} ->
-                                                     Owner;
-                                                 _ ->
-                                                     #user_credential{}
-                                             end,
-                                    Permissions_1 =
-                                        case ACLs of
-                                            [] -> ACLs;
-                                            [#bucket_acl_info{permissions = Permissions}|_] ->
-                                                Permissions
-                                        end,
-                                    {Name, Owner_1, Permissions_1, CreatedAt}
-                            end, Buckets),
-            case Ret of
-                [] -> not_found;
-                _  -> {ok, Ret}
-            end;
+            find_all_including_owner_1(Buckets, []);
         Error ->
             Error
     end.
 
+%% @private
+find_all_including_owner_1([], Acc) ->
+    {ok, lists:reverse(Acc)};
+find_all_including_owner_1([#?BUCKET{name = Name,
+                                     access_key_id = AccessKeyId,
+                                     acls = ACLs,
+                                     cluster_id = ClusterId,
+                                     created_at = CreatedAt,
+                                     del = false
+                                    }|Rest], Acc) ->
+    Owner_1 =
+        case leo_s3_user_credential:find_by_access_key_id(AccessKeyId) of
+            {ok, Owner} ->
+                Owner;
+            _ ->
+                #user_credential{}
+        end,
+    Permissions_1 =
+        case ACLs of
+            [] -> ACLs;
+            [#bucket_acl_info{permissions = Permissions}|_] ->
+                Permissions
+        end,
+    find_all_including_owner_1(Rest, [#bucket_dto{name       = Name,
+                                                  owner      = Owner_1,
+                                                  acls       = Permissions_1,
+                                                  cluster_id = ClusterId,
+                                                  created_at = CreatedAt}|Acc]);
+find_all_including_owner_1([_Other|Rest], Acc) ->
+    find_all_including_owner_1(Rest, Acc).
+
 
 %% @doc put a bucket.
 %%
+-spec(put(#?BUCKET{}) ->
+             ok | {error, any()}).
+put(#?BUCKET{name = Name,
+             last_modified_at = UpdatedAt_1} = Bucket) ->
+    DB_1 = case get_info() of
+               {ok, #bucket_info{db = DB}} ->
+                   DB;
+               _ ->
+                   mnesia
+           end,
+    case find_bucket_by_name(Name) of
+        {ok, #?BUCKET{last_modified_at = UpdatedAt_2}} when UpdatedAt_1 > UpdatedAt_2 ->
+            put_1(DB_1, Bucket);
+        not_found ->
+            put_1(DB_1, Bucket);
+        _ ->
+            ok
+    end.
+
+%% @private
+put_1(DB, Bucket) ->
+    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, Bucket).
+
+
 -spec(put(binary(), binary()) ->
              ok | {error, any()}).
-put(AccessKey, Bucket) ->
+put(AccessKey, BucketName) ->
+    %% ACL is set to private(default)
+    put(AccessKey, BucketName, ?CANNED_ACL_PRIVATE, undefined).
+
+-spec(put(binary(), binary(), string()) ->
+             ok | {error, any()}).
+put(AccessKey, BucketName, CannedACL) ->
+    put(AccessKey, BucketName, CannedACL, undefined).
+
+-spec(put(binary(), binary(), string(), atom()) ->
+             ok | {error, any()}).
+put(AccessKey, BucketName, CannedACL, ClusterId) ->
     case get_info() of
         {ok, #bucket_info{type = slave,
-                          db   = DB,
                           provider = Provider}} ->
             case leo_s3_auth:has_credential(Provider, AccessKey) of
                 true ->
-                    case rpc_call(Provider, put, [AccessKey, Bucket]) of
-                        ok ->
-                            put(AccessKey, Bucket, DB);
-                        _ ->
-                            {error, not_stored}
-                    end;
+                    rpc_call(Provider, leo_manager_api, add_bucket,
+                             [AccessKey, BucketName, CannedACL]);
                 false ->
                     {error, invalid_access}
             end;
         {ok, #bucket_info{type = master, db = DB}} ->
             case leo_s3_auth:has_credential(AccessKey) of
                 true ->
-                    put(AccessKey, Bucket, DB);
+                    put(AccessKey, BucketName, CannedACL, ClusterId, DB);
                 false ->
                     {error, invalid_access}
             end;
@@ -272,32 +318,44 @@ put(AccessKey, Bucket) ->
             Error
     end.
 
--spec(put(binary(), binary(), ets | mnesia) ->
+-spec(put(binary(), binary(), string(), atom(), ets | mnesia) ->
              ok | {error, any()}).
-put(AccessKey, Bucket, DB) ->
-    Res = head(AccessKey, Bucket),
-
-    case (Res == ok orelse Res == not_found) of
-        true ->
-            BucketStr = cast_binary_to_str(Bucket),
-            case is_valid_bucket(BucketStr) of
-                ok ->
-                    %% ACL is set to private(default)
-                    ACLs = [#bucket_acl_info{user_id     = AccessKey,
-                                             permissions = [full_control]}],
-                    Now = leo_date:now(),
-                    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                                      #?BUCKET{name = Bucket,
-                                                               access_key_id = AccessKey,
-                                                               acls = ACLs,
-                                                               created_at = Now,
-                                                               last_modified_at = Now});
-                Error ->
-                    Error
-            end;
-        false ->
-            {error, already_has}
+put(AccessKey, BucketName, CannedACL, ClusterId, undefined) ->
+    case get_info() of
+        {ok, #bucket_info{db = DB}} ->
+            put(AccessKey, BucketName, CannedACL, ClusterId, DB);
+        Error ->
+            Error
+    end;
+put(AccessKey, BucketName, CannedACL, ClusterId, DB) ->
+    BucketNameStr = cast_binary_to_str(BucketName),
+    case is_valid_bucket(BucketNameStr) of
+        ok ->
+            ACLs = canned_acl2bucket_acl_info(AccessKey, CannedACL),
+            Now = leo_date:now(),
+            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
+                                              #?BUCKET{name = BucketName,
+                                                       access_key_id = AccessKey,
+                                                       acls = ACLs,
+                                                       cluster_id = ClusterId,
+                                                       created_at = Now,
+                                                       last_modified_at = Now,
+                                                       del = false
+                                                      });
+        Error ->
+            Error
     end.
+
+
+%% @doc Add buckets
+%%
+-spec(bulk_put(list(#?BUCKET{})) ->
+             ok).
+bulk_put([]) ->
+    ok;
+bulk_put([Bucket|Rest]) ->
+    _ = ?MODULE:put(Bucket),
+    bulk_put(Rest).
 
 
 %% @doc delete a bucket.
@@ -307,14 +365,8 @@ put(AccessKey, Bucket, DB) ->
 delete(AccessKey, Bucket) ->
     case get_info() of
         {ok, #bucket_info{type = slave,
-                          db   = DB,
                           provider = Provider}} ->
-            case rpc_call(Provider, delete, [AccessKey, Bucket]) of
-                ok ->
-                    delete(AccessKey, Bucket, DB);
-                _ ->
-                    {error, not_deleted}
-            end;
+            rpc_call(Provider, leo_manager_api, delete_bucket, [AccessKey, Bucket]);
         {ok, #bucket_info{type = master, db = DB}} ->
             delete(AccessKey, Bucket, DB);
         Error ->
@@ -323,10 +375,27 @@ delete(AccessKey, Bucket) ->
 
 -spec(delete(binary(), binary(), ets | mnesia) ->
              ok | {error, any()}).
-delete(AccessKey, Bucket, DB) ->
-    leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE},
-                                      #?BUCKET{name = Bucket,
-                                               access_key_id = AccessKey}).
+delete(AccessKey, Bucket, undefined) ->
+    case get_info() of
+        {ok, #bucket_info{db = DB}} ->
+            delete(AccessKey, Bucket, DB);
+        Error ->
+            Error
+    end;
+delete(AccessKey, BucketName, DB) ->
+    Table = ?BUCKET_TABLE,
+    case leo_s3_bucket_data_handler:find_by_name(
+           {DB, Table}, AccessKey, BucketName, true) of
+        {ok, Bucket} ->
+            leo_s3_bucket_data_handler:insert(
+              {DB, ?BUCKET_TABLE},
+              Bucket#?BUCKET{del = true,
+                             last_modified_at = leo_date:now()});
+        not_found ->
+            ok;
+        Error ->
+            Error
+    end.
 
 
 %% @doc update acls in a bukcet-property
@@ -368,12 +437,14 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
         ok ->
             case leo_s3_bucket_data_handler:find_by_name(
                    {DB, ?BUCKET_TABLE}, AccessKey, Bucket, false) of
-                {ok, #?BUCKET{created_at = CreatedAt}} ->
+                {ok, #?BUCKET{cluster_id = ClusterId,
+                              created_at = CreatedAt}} ->
                     Now = leo_date:now(),
                     leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
                                                       #?BUCKET{name = Bucket,
                                                                access_key_id = AccessKey,
                                                                acls = ACLs,
+                                                               cluster_id = ClusterId,
                                                                last_synchroized_at = Now,
                                                                last_modified_at    = Now,
                                                                created_at = CreatedAt});
@@ -390,8 +461,7 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
 -spec(update_acls2private(binary(), #?BUCKET{}) ->
              ok | {error, any()}).
 update_acls2private(AccessKey, Bucket) ->
-    ACLs = [#bucket_acl_info{user_id     = AccessKey,
-                             permissions = [full_control]}],
+    ACLs = canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PRIVATE),
     update_acls(AccessKey, Bucket, ACLs).
 
 
@@ -400,8 +470,7 @@ update_acls2private(AccessKey, Bucket) ->
 -spec(update_acls2public_read(binary(), #?BUCKET{}) ->
              ok | {error, any()}).
 update_acls2public_read(AccessKey, Bucket) ->
-    ACLs = [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
-                             permissions = [read]}],
+    ACLs = canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PUBLIC_READ),
     update_acls(AccessKey, Bucket, ACLs).
 
 
@@ -410,8 +479,7 @@ update_acls2public_read(AccessKey, Bucket) ->
 -spec(update_acls2public_read_write(binary(), #?BUCKET{}) ->
              ok | {error, any()}).
 update_acls2public_read_write(AccessKey, Bucket) ->
-    ACLs = [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
-                             permissions = [read, write]}],
+    ACLs = canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PUBLIC_READ_WRITE),
     update_acls(AccessKey, Bucket, ACLs).
 
 
@@ -552,6 +620,19 @@ change_bucket_owner_1(#bucket_info{type = Type,
     end.
 
 
+%% @doc Retrieve checksum of the table
+%%
+-spec(checksum() ->
+             {ok, pos_integer()} | not_found | {error, any()}).
+checksum() ->
+    case leo_s3_bucket_data_handler:find_all({mnesia, ?BUCKET_TABLE}) of
+        {ok, RetL} ->
+            {ok, erlang:crc32(term_to_binary(RetL))};
+        _Error ->
+            {ok, -1}
+    end.
+
+
 %%--------------------------------------------------------------------
 %% INNER FUNCTIONS
 %%--------------------------------------------------------------------
@@ -627,9 +708,20 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
               {value, {ok, match}} when Value0 /= [] ->
                   {ok, Value0};
               {value, {ok, Value1}} ->
-                  lists:foreach(fun(Bucket) ->
-                                        leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Bucket)
-                                end, Value0),
+                  lists:foreach(
+                    fun(Bucket) ->
+                            case DB of
+                                mnesia ->
+                                    leo_s3_bucket_data_handler:insert(
+                                      {DB, ?BUCKET_TABLE},
+                                      Bucket#?BUCKET{del = true,
+                                                     last_modified_at = leo_date:now()
+                                                    });
+                                _ ->
+                                    leo_s3_bucket_data_handler:delete(
+                                      {DB, ?BUCKET_TABLE}, Bucket)
+                            end
+                    end, Value0),
                   ok = put_all_values(ets, Value1),
                   {ok, Value1};
               {value, not_found} ->
@@ -698,7 +790,17 @@ find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
                   {ok, Value0};
               {value, {ok, Value1}} ->
                   NewBucketVal = Value1#?BUCKET{last_synchroized_at = leo_date:now()},
-                  catch leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Value0),
+                  case DB of
+                      mnesia ->
+                          catch leo_s3_bucket_data_handler:insert(
+                                  {DB, ?BUCKET_TABLE},
+                                  Value0#?BUCKET{del = true,
+                                                 last_modified_at = leo_date:now()
+                                                });
+                      _ ->
+                          catch leo_s3_bucket_data_handler:delete(
+                                  {DB, ?BUCKET_TABLE}, Value0)
+                  end,
                   leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
                   {ok, NewBucketVal};
               {value, not_found} ->
@@ -817,3 +919,87 @@ cast_binary_to_str(Bucket) ->
         true  -> binary_to_list(Bucket);
         false -> Bucket
     end.
+
+%% @doc convert a canned acl string to a bucket_acl_info record
+canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PRIVATE) ->
+    [#bucket_acl_info{user_id     = AccessKey,
+                      permissions = [full_control]}];
+canned_acl2bucket_acl_info(_AccessKey, ?CANNED_ACL_PUBLIC_READ) ->
+    [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
+                      permissions = [read]}];
+canned_acl2bucket_acl_info(_AccessKey, ?CANNED_ACL_PUBLIC_READ_WRITE) ->
+    [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
+                      permissions = [read, write]}].
+
+
+%%--------------------------------------------------------------------
+%% Transform API
+%%--------------------------------------------------------------------
+%% @doc The table schema migrate to the new one by using mnesia:transform_table
+%%
+-spec(transform() -> ok).
+transform() ->
+    {atomic, ok} = mnesia:transform_table(
+                     ?BUCKET_TABLE,
+                     fun transform_1/1, record_info(fields, ?BUCKET), ?BUCKET),
+    ok.
+
+
+%% @doc the record is the current verion
+%% @private
+transform_1(#?BUCKET{} = Bucket) ->
+    Bucket;
+
+%% @doc migrate a record from 0.16.0 to the current version
+%% @private
+transform_1({bucket, Name, AccessKey, CreatedAt}) ->
+    #?BUCKET{name                = Name,
+             access_key_id       = AccessKey,
+             acls                = [],
+             last_synchroized_at = 0,
+             created_at          = CreatedAt,
+             last_modified_at    = 0};
+
+%% @doc migrate a record from 0.14.x to the current version
+%% @private
+transform_1({bucket, Name, AccessKey, Acls,
+             LastSynchronizedAt, CreatedAt, LastModifiedAt}) ->
+    #?BUCKET{name                = Name,
+             access_key_id       = AccessKey,
+             acls                = Acls,
+             last_synchroized_at = LastSynchronizedAt,
+             created_at          = CreatedAt,
+             last_modified_at    = LastModifiedAt};
+
+transform_1(#bucket_0_16_0{name                = Name,
+                           access_key_id       = AccessKey,
+                           acls                = Acls,
+                           last_synchroized_at = LastSynchronizedAt,
+                           created_at          = CreatedAt,
+                           last_modified_at    = LastModifiedAt}) ->
+    #?BUCKET{name                = Name,
+             access_key_id       = AccessKey,
+             acls                = Acls,
+             last_synchroized_at = LastSynchronizedAt,
+             created_at          = CreatedAt,
+             last_modified_at    = LastModifiedAt}.
+
+
+%% @doc Transform data
+%%
+transform(ClusterId) ->
+    case find_all() of
+        {ok, RetL} ->
+            transform_2(RetL, ClusterId);
+        _ ->
+            ok
+    end.
+
+transform_2([],_ClusterId) ->
+    ok;
+transform_2([#?BUCKET{cluster_id = undefined} = Bucket|Rest], ClusterId) ->
+    leo_s3_bucket_data_handler:insert({mnesia, ?BUCKET_TABLE},
+                                      Bucket#?BUCKET{cluster_id = ClusterId}),
+    transform_2(Rest, ClusterId);
+transform_2([_|Rest], ClusterId) ->
+    transform_2(Rest, ClusterId).

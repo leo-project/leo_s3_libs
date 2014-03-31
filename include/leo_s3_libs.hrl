@@ -36,3 +36,11 @@
 -define(BUCKET_TABLE,     leo_s3_buckets).
 -define(USERS_TABLE,           leo_s3_users).
 -define(USER_CREDENTIAL_TABLE, leo_s3_user_credential).
+
+%% @doc Checksum of entire tables
+-record(s3_tbls_checksum, {
+          auth   = 0 :: pos_integer(),
+          bucket = 0 :: pos_integer(),
+          user   = 0 :: pos_integer(),
+          credential = 0 :: pos_integer()
+         }).

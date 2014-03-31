@@ -27,9 +27,11 @@
 -author('Yosuke Hara').
 
 -include("leo_s3_bucket.hrl").
+-include("leo_s3_libs.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([start/1, start/2, update_providers/1]).
+-export([start/1, start/2,
+         update_providers/1, get_checksums/0]).
 
 
 %%--------------------------------------------------------------------
@@ -72,6 +74,21 @@ update_providers(Provider) ->
     ok = leo_s3_bucket:update_providers(Provider),
     ok = leo_s3_endpoint:update_providers(Provider),
     ok.
+
+
+%% @doc update_providers(slave only)
+%%
+-spec(get_checksums() ->
+             ok).
+get_checksums() ->
+    {ok, C1} = leo_s3_auth:checksum(),
+    {ok, C2} = leo_s3_bucket:checksum(),
+    {ok, C3} = leo_s3_user:checksum(),
+    {ok, C4} = leo_s3_user_credential:checksum(),
+    {ok, #s3_tbls_checksum{auth       = C1,
+                           bucket     = C2,
+                           user       = C3,
+                           credential = C4}}.
 
 %%--------------------------------------------------------------------
 %% INNER FUNCTION

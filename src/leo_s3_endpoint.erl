@@ -31,9 +31,10 @@
 -include("leo_s3_libs.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
--export([start/2,  create_endpoint_table/2,
+-export([start/2,  create_table/2,
          update_providers/1,
-         set_endpoint/1, get_endpoints/0, delete_endpoint/1
+         set_endpoint/1, get_endpoints/0, delete_endpoint/1,
+         checksum/0
         ]).
 
 %%--------------------------------------------------------------------
@@ -72,7 +73,7 @@ update_providers(Provider) ->
 
 %% @doc Create endpoint table(mnesia)
 %%
-create_endpoint_table(Mode, Nodes) ->
+create_table(Mode, Nodes) ->
     catch application:start(mnesia),
     {atomic, ok} =
         mnesia:create_table(
@@ -82,8 +83,8 @@ create_endpoint_table(Mode, Nodes) ->
            {record_name, endpoint},
            {attributes, record_info(fields, endpoint)},
            {user_properties,
-            [{endpoint,   {varchar, undefined}, false, primary,   undefined, identity,  varchar},
-             {created_at, {integer, undefined}, false, undefined, undefined, undefined, integer}
+            [{endpoint,   string,  primary},
+             {created_at, integer, false}
             ]}
           ]),
     ok.
@@ -127,6 +128,18 @@ delete_endpoint(EndPoint) ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB}} ->
             leo_s3_libs_data_handler:delete({DB, ?ENDPOINT_TABLE}, EndPoint);
+        Error ->
+            Error
+    end.
+
+
+%% @doc Retrieve checksum of the table
+-spec(checksum() ->
+             {ok, pos_integer()} | not_found | {error, any()}).
+checksum() ->
+    case leo_s3_libs_data_handler:all({mnesia, ?ENDPOINT_TABLE}) of
+        {ok, RetL} ->
+            {ok, erlang:crc32(term_to_binary(RetL))};
         Error ->
             Error
     end.

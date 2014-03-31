@@ -41,9 +41,8 @@
           id                      :: binary(),
           password = <<>>         :: binary(),
           role_id = ?ROLE_GENERAL :: integer(),
-          cluster_id              :: atom(),
-          created_at = 0          :: integer(),
-          updated_at = 0          :: integer(),
+          created_at = leo_date:now() :: integer(),
+          updated_at = leo_date:now() :: integer(),
           del = false             :: boolean()
          }).
 -define(S3_USER, 'user_1').

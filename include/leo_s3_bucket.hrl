@@ -71,16 +71,29 @@
          }).
 
 %% - LeoFS-v1.0.0 -
+-ifdef(TEST).
 -record(bucket_1, {
           name          :: string(), %% bucket name
           access_key_id :: binary(), %% access-key-id
           acls = []     :: acls(),   %% acl list
           cluster_id    :: atom(),   %% cluster_id
           last_synchroized_at = 0 :: integer(), %% last synchronized date and time
-          created_at          = 0 :: integer(), %% created date and time
-          last_modified_at    = 0 :: integer(), %% modified date and time
+          created_at       = 0 :: integer(), %% created date and time
+          last_modified_at = 0 :: integer(), %% modified date and time
           del = false :: boolean()   %% delete-flag
          }).
+-else.
+-record(bucket_1, {
+          name          :: string(), %% bucket name
+          access_key_id :: binary(), %% access-key-id
+          acls = []     :: acls(),   %% acl list
+          cluster_id    :: atom(),   %% cluster_id
+          last_synchroized_at = 0 :: integer(), %% last synchronized date and time
+          created_at       = leo_date:now() :: integer(), %% created date and time
+          last_modified_at = leo_date:now() :: integer(), %% modified date and time
+          del = false :: boolean()   %% delete-flag
+         }).
+-endif.
 %% Current bucket-record is 'bucket_1'
 -define(BUCKET, bucket_1).
 

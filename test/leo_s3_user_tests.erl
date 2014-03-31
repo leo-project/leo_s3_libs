@@ -122,20 +122,6 @@ suite_(_) ->
     {ok, ALL_2} = leo_s3_user_credential:find_all_with_role(),
     ?assertEqual(1, length(ALL_1) - length(ALL_2)),
 
-
-    ok = leo_s3_user:transform('leofs_99'),
-    Fun = fun() ->
-                  Q1 = qlc:q([X || X <- mnesia:table(?USERS_TABLE)]),
-                  Q2 = qlc:sort(Q1, [{order, ascending}]),
-                  qlc:e(Q2)
-          end,
-    case leo_mnesia:read(Fun) of
-        {ok, RetL} ->
-            transform_1(RetL);
-        _ ->
-            ok
-    end,
-
     %% check checksum
     {ok, Checksum_1} = leo_s3_user:checksum(),
     {ok, Checksum_2} = leo_s3_user_credential:checksum(),
@@ -163,14 +149,6 @@ suite_(_) ->
     ?assertEqual(5, length(RetL_4) - length(RetL_3)),
 
     ok.
-
-%% @private
-transform_1([]) ->
-    ok;
-transform_1([User|Rest]) ->
-    ?assertEqual(true, is_record(User, ?S3_USER)),
-    ?assertEqual('leofs_99', User#?S3_USER.cluster_id),
-    transform_1(Rest).
 
 -endif.
 

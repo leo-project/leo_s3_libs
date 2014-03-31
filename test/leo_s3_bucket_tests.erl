@@ -292,7 +292,6 @@ ets_suite_(_) ->
                                                    ok
                                            end]),
     {ok, Ret2} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
-
     ?assertEqual(3, length(Ret2)),
     5 = leo_s3_bucket_data_handler:size({ets, leo_s3_buckets}),
 

@@ -257,14 +257,26 @@ find_all_including_owner() ->
 %%
 -spec(put(#?BUCKET{}) ->
              ok | {error, any()}).
-put(Bucket) ->
+put(#?BUCKET{name = Name,
+             last_modified_at = UpdatedAt_1} = Bucket) ->
     DB_1 = case get_info() of
                {ok, #bucket_info{db = DB}} ->
                    DB;
                _ ->
                    mnesia
            end,
-    leo_s3_bucket_data_handler:insert({DB_1, ?BUCKET_TABLE}, Bucket).
+    case find_bucket_by_name(Name) of
+        {ok, #?BUCKET{last_modified_at = UpdatedAt_2}} when UpdatedAt_1 > UpdatedAt_2 ->
+            put_1(DB_1, Bucket);
+        not_found ->
+            put_1(DB_1, Bucket);
+        _ ->
+            ok
+    end.
+
+%% @private
+put_1(DB, Bucket) ->
+    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, Bucket).
 
 
 -spec(put(binary(), binary()) ->
@@ -323,7 +335,9 @@ put(AccessKey, BucketName, CannedACL, ClusterId, DB) ->
                                                        acls = ACLs,
                                                        cluster_id = ClusterId,
                                                        created_at = Now,
-                                                       last_modified_at = Now});
+                                                       last_modified_at = Now,
+                                                       del = false
+                                                      });
         Error ->
             Error
     end.

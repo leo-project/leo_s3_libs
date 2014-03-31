@@ -38,7 +38,7 @@
          update/1, delete/1,
          find_by_id/1, find_all/0,
          auth/2, checksum/0,
-         transform/0, transform/1
+         transform/0
         ]).
 
 %%--------------------------------------------------------------------
@@ -61,6 +61,7 @@ create_table(Mode, Nodes) ->
              {password,   binary,  fasle},
              {role_id,    integer, false},
              {created_at, integer, false},
+             {updated_at, integer, false},
              {del,        boolean, false}
             ]}
           ]),
@@ -71,9 +72,21 @@ create_table(Mode, Nodes) ->
 %%
 -spec(put(#?S3_USER{})  ->
              ok | {error, any()}).
-put(#?S3_USER{} = User) ->
-    leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
-                                    {[], User}).
+put(#?S3_USER{id = UserId,
+              updated_at = UpdatedAt_1} = User) ->
+    case find_by_id(UserId) of
+        {ok, #?S3_USER{updated_at = UpdatedAt_2}} when UpdatedAt_1 > UpdatedAt_2 ->
+            put_1(User);
+        not_found ->
+            put_1(User);
+        _ ->
+            ok
+    end.
+
+%% @private
+put_1(User) ->
+  leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
+                                  {[], User}).
 
 
 %% @doc Create a user account
@@ -164,19 +177,13 @@ update(#?S3_USER{id       = UserId,
              ok | {error, any()}).
 delete(UserId) ->
     case find_by_id(UserId) of
-        {ok, #?S3_USER{role_id    = RoleId,
-                       password   = Password,
-                       created_at = CreatedAt}} ->
-            case leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
-                                                 {[], #?S3_USER{id         = UserId,
-                                                                role_id    = RoleId,
-                                                                password   = Password,
-                                                                created_at = CreatedAt,
-                                                                updated_at = leo_date:now(),
-                                                                del        = true}}) of
+        {ok, #?S3_USER{} = S3User} ->
+            case leo_s3_libs_data_handler:insert(
+                   {mnesia, ?USERS_TABLE},
+                   {[], S3User#?S3_USER{updated_at = leo_date:now(),
+                                        del        = true}}) of
                 ok ->
-                    leo_s3_libs_data_handler:delete(
-                      {mnesia, ?USER_CREDENTIAL_TABLE}, UserId);
+                    ok;
                 Error ->
                     Error
             end;
@@ -283,33 +290,6 @@ transform_1(#user{id = Id,
               created_at = CreatedAt,
               updated_at = CreatedAt,
               del = DelFlag}.
-
-
-%% @doc Transform (set cluster-id to every records)
--spec(transform(atom()) ->
-             ok).
-transform(ClusterId) ->
-    Fun = fun() ->
-                  Q1 = qlc:q([X || X <- mnesia:table(?USERS_TABLE)]),
-                  Q2 = qlc:sort(Q1, [{order, ascending}]),
-                  qlc:e(Q2)
-          end,
-    case leo_mnesia:read(Fun) of
-        {ok, RetL} ->
-            transform_2(RetL, ClusterId);
-        _ ->
-            ok
-    end.
-
-transform_2([],_ClusterId) ->
-    ok;
-transform_2([#?S3_USER{cluster_id = undefined} = User|Rest], ClusterId) ->
-    leo_s3_libs_data_handler:insert(
-      {mnesia, ?USERS_TABLE},
-      {[], User#?S3_USER{cluster_id = ClusterId}}),
-    transform_2(Rest, ClusterId);
-transform_2([_|Rest], ClusterId) ->
-    transform_2(Rest, ClusterId).
 
 
 %%--------------------------------------------------------------------

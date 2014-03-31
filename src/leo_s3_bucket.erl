@@ -220,37 +220,41 @@ find_all() ->
 find_all_including_owner() ->
     case find_all() of
         {ok, Buckets} ->
-            Ret = lists:map(
-                    fun(#?BUCKET{name = Name,
-                                 access_key_id = AccessKeyId,
-                                 acls = ACLs,
-                                 cluster_id = ClusterId,
-                                 created_at = CreatedAt}) ->
-                            Owner_1 = case leo_s3_user_credential:find_by_access_key_id(AccessKeyId) of
-                                          {ok, Owner} ->
-                                              Owner;
-                                          _ ->
-                                              #user_credential{}
-                                      end,
-                            Permissions_1 =
-                                case ACLs of
-                                    [] -> ACLs;
-                                    [#bucket_acl_info{permissions = Permissions}|_] ->
-                                        Permissions
-                                end,
-                            #bucket_dto{name       = Name,
-                                        owner      = Owner_1,
-                                        acls       = Permissions_1,
-                                        cluster_id = ClusterId,
-                                        created_at = CreatedAt}
-                    end, Buckets),
-            case Ret of
-                [] -> not_found;
-                _  -> {ok, Ret}
-            end;
+            find_all_including_owner_1(Buckets, []);
         Error ->
             Error
     end.
+
+%% @private
+find_all_including_owner_1([], Acc) ->
+    {ok, lists:reverse(Acc)};
+find_all_including_owner_1([#?BUCKET{name = Name,
+                                     access_key_id = AccessKeyId,
+                                     acls = ACLs,
+                                     cluster_id = ClusterId,
+                                     created_at = CreatedAt,
+                                     del = false
+                                    }|Rest], Acc) ->
+    Owner_1 =
+        case leo_s3_user_credential:find_by_access_key_id(AccessKeyId) of
+            {ok, Owner} ->
+                Owner;
+            _ ->
+                #user_credential{}
+        end,
+    Permissions_1 =
+        case ACLs of
+            [] -> ACLs;
+            [#bucket_acl_info{permissions = Permissions}|_] ->
+                Permissions
+        end,
+    find_all_including_owner_1(Rest, [#bucket_dto{name       = Name,
+                                                  owner      = Owner_1,
+                                                  acls       = Permissions_1,
+                                                  cluster_id = ClusterId,
+                                                  created_at = CreatedAt}|Acc]);
+find_all_including_owner_1([_Other|Rest], Acc) ->
+    find_all_including_owner_1(Rest, Acc).
 
 
 %% @doc put a bucket.
@@ -704,9 +708,18 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
               {value, {ok, match}} when Value0 /= [] ->
                   {ok, Value0};
               {value, {ok, Value1}} ->
-                  lists:foreach(fun(Bucket) ->
-                                        leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Bucket)
-                                end, Value0),
+                  lists:foreach(
+                    fun(Bucket) ->
+                            case DB of
+                                mnesia ->
+                                    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
+                                                                      Bucket#?BUCKET{del = true,
+                                                                                     last_modified_at = leo_date:now()
+                                                                                    });
+                                _ ->
+                                    leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Bucket)
+                            end
+                    end, Value0),
                   ok = put_all_values(ets, Value1),
                   {ok, Value1};
               {value, not_found} ->
@@ -775,7 +788,15 @@ find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
                   {ok, Value0};
               {value, {ok, Value1}} ->
                   NewBucketVal = Value1#?BUCKET{last_synchroized_at = leo_date:now()},
-                  catch leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Value0),
+                  case DB of
+                      mnesia ->
+                          catch leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
+                                                                  Value0#?BUCKET{del = true,
+                                                                                 last_modified_at = leo_date:now()
+                                                                                });
+                      _ ->
+                          catch leo_s3_bucket_data_handler:delete({DB, ?BUCKET_TABLE}, Value0)
+                  end,
                   leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
                   {ok, NewBucketVal};
               {value, not_found} ->

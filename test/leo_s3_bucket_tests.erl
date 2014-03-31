@@ -155,7 +155,8 @@ mnesia_suite_(_) ->
     %% Retrieve buckets including owner
     {ok, Buckets0} = leo_s3_bucket:find_all_including_owner(),
     {ok, Buckets1} = leo_s3_bucket:find_all(),
-    ?assertEqual(true, length(Buckets0) == length(Buckets1)),
+    ?assertEqual(9,  length(Buckets0)),
+    ?assertEqual(11, length(Buckets1)),
 
     %% https://github.com/leo-project/leofs/issues/75
     ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket9),

@@ -242,8 +242,8 @@ checksum() ->
     case find_all() of
         {ok, RetL} ->
             {ok, erlang:crc32(term_to_binary(RetL))};
-        Error ->
-            Error
+        _Error ->
+            {ok, -1}
     end.
 
 

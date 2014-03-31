@@ -596,8 +596,8 @@ checksum() ->
     case leo_s3_bucket_data_handler:find_all({mnesia, ?BUCKET_TABLE}) of
         {ok, RetL} ->
             {ok, erlang:crc32(term_to_binary(RetL))};
-        Error ->
-            Error
+        _Error ->
+            {ok, -1}
     end.
 
 

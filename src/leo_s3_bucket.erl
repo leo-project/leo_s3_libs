@@ -43,7 +43,7 @@
          get_acls/1, update_acls/3,
          update_acls2private/2, update_acls2public_read/2,
          update_acls2public_read_write/2, update_acls2authenticated_read/2,
-         put/1, put/2, put/3, put/4, put/5,
+         put/1, put/2, put/3, put/4, put/5, bulk_put/1,
          delete/2, delete/3, head/2, head/4,
          change_bucket_owner/2,
          checksum/0
@@ -327,6 +327,18 @@ put(AccessKey, BucketName, CannedACL, ClusterId, DB) ->
         Error ->
             Error
     end.
+
+
+%% @doc Add buckets
+%%
+-spec(bulk_put(list(#?BUCKET{})) ->
+             ok).
+bulk_put([]) ->
+    ok;
+bulk_put([Bucket|Rest]) ->
+    _ = ?MODULE:put(Bucket),
+    bulk_put(Rest).
+
 
 %% @doc delete a bucket.
 %%

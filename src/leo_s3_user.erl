@@ -34,7 +34,8 @@
 -include_lib("stdlib/include/qlc.hrl").
 
 -export([create_table/2,
-         put/1, put/3, update/1, delete/1,
+         put/1, put/3, bulk_put/1,
+         update/1, delete/1,
          find_by_id/1, find_all/0,
          auth/2, checksum/0,
          transform/0, transform/1
@@ -111,6 +112,17 @@ put_1(UserId, Password, WithS3Keys) ->
         Error ->
             Error
     end.
+
+
+%% @doc Add buckets
+%%
+-spec(bulk_put(list(#?S3_USER{})) ->
+             ok).
+bulk_put([]) ->
+    ok;
+bulk_put([User|Rest]) ->
+    _ = ?MODULE:put(User),
+    bulk_put(Rest).
 
 
 %% @doc Update a user

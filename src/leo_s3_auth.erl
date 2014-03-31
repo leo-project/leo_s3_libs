@@ -34,7 +34,7 @@
 -include_lib("stdlib/include/qlc.hrl").
 
 -export([start/2,
-         create_table/2, put/1,
+         create_table/2, put/1, bulk_put/1,
          update_providers/1,
          create_key/1, get_credential/1, has_credential/1, has_credential/2,
          authenticate/3, get_signature/2,
@@ -118,6 +118,17 @@ put(#credential{access_key_id = Id} = Credential) ->
            end,
     leo_s3_libs_data_handler:insert(
       {DB_1, ?AUTH_TABLE}, {Id, Credential}).
+
+
+%% @doc Add credentials
+%%
+-spec(bulk_put(list(#credential{})) ->
+             ok).
+bulk_put([]) ->
+    ok;
+bulk_put([Credential|Rest]) ->
+    _ = ?MODULE:put(Credential),
+    bulk_put(Rest).
 
 
 %% @doc Generate access-key-id and secret-access-key

@@ -136,6 +136,26 @@ suite_(_) ->
     ?assertEqual(true, Checksum_1 > 0),
     ?assertEqual(true, Checksum_2 > 0),
 
+
+    %% check bulk-insert
+    {ok, RetL_1} = leo_s3_user:find_all(),
+    ok = leo_s3_user:bulk_put([#?S3_USER{id = 1},
+                               #?S3_USER{id = 2},
+                               #?S3_USER{id = 3},
+                               #?S3_USER{id = 4},
+                               #?S3_USER{id = 5}]),
+    {ok, RetL_2} = leo_s3_user:find_all(),
+    ?assertEqual(5, length(RetL_2) - length(RetL_1)),
+
+    {ok, RetL_3} = leo_s3_user_credential:find_all(),
+    ok = leo_s3_user_credential:bulk_put([#user_credential{user_id = 1},
+                                          #user_credential{user_id = 2},
+                                          #user_credential{user_id = 3},
+                                          #user_credential{user_id = 4},
+                                          #user_credential{user_id = 5}]),
+    {ok, RetL_4} = leo_s3_user_credential:find_all(),
+    ?assertEqual(5, length(RetL_4) - length(RetL_3)),
+
     ok.
 
 %% @private

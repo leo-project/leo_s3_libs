@@ -33,7 +33,7 @@
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
--export([create_table/2, put/1, put/2,
+-export([create_table/2, put/1, put/2, bulk_put/1,
          delete/1,
          find_by_access_key_id/1,
          find_all/0, find_all_with_role/0,
@@ -99,6 +99,17 @@ put(UserId, CreatedAt) ->
         Error ->
             Error
     end.
+
+
+%% @doc Add buckets
+%%
+-spec(bulk_put(list(#user_credential{})) ->
+             ok).
+bulk_put([]) ->
+    ok;
+bulk_put([UserCredential|Rest]) ->
+    _ = ?MODULE:put(UserCredential),
+    bulk_put(Rest).
 
 
 %% @doc Remote a credential-user info

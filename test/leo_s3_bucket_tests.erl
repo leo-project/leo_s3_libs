@@ -191,6 +191,16 @@ mnesia_suite_(_) ->
     {ok, Checksum} = leo_s3_bucket:checksum(),
     ?assertEqual(true, Checksum > 0),
 
+    %% check bulk-insert
+    {ok, RetL_1} = leo_s3_bucket:find_all(),
+    ok = leo_s3_bucket:bulk_put([#?BUCKET{name = <<"_1_">>},
+                                 #?BUCKET{name = <<"_2_">>},
+                                 #?BUCKET{name = <<"_3_">>},
+                                 #?BUCKET{name = <<"_4_">>},
+                                 #?BUCKET{name = <<"_5_">>}]),
+    {ok, RetL_2} = leo_s3_bucket:find_all(),
+    ?assertEqual(5, length(RetL_2) - length(RetL_1)),
+
     application:stop(mnesia),
     timer:sleep(250),
     ok.

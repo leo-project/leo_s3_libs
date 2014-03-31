@@ -92,9 +92,12 @@ suite_(_) ->
     {ok, _} = leo_s3_user:put(UserId ++ "_2", Password0, true),
     {ok, _} = leo_s3_user:put(UserId ++ "_3", Password0, true),
     {ok, _} = leo_s3_user:put(UserId ++ "_4", Password0, true),
-    {ok, Users} = leo_s3_user_credential:find_all(),
-    ?debugVal(Users),
-    ?assertEqual(5, length(Users)),
+    {ok, Users_1} = leo_s3_user_credential:find_all(),
+    {ok, Users_2} = leo_s3_user_credential:find_all_with_role(),
+    ?debugVal(Users_1),
+    ?debugVal(Users_2),
+    ?assertEqual(5, length(Users_1)),
+    ?assertEqual(5, length(Users_2)),
 
     %% %% get_credential_by_id
     {ok, Credential} = leo_s3_user_credential:get_credential_by_user_id(UserId),

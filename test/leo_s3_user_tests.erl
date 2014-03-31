@@ -116,8 +116,11 @@ suite_(_) ->
     ?assertEqual(9,      Res3#?S3_USER.role_id),
 
     %% delete
+    {ok, ALL_1} = leo_s3_user_credential:find_all_with_role(),
     ok = leo_s3_user:delete(UserId),
     not_found = leo_s3_user:find_by_id(UserId),
+    {ok, ALL_2} = leo_s3_user_credential:find_all_with_role(),
+    ?assertEqual(1, length(ALL_1) - length(ALL_2)),
 
 
     ok = leo_s3_user:transform('leofs_99'),

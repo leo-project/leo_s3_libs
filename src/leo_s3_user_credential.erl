@@ -159,19 +159,28 @@ find_all() ->
 find_all_with_role() ->
     case find_all() of
         {ok, RetL} ->
-            Users_2 = lists:map(fun(#user_credential{user_id = UserId,
-                                                     access_key_id = AccessKeyId,
-                                                     created_at = CretedAt}) ->
-                                        {ok, #?S3_USER{role_id = RoleId}} =
-                                            leo_s3_user:find_by_id(UserId),
-                                        [{user_id, UserId},
-                                         {role_id, RoleId},
-                                         {access_key_id, AccessKeyId},
-                                         {created_at, CretedAt}]
-                                end, RetL),
-            {ok, Users_2};
+            RetL_1 = find_all_with_role_1(RetL, []),
+            {ok, RetL_1};
         Error ->
             Error
+    end.
+
+%% @private
+find_all_with_role_1([], Acc) ->
+    lists:reverse(Acc);
+find_all_with_role_1([#user_credential{user_id = UserId,
+                                       access_key_id = AccessKeyId,
+                                       created_at = CretedAt}|Rest], Acc) ->
+    case leo_s3_user:find_by_id(UserId) of
+        {ok, #?S3_USER{role_id = RoleId,
+                       del = false}} ->
+            find_all_with_role_1(Rest, [[{user_id, UserId},
+                                         {role_id, RoleId},
+                                         {access_key_id, AccessKeyId},
+                                         {created_at, CretedAt}]|Acc]);
+        _ ->
+
+            find_all_with_role_1(Rest, Acc)
     end.
 
 

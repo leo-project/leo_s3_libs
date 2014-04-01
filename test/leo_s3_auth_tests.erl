@@ -27,6 +27,7 @@
 -author('Yosuke Hara').
 
 -include("leo_s3_auth.hrl").
+-include("leo_s3_user.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 %%--------------------------------------------------------------------
@@ -101,6 +102,17 @@ mnesia_suite_(_) ->
                      fun(_AccessKeyId, _Bucket) ->
                              ok
                      end),
+    _ = meck:unload(leo_s3_user),
+    ok = meck:new(leo_s3_user),
+    ok = meck:expect(leo_s3_user, find_by_id,
+                     fun(_) ->
+                             {ok, #?S3_USER{}}
+                     end),
+    ok = meck:new(leo_s3_user_credential),
+    ok = meck:expect(leo_s3_user_credential, find_by_access_key_id,
+                     fun(_) ->
+                             {ok, #user_credential{}}
+                     end),
 
     SignParams0 = #sign_params{http_verb    = <<"GET">>,
                                content_md5  = <<>>,
@@ -115,6 +127,16 @@ mnesia_suite_(_) ->
     {ok, Credential}  = leo_s3_auth:get_credential(AccessKeyId),
     ?assertEqual(AccessKeyId,     Credential#credential.access_key_id),
     ?assertEqual(SecretAccessKey, Credential#credential.secret_access_key),
+
+    %% removed a user-credential
+    _ = meck:unload(leo_s3_user_credential),
+    ok = meck:new(leo_s3_user_credential),
+    ok = meck:expect(leo_s3_user_credential, find_by_access_key_id,
+                     fun(_) ->
+                             not_found
+                     end),
+    ?assertEqual(not_found, leo_s3_auth:get_credential(AccessKeyId)),
+
 
     %% inspect-4 - for authentication
     Authorization1 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":example">>/binary >>,

@@ -30,6 +30,7 @@
 -include("leo_s3_auth.hrl").
 -include("leo_s3_endpoint.hrl").
 -include("leo_s3_libs.hrl").
+-include("leo_s3_user.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 
@@ -163,7 +164,22 @@ create_key(UserId) ->
 -spec(get_credential(binary()) ->
              {ok, #credential{}} | not_found | {error, any()}).
 get_credential(AccessKeyId) ->
-    leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, AccessKeyId).
+    case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, AccessKeyId) of
+        {ok, #credential{}} = Ret ->
+            case leo_s3_user_credential:find_by_access_key_id(AccessKeyId) of
+                {ok, #user_credential{user_id = UserId}} ->
+                    case leo_s3_user:find_by_id(UserId) of
+                        {ok, _} ->
+                            Ret;
+                        Error ->
+                            Error
+                    end;
+                Error ->
+                    Error
+            end;
+        Error ->
+            Error
+    end.
 
 
 %% @doc Has a credential into the master-nodes?

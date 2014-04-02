@@ -46,6 +46,7 @@
          put/1, put/2, put/3, put/4, put/5, bulk_put/1,
          delete/2, delete/3, head/2, head/4,
          change_bucket_owner/2,
+         aclinfo2str/1,
          checksum/0
         ]).
 -export([transform/0, transform/1]).
@@ -931,6 +932,19 @@ canned_acl2bucket_acl_info(_AccessKey, ?CANNED_ACL_PUBLIC_READ_WRITE) ->
     [#bucket_acl_info{user_id     = ?GRANTEE_ALL_USER,
                       permissions = [read, write]}].
 
+%% @doc Convert #bucket_acl_info to string to display ACL info on manager console
+%%
+-spec(aclinfo2str(#bucket_acl_info{}) ->
+                  string()).
+aclinfo2str(BucketACLInfoList) ->
+    OwnerPermissionStr = io_lib:format("~s(full_control)",[?GRANTEE_DISPLAY_OWNER]),
+    lists:flatten(lists:foldl(
+        fun(#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, permissions = Permissions}, Acc) ->
+                PermissionsStr = string:join([atom_to_list(Item) || Item <- Permissions], ","),
+                io_lib:format("~s, ~s(~s)",[Acc, ?GRANTEE_DISPLAY_ALL_USER, PermissionsStr]);
+           (#bucket_acl_info{user_id = _, permissions = _}, Acc) ->
+                Acc
+        end, OwnerPermissionStr, BucketACLInfoList)).
 
 %%--------------------------------------------------------------------
 %% Transform API

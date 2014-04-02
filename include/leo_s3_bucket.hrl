@@ -28,6 +28,9 @@
 %%
 -define(GRANTEE_ALL_USER, <<"http://acs.amazonaws.com/groups/global/AllUsers">>).
 -define(GRANTEE_AUTHENTICATED_USER, <<"http://acs.amazonaws.com/groups/global/AuthenticatedUsers">>).
+% for display
+-define(GRANTEE_DISPLAY_ALL_USER, "Everyone").
+-define(GRANTEE_DISPLAY_OWNER, "Me").
 
 -ifdef(TEST).
 -define(DEF_BUCKET_PROP_SYNC_INTERVAL, 60).

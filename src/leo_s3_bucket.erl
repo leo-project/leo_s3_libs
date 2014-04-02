@@ -243,15 +243,9 @@ find_all_including_owner_1([#?BUCKET{name = Name,
             _ ->
                 #user_credential{}
         end,
-    Permissions_1 =
-        case ACLs of
-            [] -> ACLs;
-            [#bucket_acl_info{permissions = Permissions}|_] ->
-                Permissions
-        end,
     find_all_including_owner_1(Rest, [#bucket_dto{name       = Name,
                                                   owner      = Owner_1,
-                                                  acls       = Permissions_1,
+                                                  acls       = ACLs,
                                                   cluster_id = ClusterId,
                                                   created_at = CreatedAt}|Acc]);
 find_all_including_owner_1([_Other|Rest], Acc) ->

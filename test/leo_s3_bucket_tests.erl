@@ -84,14 +84,14 @@ teardown(_) ->
     ok.
 
 mnesia_suite_(_) ->
-    meck:new(leo_s3_auth),
+    meck:new(leo_s3_auth, [non_strict]),
     meck:expect(leo_s3_auth, has_credential, fun(_) -> true end),
     meck:expect(leo_s3_auth, get_owner_by_access_key,
                 fun(_) ->
                         {ok, <<"leofs">>}
                 end),
 
-    meck:new(leo_s3_user),
+    meck:new(leo_s3_user, [non_strict]),
     meck:expect(leo_s3_user, find_by_access_key_id,
                 fun(_) -> {ok, <<"leofs">>} end),
 
@@ -219,7 +219,7 @@ ets_suite_(_) ->
 
 
     %% inspect
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_buckets_by_id,
                                            fun(_AccessKey, _Checksum) ->
                                                    {ok, match}
@@ -232,7 +232,7 @@ ets_suite_(_) ->
                                            fun(_AccessKey, _Bucket) ->
                                                    ok
                                            end]),
-    ok = rpc:call(Manager1, meck, new,    [leo_manager_api, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_manager_api, [no_link, non_strict]]),
 
     Me = erlang:node(),
     ok = rpc:call(Manager1, meck, expect, [leo_manager_api, add_bucket,
@@ -248,7 +248,7 @@ ets_suite_(_) ->
                                                    ok
                                            end]),
 
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_auth, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_auth, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_auth, has_credential,
                                            fun(_AccessKey) ->
                                                    true
@@ -276,7 +276,7 @@ ets_suite_(_) ->
 
     %% inspect-2
     ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_buckets_by_id,
                                            fun(_AccessKey, _Checksum) ->
                                                    {ok, [#?BUCKET{name = ?Bucket3, access_key_id = ?ACCESS_KEY_0},
@@ -306,7 +306,7 @@ ets_suite_(_) ->
 
     %% inspect-4
     ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, head,
                                            fun(_AccessKey, _Bucket, _Checksum) ->
                                                    {ok, #?BUCKET{name = ?Bucket3,
@@ -316,7 +316,7 @@ ets_suite_(_) ->
 
     %% inspect-5
     ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, head,
                                            fun(_AccessKey, _Bucket, _Checksum) ->
                                                    not_found
@@ -332,7 +332,7 @@ ets_suite_(_) ->
     %% ACL related
     %% find_bucket_by_name
     ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_bucket_by_name,
                                            fun(_Bucket, _CRC) ->
                                                    {ok, #?BUCKET{name = ?Bucket0,
@@ -358,7 +358,7 @@ ets_suite_(_) ->
 
 
     %% Change owner of a bucket
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket_data_handler, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket_data_handler, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket_data_handler, insert,
                                            fun(_DBInfo, _BucketData) ->
                                                    ok

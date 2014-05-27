@@ -71,7 +71,7 @@ mnesia_suite_(_) ->
     {error, not_initialized} = leo_s3_auth:create_key(?USER_ID),
 
     %% inspect-2
-    ok = meck:new(leo_s3_user),
+    ok = meck:new(leo_s3_user, [non_strict]),
     ok = meck:expect(leo_s3_user, find_by_id,
                      fun(_) ->
                              not_found
@@ -97,18 +97,18 @@ mnesia_suite_(_) ->
 
 
     %% inspect-3 - for authentication
-    ok = meck:new(leo_s3_bucket),
+    ok = meck:new(leo_s3_bucket, [non_strict]),
     ok = meck:expect(leo_s3_bucket, head,
                      fun(_AccessKeyId, _Bucket) ->
                              ok
                      end),
     _ = meck:unload(leo_s3_user),
-    ok = meck:new(leo_s3_user),
+    ok = meck:new(leo_s3_user, [non_strict]),
     ok = meck:expect(leo_s3_user, find_by_id,
                      fun(_) ->
                              {ok, #?S3_USER{}}
                      end),
-    ok = meck:new(leo_s3_user_credential),
+    ok = meck:new(leo_s3_user_credential, [non_strict]),
     ok = meck:expect(leo_s3_user_credential, find_by_access_key_id,
                      fun(_) ->
                              {ok, #user_credential{}}
@@ -130,7 +130,7 @@ mnesia_suite_(_) ->
 
     %% removed a user-credential
     _ = meck:unload(leo_s3_user_credential),
-    ok = meck:new(leo_s3_user_credential),
+    ok = meck:new(leo_s3_user_credential, [non_strict]),
     ok = meck:expect(leo_s3_user_credential, find_by_access_key_id,
                      fun(_) ->
                              not_found
@@ -144,7 +144,7 @@ mnesia_suite_(_) ->
 
     %% inspect-5 - for authentication
     _ = meck:unload(leo_s3_bucket),
-    ok = meck:new(leo_s3_bucket),
+    ok = meck:new(leo_s3_bucket, [non_strict]),
     ok = meck:expect(leo_s3_bucket, head,
                      fun(_AccessKeyId, _Bucket) ->
                              not_found
@@ -201,13 +201,13 @@ ets_suite_(_) ->
     AccessKeyId     = <<"example_access_key_id">>,
     SecretAccessKey = <<"example_secret_key">>,
 
-    ok = meck:new(leo_s3_user),
+    ok = meck:new(leo_s3_user, [non_strict]),
     ok = meck:expect(leo_s3_user, find_by_id,
                      fun(_) ->
                              not_found
                      end),
 
-    ok = meck:new(leo_s3_bucket),
+    ok = meck:new(leo_s3_bucket, [non_strict]),
     ok = meck:expect(leo_s3_bucket, head,
                      fun(_AccessKeyId, _Bucket) ->
                              ok

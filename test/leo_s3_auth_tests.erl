@@ -214,7 +214,7 @@ ets_suite_(_) ->
                      end),
 
     _  = rpc:call(Manager1, meck, unload, []),
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_auth, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_auth, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_auth, get_credential,
                                            fun(_AccessKeyId) ->
                                                    {ok, #credential{access_key_id     = AccessKeyId,
@@ -244,7 +244,7 @@ ets_suite_(_) ->
 
     %% inspect-4 - for authentication
     _  = rpc:call(Manager1, meck, unload, []),
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_auth, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_auth, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_auth, get_credential,
                                            fun(_AccessKeyId) ->
                                                    not_found

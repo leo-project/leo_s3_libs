@@ -333,22 +333,26 @@ ets_suite_(_) ->
     %% find_bucket_by_name
     ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
     ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_bucket_by_name,
-                                           fun(_Bucket, _CRC) ->
-                                                   {ok, #?BUCKET{name = ?Bucket0,
-                                                                 access_key_id = ?ACCESS_KEY_0,
-                                                                 acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0, permissions = [full_control]}]}}
-                                           end]),
+    ok = rpc:call(Manager1, meck, expect,
+                  [leo_s3_bucket, find_bucket_by_name,
+                   fun(_Bucket, _CRC) ->
+                           {ok, #?BUCKET{name = ?Bucket0,
+                                         access_key_id = ?ACCESS_KEY_0,
+                                         acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                                                                  permissions = [full_control]}]}}
+                   end]),
     %% to be synced
     {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
                            permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
     %% local records to be refered
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_bucket_by_name,
-                                           fun(_Bucket, _CRC) ->
-                                                   {ok, #?BUCKET{name = ?Bucket0,
-                                                                 access_key_id = ?ACCESS_KEY_0,
-                                                                 acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0, permissions = [read]}]}}
-                                           end]),
+    ok = rpc:call(Manager1, meck, expect,
+                  [leo_s3_bucket, find_bucket_by_name,
+                   fun(_Bucket, _CRC) ->
+                           {ok, #?BUCKET{name = ?Bucket0,
+                                         access_key_id = ?ACCESS_KEY_0,
+                                         acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                                                                  permissions = [read]}]}}
+                   end]),
     {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
                            permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
     timer:sleep(3500),

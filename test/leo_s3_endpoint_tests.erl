@@ -95,7 +95,7 @@ ets_suite_(_) ->
     Res0 = leo_s3_endpoint:get_endpoints(),
     ?assertEqual({error, not_found}, Res0),
 
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_endpoint, [no_link]]),
+    ok = rpc:call(Manager1, meck, new,    [leo_s3_endpoint, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_endpoint, get_endpoints,
                                            fun() ->
                                                    {ok, [#endpoint{endpoint="photo.leofs.org"},

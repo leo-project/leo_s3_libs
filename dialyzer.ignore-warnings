@@ -1,0 +1,6 @@
+## Dialyzer - ignore warnings
+##
+##
+## leo_s3_endpoint.erl
+##
+Cons will produce an improper list since its 2nd argument is none()

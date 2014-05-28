@@ -150,12 +150,8 @@ create_key(UserId) ->
                                        crypto:hash(sha,
                                                    list_to_binary(lists:append([UserId,"/",Clock]))))),
             create_key1(UserId, Digest0, Digest1);
-        [] ->
-            {error, not_initialized};
         not_found ->
-            {error, not_initialized};
-        {'EXIT', Cause} ->
-            {error, Cause}
+            {error, not_initialized}
     end.
 
 
@@ -185,7 +181,7 @@ get_credential(AccessKeyId) ->
 %% @doc Has a credential into the master-nodes?
 %%
 -spec(has_credential(binary()) ->
-             true | false).
+             boolean()).
 has_credential(AccessKeyId) ->
     case get_credential(AccessKeyId) of
         {ok, _Credential} ->
@@ -195,7 +191,7 @@ has_credential(AccessKeyId) ->
     end.
 
 -spec(has_credential(list(), binary()) ->
-             true | false).
+             boolean()).
 has_credential(MasterNodes, AccessKey) ->
     Ret = lists:foldl(
             fun(Node, false) ->
@@ -444,7 +440,7 @@ authenticate4(AuthParams) ->
 %% @doc Retrieve db-type from ETS
 %% @private
 -spec(get_auth_info() ->
-             {ok, ets | mnesia} | not_found).
+             {ok, #auth_info{}} | not_found).
 get_auth_info() ->
     case catch ets:lookup(leo_s3_auth_info, 1) of
         [{_, AuthInfo}|_] ->

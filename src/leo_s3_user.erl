@@ -85,8 +85,8 @@ put(#?S3_USER{id = UserId,
 
 %% @private
 put_1(User) ->
-  leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
-                                  {[], User}).
+    leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
+                                    {[], User}).
 
 
 %% @doc Create a user account
@@ -153,12 +153,10 @@ update(#?S3_USER{id       = UserId,
                           true  -> RoleId1;
                           false -> RoleId0
                       end,
-            Password2 = case (Password0 == <<>> orelse
-                              Password0 == []) of
+            Password2 = case (Password0 == <<>>) of
                             true  -> Password1;
                             false -> hash_and_salt_password(Password0, CreatedAt)
                         end,
-
             leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
                                             {[], #?S3_USER{id         = UserId,
                                                            role_id    = RoleId2,
@@ -173,7 +171,7 @@ update(#?S3_USER{id       = UserId,
 
 %% @doc Delete a user
 %%
--spec(delete(integer()) ->
+-spec(delete(binary()) ->
              ok | {error, any()}).
 delete(UserId) ->
     case find_by_id(UserId) of
@@ -194,7 +192,7 @@ delete(UserId) ->
 
 %% @doc Retrieve a user by user-id
 %%
--spec(find_by_id(binary()) ->
+-spec(find_by_id(string()|binary()) ->
              {ok, #?S3_USER{}} | not_found | {error, any()}).
 find_by_id(UserId) ->
     F = fun() ->
@@ -237,13 +235,13 @@ auth(UserId, PW0) ->
                        created_at = CreatedAt} = User} ->
             case hash_and_salt_password(PW0, CreatedAt) of
                 PW1 ->
-                    {ok, User#?S3_USER{password = []}};
+                    {ok, User#?S3_USER{password = <<>>}};
                 _ ->
                     %% migrate previous-version(v0.12.7)'s data
                     case erlang:md5(PW0) of
                         PW1 ->
                             _ = update(User),
-                            {ok, User#?S3_USER{password = []}};
+                            {ok, User#?S3_USER{password = <<>>}};
                         _ ->
                             {error, invalid_values}
                     end

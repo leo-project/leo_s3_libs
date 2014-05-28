@@ -29,7 +29,7 @@
 %% @doc S3 User Info
 %% to LeoFS v1.0.0-pre3
 -record(user, {
-          id                      :: binary(),
+          id = <<>>               :: binary(),
           password = <<>>         :: binary(),
           role_id = ?ROLE_GENERAL :: integer(),
           created_at = 0          :: integer(),
@@ -38,7 +38,7 @@
 
 %% from LeoFS v1.0.0
 -record(user_1, {
-          id                      :: binary(),
+          id = <<>>               :: binary(),
           password = <<>>         :: binary(),
           role_id = ?ROLE_GENERAL :: integer(),
           created_at = leo_date:now() :: integer(),
@@ -50,7 +50,7 @@
 
 %% @doc S3 User and Credential Info
 -record(user_credential, {
-          user_id = []         :: binary(),
+          user_id = []         :: string(),
           access_key_id = <<>> :: binary(),
           created_at = 0       :: integer()
          }).

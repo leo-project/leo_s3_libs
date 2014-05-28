@@ -63,8 +63,8 @@ all({ets, Table}) ->
 
 %% Retrieve a record by key from the table.
 %%
--spec(lookup({mnesia|ets, atom()}, integer()) ->
-             tuple() | list() | {error, any()}).
+-spec(lookup({mnesia|ets, atom()}, any()) ->
+             {ok, any()} | list() | {error, any()}).
 lookup({mnesia, Table}, Id) ->
     case catch mnesia:ets(fun ets:lookup/2, [Table, Id]) of
         [Value|_] ->
@@ -87,7 +87,7 @@ lookup({ets, Table}, Id) ->
 
 %% @doc Insert a record into the table.
 %%
--spec(insert({mnesia|ets, atom}, {integer(), any()}) ->
+-spec(insert({mnesia|ets, atom()}, {any(), any()}) ->
              ok | {error, any()}).
 insert({mnesia, Table}, {_Id, Value}) ->
     Fun = fun() -> mnesia:write(Table, Value, write) end,
@@ -96,35 +96,29 @@ insert({mnesia, Table}, {_Id, Value}) ->
 insert({ets, Table}, {Id, Value}) ->
     case ets:insert(Table, {Id, Value}) of
         true ->
-            ok;
-        {'EXIT', Cause} ->
-            {error, Cause}
+            ok
     end.
 
 
 
 %% @doc Remove a record from the table.
 %%
--spec(delete({mnesia|ets, atom}, integer()) ->
-             ok | {error, any()}).
+-spec(delete({mnesia|ets, atom()}, any()) ->
+             ok | not_found | {error, any()}).
 delete({mnesia, Table}, Id) ->
-    case catch lookup({mnesia, Table}, Id) of
+    case lookup({mnesia, Table}, Id) of
         {ok, Value} ->
             Fun = fun() ->
                           mnesia:delete_object(Table, Value, write)
                   end,
             leo_mnesia:delete(Fun);
-        {'EXIT', Cause} ->
-            {error, Cause};
         Error ->
             Error
     end;
 delete({ets, Table}, Id) ->
-    case catch ets:delete(Table, Id) of
+    case ets:delete(Table, Id) of
         true ->
-            ok;
-        {'EXIT', Cause} ->
-            {error, Cause}
+            ok
     end.
 
 

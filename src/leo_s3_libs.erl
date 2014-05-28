@@ -79,7 +79,7 @@ update_providers(Provider) ->
 %% @doc update_providers(slave only)
 %%
 -spec(get_checksums() ->
-             ok).
+             {ok, #s3_tbls_checksum{}}).
 get_checksums() ->
     {ok, C1} = leo_s3_auth:checksum(),
     {ok, C2} = leo_s3_bucket:checksum(),

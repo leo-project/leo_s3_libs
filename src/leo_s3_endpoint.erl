@@ -73,20 +73,19 @@ update_providers(Provider) ->
 
 %% @doc Create endpoint table(mnesia)
 %%
+-spec(create_table(ram_copies|disc_copies, [atom()]) ->
+             ok).
 create_table(Mode, Nodes) ->
     catch application:start(mnesia),
-    {atomic, ok} =
-        mnesia:create_table(
-          ?ENDPOINT_TABLE,
-          [{Mode, Nodes},
-           {type, set},
-           {record_name, endpoint},
-           {attributes, record_info(fields, endpoint)},
-           {user_properties,
-            [{endpoint,   string,  primary},
-             {created_at, integer, false}
-            ]}
-          ]),
+    mnesia:create_table(
+      ?ENDPOINT_TABLE, [{Mode, Nodes},
+                        {type, set},
+                        {record_name, endpoint},
+                        {attributes, record_info(fields, endpoint)},
+                        {user_properties,
+                         [{endpoint,   string,  primary},
+                          {created_at, integer, false}
+                         ]}]),
     ok.
 
 
@@ -122,8 +121,8 @@ get_endpoints() ->
 
 %% @doc Remove a End-Point from the Mnesia or ETS
 %%
--spec(delete_endpoint(binary()) ->
-             ok | {error, any()}).
+-spec(delete_endpoint(any()) ->
+             ok | not_found | {error, any()}).
 delete_endpoint(EndPoint) ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB}} ->

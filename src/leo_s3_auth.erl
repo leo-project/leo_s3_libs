@@ -573,7 +573,7 @@ auth_sub_resources(QueryStr) ->
                                 case Rest of
                                     [] -> <<"?", Key/binary>>;
                                     [Val|_] ->
-                                        DecodedVal = cowboy_http:urldecode(Val),
+                                        DecodedVal = cow_qs:urldecode(Val),
                                         <<"?", Key/binary, "=", DecodedVal/binary>>
                                 end
                         end;
@@ -586,7 +586,7 @@ auth_sub_resources(QueryStr) ->
                                 case Rest of
                                     [] -> <<Acc/binary, "&", Key/binary>>;
                                     [Val|_] ->
-                                        DecodedVal = cowboy_http:urldecode(Val),
+                                        DecodedVal = cow_qs:urldecode(Val),
                                         <<Acc/binary, "&", Key/binary, "=", DecodedVal/binary>>
                                 end
                         end

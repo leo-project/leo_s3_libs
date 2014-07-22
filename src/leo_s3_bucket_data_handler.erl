@@ -178,9 +178,7 @@ delete({ets, Table}, #?BUCKET{name = Name,
                     {error, Cause}
             end;
         [] ->
-            ok;
-        Error ->
-            Error
+            ok
     end.
 
 

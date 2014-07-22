@@ -6,3 +6,6 @@ priv
 *.beam
 *.plt
 *.swp
+.leo_s3_libs_dialyzer_plt
+leo_s3_libs.dot
+leo_s3_libs.png

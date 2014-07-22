@@ -57,7 +57,7 @@
 %%--------------------------------------------------------------------
 %% @doc Launch a lib
 %%
--spec(start(atom(), ets | mnesia, pos_integer()) ->
+-spec(start(atom(), [atom()], pos_integer()) ->
              ok).
 start(slave = Type, Provider, SyncInterval) ->
     catch ets:new(?BUCKET_TABLE, [named_table, ordered_set, public, {read_concurrency, true}]),
@@ -162,8 +162,8 @@ find_buckets_by_id(AccessKey, Checksum0) ->
 
 %% @doc Retrieve a bucket by bucket-name
 %%
--spec(find_bucket_by_name(binary()) ->
-             {ok, #?BUCKET{}} | {error, any()}).
+-spec(find_bucket_by_name(string()) ->
+             {ok, []} | {ok, #?BUCKET{}} | not_found | {error, any()}).
 find_bucket_by_name(Bucket) ->
     case get_info() of
         %% Retrieve value from local-mnesia.
@@ -453,7 +453,7 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
 
 %% @doc update acls to 'private'
 %%
--spec(update_acls2private(binary(), #?BUCKET{}) ->
+-spec(update_acls2private(binary(), binary()) ->
              ok | {error, any()}).
 update_acls2private(AccessKey, Bucket) ->
     ACLs = canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PRIVATE),
@@ -462,7 +462,7 @@ update_acls2private(AccessKey, Bucket) ->
 
 %% @doc update acls to 'public_read'
 %%
--spec(update_acls2public_read(binary(), #?BUCKET{}) ->
+-spec(update_acls2public_read(binary(), binary()) ->
              ok | {error, any()}).
 update_acls2public_read(AccessKey, Bucket) ->
     ACLs = canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PUBLIC_READ),
@@ -471,7 +471,7 @@ update_acls2public_read(AccessKey, Bucket) ->
 
 %% @doc update acls to 'public_read_write'
 %%
--spec(update_acls2public_read_write(binary(), #?BUCKET{}) ->
+-spec(update_acls2public_read_write(binary(), binary()) ->
              ok | {error, any()}).
 update_acls2public_read_write(AccessKey, Bucket) ->
     ACLs = canned_acl2bucket_acl_info(AccessKey, ?CANNED_ACL_PUBLIC_READ_WRITE),
@@ -480,7 +480,7 @@ update_acls2public_read_write(AccessKey, Bucket) ->
 
 %% @doc update acls to 'authenticated_read'
 %%
--spec(update_acls2authenticated_read(binary(), #?BUCKET{}) ->
+-spec(update_acls2authenticated_read(binary(), binary()) ->
              ok | {error, any()}).
 update_acls2authenticated_read(AccessKey, Bucket) ->
     ACLs = [#bucket_acl_info{user_id     = ?GRANTEE_AUTHENTICATED_USER,
@@ -568,7 +568,7 @@ head(AccessKey, Bucket, DB, Provider) ->
 %% @doc Is exist a bucket into the db
 %%
 -spec(change_bucket_owner(binary(), binary()) ->
-             ok | not_found | {error, forbidden} | {error, any()}).
+             ok | not_found | {error, any()}).
 change_bucket_owner(AccessKey, Bucket) ->
     case get_info() of
         {ok, #bucket_info{db       = DB,
@@ -605,8 +605,6 @@ change_bucket_owner_1(#bucket_info{type = Type,
                           insert, [{mnesia, ?BUCKET_TABLE}, BucketData]) of
                 ok ->
                     ok;
-                not_found ->
-                    not_found;
                 _ ->
                     {error, not_updated}
             end;
@@ -646,15 +644,13 @@ setup(Type, DB, Provider, SyncInterval) ->
 %% @doc Retrieve database-type.
 %% @private
 -spec(get_info() ->
-             {ok, #?BUCKET{}} | {error, any()}).
+             {ok, #bucket_info{}} | {error, any()}).
 get_info() ->
     case ets:lookup(?BUCKET_INFO, 1) of
         [{_, Info}|_] ->
             {ok, Info};
         [] ->
-            {error, not_initialized};
-        {_, Cause} ->
-            {error, Cause}
+            {error, not_initialized}
     end.
 
 
@@ -733,12 +729,6 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
                                           {function, "find_buckets_by_id_2/5"},
                                           {line, ?LINE}, {body, Cause}]),
                   {ok, Value0};
-              {'EXIT', Cause} ->
-                  error_logger:error_msg("~p,~p,~p,~p~n",
-                                         [{module, ?MODULE_STRING},
-                                          {function, "find_buckets_by_id_2/5"},
-                                          {line, ?LINE}, {body, Cause}]),
-                  {ok, Value0};
               timeout ->
                   {ok, Value0}
           end,
@@ -747,8 +737,8 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
 
 %% @doc Retrieve buckets by name
 %% @private
--spec(find_bucket_by_name_1(binary(), ets|mnesia, list()) ->
-             {ok, list()} | {error, any()}).
+-spec(find_bucket_by_name_1(string(), ets|mnesia, list()) ->
+             {ok, []} | {ok, #?BUCKET{}} | not_found | {error, any()}).
 find_bucket_by_name_1(Bucket, DB, Providers) ->
     Value0 = case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
                  {ok, Val} ->
@@ -768,7 +758,7 @@ find_bucket_by_name_1(Bucket, DB, Providers) ->
     Ret.
 
 -spec(find_bucket_by_name_2(binary(), ets|mnesia, atom(), list()) ->
-             {ok, list()} | {error, any()}).
+             {ok, []} | {ok, #?BUCKET{}} | not_found | {error, any()}).
 find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
     LastModifiedAt = case Value0 == [] of
                          true ->
@@ -812,12 +802,6 @@ find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
                                           {function, "find_bucket_by_name_2/4"},
                                           {line, ?LINE}, {body, Cause}]),
                   {ok, Value0};
-              {'EXIT', Cause} ->
-                  error_logger:error_msg("~p,~p,~p,~p~n",
-                                         [{module, ?MODULE_STRING},
-                                          {function, "find_bucket_by_name_2/4"},
-                                          {line, ?LINE}, {body, Cause}]),
-                  {ok, Value0};
               timeout ->
                   {ok, Value0}
           end,
@@ -827,12 +811,12 @@ find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
 %% @doc Communicate remote node(s)
 %% @private
 -spec(rpc_call(list(), atom(), list()) ->
-             true | false).
+             ok | {error, any()}).
 rpc_call(Provider, Function, Args) ->
     rpc_call(Provider, leo_s3_bucket, Function, Args).
 
 -spec(rpc_call(list(), atom(), atom(), list()) ->
-             true | false).
+             ok | {error, any()}).
 rpc_call(Provider, Mod, Function, Args) ->
     rpc_call_1(Provider, Mod, Function, Args, []).
 
@@ -848,9 +832,7 @@ rpc_call_1([Node|Rest], Mod, Function, Args, Acc) ->
             Reply;
         {value, Error} ->
             rpc_call_1(Rest, Mod, Function, Args, [Error|Acc]);
-        {badrpc, Cause} ->
-            rpc_call_1(Rest, Mod, Function, Args, [{error, Cause}|Acc]);
-        Cause ->
+        timeout = Cause ->
             rpc_call_1(Rest, Mod, Function, Args, [{error, Cause}|Acc])
     end.
 
@@ -928,17 +910,17 @@ canned_acl2bucket_acl_info(_AccessKey, ?CANNED_ACL_PUBLIC_READ_WRITE) ->
 
 %% @doc Convert #bucket_acl_info to string to display ACL info on manager console
 %%
--spec(aclinfo2str(#bucket_acl_info{}) ->
-                  string()).
+-spec(aclinfo2str([#bucket_acl_info{}]) ->
+             string()).
 aclinfo2str(BucketACLInfoList) ->
     OwnerPermissionStr = io_lib:format("~s(full_control)",[?GRANTEE_DISPLAY_OWNER]),
     lists:flatten(lists:foldl(
-        fun(#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, permissions = Permissions}, Acc) ->
-                PermissionsStr = string:join([atom_to_list(Item) || Item <- Permissions], ","),
-                io_lib:format("~s, ~s(~s)",[Acc, ?GRANTEE_DISPLAY_ALL_USER, PermissionsStr]);
-           (#bucket_acl_info{user_id = _, permissions = _}, Acc) ->
-                Acc
-        end, OwnerPermissionStr, BucketACLInfoList)).
+                    fun(#bucket_acl_info{user_id = ?GRANTEE_ALL_USER, permissions = Permissions}, Acc) ->
+                            PermissionsStr = string:join([atom_to_list(Item) || Item <- Permissions], ","),
+                            io_lib:format("~s, ~s(~s)",[Acc, ?GRANTEE_DISPLAY_ALL_USER, PermissionsStr]);
+                       (#bucket_acl_info{user_id = _, permissions = _}, Acc) ->
+                            Acc
+                    end, OwnerPermissionStr, BucketACLInfoList)).
 
 %%--------------------------------------------------------------------
 %% Transform API

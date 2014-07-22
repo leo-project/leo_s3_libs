@@ -49,7 +49,7 @@
 -type permissions() :: [permission()].
 
 -record(bucket_acl_info, {
-          user_id          :: string(),      %% correspond with user table's user_id
+          user_id = <<>>   :: binary(),      %% correspond with user table's user_id
           permissions = [] :: permissions()  %% permissions
          }).
 
@@ -58,16 +58,16 @@
 
 %% - LeoFS-v0.14.9
 -record(bucket, {
-          name           :: string(), %% bucket name
-          access_key     :: binary(), %% access-key-id
-          created_at = 0 :: integer() %% created date and time
+          name = []          :: string(), %% bucket name
+          access_key = <<>>  :: binary(), %% access-key-id
+          created_at = 0     :: integer() %% created date and time
          }).
 
 %% - LeoFS-v0.16.0 - v1.0.0-pre3
 -record(bucket_0_16_0, {
-          name          :: string(), %% bucket name
-          access_key_id :: binary(), %% access-key-id
-          acls = []     :: acls(),   %% acl list
+          name = []            :: string(), %% bucket name
+          access_key_id = <<>> :: binary(), %% access-key-id
+          acls = []            :: acls(),   %% acl list
           last_synchroized_at = 0 :: integer(), %% last synchronized date and time
           created_at          = 0 :: integer(), %% created date and time
           last_modified_at    = 0 :: integer() %% modified date and time
@@ -76,10 +76,10 @@
 %% - LeoFS-v1.0.0 -
 -ifdef(TEST).
 -record(bucket_1, {
-          name          :: string(), %% bucket name
-          access_key_id :: binary(), %% access-key-id
-          acls = []     :: acls(),   %% acl list
-          cluster_id    :: atom(),   %% cluster_id
+          name = []               :: string(), %% bucket name
+          access_key_id = <<>>    :: binary(), %% access-key-id
+          acls = []               :: acls(),   %% acl list
+          cluster_id              :: atom(),   %% cluster_id
           last_synchroized_at = 0 :: integer(), %% last synchronized date and time
           created_at       = 0 :: integer(), %% created date and time
           last_modified_at = 0 :: integer(), %% modified date and time
@@ -87,10 +87,10 @@
          }).
 -else.
 -record(bucket_1, {
-          name          :: string(), %% bucket name
-          access_key_id :: binary(), %% access-key-id
-          acls = []     :: acls(),   %% acl list
-          cluster_id    :: atom(),   %% cluster_id
+          name = []               :: string(), %% bucket name
+          access_key_id = <<>>    :: binary(), %% access-key-id
+          acls = []               :: acls(),   %% acl list
+          cluster_id              :: atom(),   %% cluster_id
           last_synchroized_at = 0 :: integer(), %% last synchronized date and time
           created_at       = leo_date:now() :: integer(), %% created date and time
           last_modified_at = leo_date:now() :: integer(), %% modified date and time
@@ -110,8 +110,8 @@
 
 %% {Name, Owner_1, Permissions_1, CreatedAt}
 -record(bucket_dto, {
-          name          :: string(),  %% bucket name
-          owner         :: string(),  %% owner name
+          name = []     :: string(),  %% bucket name
+          owner         :: tuple(),   %% owner info
           acls = []     :: acls(),    %% acl list
           cluster_id    :: atom(),    %% cluster_id
           created_at = 0 :: integer() %% created date and time

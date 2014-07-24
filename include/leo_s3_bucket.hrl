@@ -58,14 +58,14 @@
 
 %% - LeoFS-v0.14.9
 -record(bucket, {
-          name = []          :: string(), %% bucket name
+          name = <<>>        :: binary(), %% bucket name
           access_key = <<>>  :: binary(), %% access-key-id
           created_at = 0     :: integer() %% created date and time
          }).
 
 %% - LeoFS-v0.16.0 - v1.0.0-pre3
 -record(bucket_0_16_0, {
-          name = []            :: string(), %% bucket name
+          name = <<>>          :: binary(), %% bucket name
           access_key_id = <<>> :: binary(), %% access-key-id
           acls = []            :: acls(),   %% acl list
           last_synchroized_at = 0 :: integer(), %% last synchronized date and time
@@ -76,7 +76,7 @@
 %% - LeoFS-v1.0.0 -
 -ifdef(TEST).
 -record(bucket_1, {
-          name = []               :: string(), %% bucket name
+          name = <<>>             :: binary(), %% bucket name
           access_key_id = <<>>    :: binary(), %% access-key-id
           acls = []               :: acls(),   %% acl list
           cluster_id              :: atom(),   %% cluster_id
@@ -87,7 +87,7 @@
          }).
 -else.
 -record(bucket_1, {
-          name = []               :: string(), %% bucket name
+          name = <<>>             :: binary(), %% bucket name
           access_key_id = <<>>    :: binary(), %% access-key-id
           acls = []               :: acls(),   %% acl list
           cluster_id              :: atom(),   %% cluster_id
@@ -110,7 +110,7 @@
 
 %% {Name, Owner_1, Permissions_1, CreatedAt}
 -record(bucket_dto, {
-          name = []     :: string(),  %% bucket name
+          name = <<>>   :: binary(),  %% bucket name
           owner         :: tuple(),   %% owner info
           acls = []     :: acls(),    %% acl list
           cluster_id    :: atom(),    %% cluster_id

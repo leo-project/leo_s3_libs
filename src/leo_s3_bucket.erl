@@ -121,7 +121,7 @@ create_table_old_for_test(Mode, Nodes) ->
 %% @doc Retrieve buckets by AccessKey
 %%
 -spec(find_buckets_by_id(binary()) ->
-             {ok, list()} | {error, any()}).
+             {ok, list()} | not_found | {error, any()}).
 find_buckets_by_id(AccessKey) ->
     case get_info() of
         %% Retrieve value from local-mnesia.
@@ -162,7 +162,7 @@ find_buckets_by_id(AccessKey, Checksum0) ->
 
 %% @doc Retrieve a bucket by bucket-name
 %%
--spec(find_bucket_by_name(string()) ->
+-spec(find_bucket_by_name(string() | binary()) ->
              {ok, []} | {ok, #?BUCKET{}} | not_found | {error, any()}).
 find_bucket_by_name(Bucket) ->
     case get_info() of

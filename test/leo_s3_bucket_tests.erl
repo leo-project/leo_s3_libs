@@ -207,177 +207,180 @@ mnesia_suite_(_) ->
     ok.
 
 ets_suite_(_) ->
-    %% preparing
-    [] = os:cmd("epmd -daemon"),
-    {ok, Hostname} = inet:gethostname(),
-
-    Manager0 = list_to_atom("manager_0@" ++ Hostname),
-    net_kernel:start([Manager0, shortnames]),
-
-    {ok, Manager1} = slave:start_link(list_to_atom(Hostname), 'manager_1'),
-    true = rpc:call(Manager1, code, add_path, ["../deps/meck/ebin"]),
-
-
-    %% inspect
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_buckets_by_id,
-                                           fun(_AccessKey, _Checksum) ->
-                                                   {ok, match}
-                                           end]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, put,
-                                           fun(_AccessKey, _Bucket) ->
-                                                   ok
-                                           end]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, delete,
-                                           fun(_AccessKey, _Bucket) ->
-                                                   ok
-                                           end]),
-    ok = rpc:call(Manager1, meck, new,    [leo_manager_api, [no_link, non_strict]]),
-
-    Me = erlang:node(),
-    ok = rpc:call(Manager1, meck, expect, [leo_manager_api, add_bucket,
-                                           fun(AccessKey, Bucket, CannedACL) ->
-                                                   rpc:call(Me, leo_s3_bucket, put,
-                                                            [AccessKey, Bucket, CannedACL, undefined, undefined]),
-                                                   ok
-                                           end]),
-    ok = rpc:call(Manager1, meck, expect, [leo_manager_api, delete_bucket,
-                                           fun(AccessKey, Bucket) ->
-                                                   rpc:call(Me, leo_s3_bucket, delete,
-                                                            [AccessKey, Bucket, undefined]),
-                                                   ok
-                                           end]),
-
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_auth, [no_link, non_strict]]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_auth, has_credential,
-                                           fun(_AccessKey) ->
-                                                   true
-                                           end]),
-
-
-    ok = leo_s3_bucket:start(slave, [Manager1], 3),
-
-    ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket0),
-    ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket1),
-    ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket2),
-    ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket3),
-    ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket4),
-    ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket5),
-    ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket6),
-
-    {ok, Ret1} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
-    ?assertEqual(2, length(Ret1)),
-
-    ok = leo_s3_bucket:delete(?ACCESS_KEY_1, ?Bucket5),
-    ok = leo_s3_bucket:delete(?ACCESS_KEY_1, ?Bucket6),
-
-    not_found = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
-    7 = leo_s3_bucket_data_handler:size({ets, leo_s3_buckets}),
-
-    %% inspect-2
-    ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_buckets_by_id,
-                                           fun(_AccessKey, _Checksum) ->
-                                                   {ok, [#?BUCKET{name = ?Bucket3, access_key_id = ?ACCESS_KEY_0},
-                                                         #?BUCKET{name = ?Bucket7, access_key_id = ?ACCESS_KEY_0},
-                                                         #?BUCKET{name = ?Bucket8, access_key_id = ?ACCESS_KEY_0}
-                                                        ]}
-                                           end]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, put,
-                                           fun(_AccessKey, _Bucket) ->
-                                                   ok
-                                           end]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, delete,
-                                           fun(_AccessKey, _Bucket) ->
-                                                   ok
-                                           end]),
-    {ok, Ret2} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
-    ?assertEqual(3, length(Ret2)),
-    5 = leo_s3_bucket_data_handler:size({ets, leo_s3_buckets}),
-
-
-    %% inspect-3
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, head,
-                                           fun(_AccessKey, _Bucket, _Checksum) ->
-                                                   {ok, match}
-                                           end]),
-    ok = leo_s3_bucket:head(?ACCESS_KEY_0, ?Bucket3),
-
-    %% inspect-4
-    ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, head,
-                                           fun(_AccessKey, _Bucket, _Checksum) ->
-                                                   {ok, #?BUCKET{name = ?Bucket3,
-                                                                 access_key_id = ?ACCESS_KEY_0}}
-                                           end]),
-    ok = leo_s3_bucket:head(?ACCESS_KEY_0, ?Bucket3),
-
-    %% inspect-5
-    ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, head,
-                                           fun(_AccessKey, _Bucket, _Checksum) ->
-                                                   not_found
-                                           end]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_buckets_by_id,
-                                           fun(_AccessKey, _Checksum) ->
-                                                   not_found
-                                           end]),
-
-    not_found = leo_s3_bucket:head(?ACCESS_KEY_0, ?Bucket4),
-    ?debugVal(ets:tab2list('leo_s3_buckets')),
-
-    %% ACL related
-    %% find_bucket_by_name
-    ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
-    ok = rpc:call(Manager1, meck, expect,
-                  [leo_s3_bucket, find_bucket_by_name,
-                   fun(_Bucket, _CRC) ->
-                           {ok, #?BUCKET{name = ?Bucket0,
-                                         access_key_id = ?ACCESS_KEY_0,
-                                         acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
-                                                                  permissions = [full_control]}]}}
-                   end]),
-    %% to be synced
-    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
-                           permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
-    %% local records to be refered
-    ok = rpc:call(Manager1, meck, expect,
-                  [leo_s3_bucket, find_bucket_by_name,
-                   fun(_Bucket, _CRC) ->
-                           {ok, #?BUCKET{name = ?Bucket0,
-                                         access_key_id = ?ACCESS_KEY_0,
-                                         acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
-                                                                  permissions = [read]}]}}
-                   end]),
-    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
-                           permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
-    timer:sleep(3500),
-    %% to be synced with latest manager's ACL(read)
-    {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
-                           permissions = [read]}]} = leo_s3_bucket:get_acls(?Bucket0),
-
-
-    %% Change owner of a bucket
-    ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket_data_handler, [no_link, non_strict]]),
-    ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket_data_handler, insert,
-                                           fun(_DBInfo, _BucketData) ->
-                                                   ok
-                                           end]),
-    ok = leo_s3_bucket:change_bucket_owner(?ACCESS_KEY_2, ?Bucket0),
-
-    %% update_providers
-    Manager2 = list_to_atom("manager_2@" ++ Hostname),
-    ok = leo_s3_bucket:update_providers([Manager2]),
-
-    %% teardown
-    slave:stop(Manager1),
-    net_kernel:stop(),
-    meck:unload(),
-    ok.
+    {timeout, 15,
+     [?_test(
+         begin
+            %% preparing
+            [] = os:cmd("epmd -daemon"),
+            {ok, Hostname} = inet:gethostname(),
+        
+            Manager0 = list_to_atom("manager_0@" ++ Hostname),
+            net_kernel:start([Manager0, shortnames]),
+        
+            {ok, Manager1} = slave:start_link(list_to_atom(Hostname), 'manager_1'),
+            true = rpc:call(Manager1, code, add_path, ["../deps/meck/ebin"]),
+        
+        
+            %% inspect
+            ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_buckets_by_id,
+                                                   fun(_AccessKey, _Checksum) ->
+                                                           {ok, match}
+                                                   end]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, put,
+                                                   fun(_AccessKey, _Bucket) ->
+                                                           ok
+                                                   end]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, delete,
+                                                   fun(_AccessKey, _Bucket) ->
+                                                           ok
+                                                   end]),
+            ok = rpc:call(Manager1, meck, new,    [leo_manager_api, [no_link, non_strict]]),
+        
+            Me = erlang:node(),
+            ok = rpc:call(Manager1, meck, expect, [leo_manager_api, add_bucket,
+                                                   fun(AccessKey, Bucket, CannedACL) ->
+                                                           rpc:call(Me, leo_s3_bucket, put,
+                                                                    [AccessKey, Bucket, CannedACL, undefined, undefined]),
+                                                           ok
+                                                   end]),
+            ok = rpc:call(Manager1, meck, expect, [leo_manager_api, delete_bucket,
+                                                   fun(AccessKey, Bucket) ->
+                                                           rpc:call(Me, leo_s3_bucket, delete,
+                                                                    [AccessKey, Bucket, undefined]),
+                                                           ok
+                                                   end]),
+        
+            ok = rpc:call(Manager1, meck, new,    [leo_s3_auth, [no_link, non_strict]]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_auth, has_credential,
+                                                   fun(_AccessKey) ->
+                                                           true
+                                                   end]),
+        
+        
+            ok = leo_s3_bucket:start(slave, [Manager1], 3),
+        
+            ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket0),
+            ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket1),
+            ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket2),
+            ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket3),
+            ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket4),
+            ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket5),
+            ok = leo_s3_bucket:put(?ACCESS_KEY_1, ?Bucket6),
+        
+            {ok, Ret1} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
+            ?assertEqual(2, length(Ret1)),
+        
+            ok = leo_s3_bucket:delete(?ACCESS_KEY_1, ?Bucket5),
+            ok = leo_s3_bucket:delete(?ACCESS_KEY_1, ?Bucket6),
+        
+            not_found = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_1),
+            7 = leo_s3_bucket_data_handler:size({ets, leo_s3_buckets}),
+        
+            %% inspect-2
+            ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
+            ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_buckets_by_id,
+                                                   fun(_AccessKey, _Checksum) ->
+                                                           {ok, [#?BUCKET{name = ?Bucket3, access_key_id = ?ACCESS_KEY_0},
+                                                                 #?BUCKET{name = ?Bucket7, access_key_id = ?ACCESS_KEY_0},
+                                                                 #?BUCKET{name = ?Bucket8, access_key_id = ?ACCESS_KEY_0}
+                                                                ]}
+                                                   end]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, put,
+                                                   fun(_AccessKey, _Bucket) ->
+                                                           ok
+                                                   end]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, delete,
+                                                   fun(_AccessKey, _Bucket) ->
+                                                           ok
+                                                   end]),
+            {ok, Ret2} = leo_s3_bucket:find_buckets_by_id(?ACCESS_KEY_0),
+            ?assertEqual(3, length(Ret2)),
+            5 = leo_s3_bucket_data_handler:size({ets, leo_s3_buckets}),
+        
+        
+            %% inspect-3
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, head,
+                                                   fun(_AccessKey, _Bucket, _Checksum) ->
+                                                           {ok, match}
+                                                   end]),
+            ok = leo_s3_bucket:head(?ACCESS_KEY_0, ?Bucket3),
+        
+            %% inspect-4
+            ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
+            ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, head,
+                                                   fun(_AccessKey, _Bucket, _Checksum) ->
+                                                           {ok, #?BUCKET{name = ?Bucket3,
+                                                                         access_key_id = ?ACCESS_KEY_0}}
+                                                   end]),
+            ok = leo_s3_bucket:head(?ACCESS_KEY_0, ?Bucket3),
+        
+            %% inspect-5
+            ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
+            ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, head,
+                                                   fun(_AccessKey, _Bucket, _Checksum) ->
+                                                           not_found
+                                                   end]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket, find_buckets_by_id,
+                                                   fun(_AccessKey, _Checksum) ->
+                                                           not_found
+                                                   end]),
+        
+            not_found = leo_s3_bucket:head(?ACCESS_KEY_0, ?Bucket4),
+            ?debugVal(ets:tab2list('leo_s3_buckets')),
+        
+            %% ACL related
+            %% find_bucket_by_name
+            ok = rpc:call(Manager1, meck, unload, [leo_s3_bucket]),
+            ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket, [no_link, non_strict]]),
+            ok = rpc:call(Manager1, meck, expect,
+                          [leo_s3_bucket, find_bucket_by_name,
+                           fun(_Bucket, _CRC) ->
+                                   {ok, #?BUCKET{name = ?Bucket0,
+                                                 access_key_id = ?ACCESS_KEY_0,
+                                                 acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                                                                          permissions = [full_control]}]}}
+                           end]),
+            %% to be synced
+            {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                                   permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
+            %% local records to be refered
+            ok = rpc:call(Manager1, meck, expect,
+                          [leo_s3_bucket, find_bucket_by_name,
+                           fun(_Bucket, _CRC) ->
+                                   {ok, #?BUCKET{name = ?Bucket0,
+                                                 access_key_id = ?ACCESS_KEY_0,
+                                                 acls = [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                                                                          permissions = [read]}]}}
+                           end]),
+            {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                                   permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
+            timer:sleep(3500),
+            %% to be synced with latest manager's ACL(read)
+            {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
+                                   permissions = [read]}]} = leo_s3_bucket:get_acls(?Bucket0),
+        
+        
+            %% Change owner of a bucket
+            ok = rpc:call(Manager1, meck, new,    [leo_s3_bucket_data_handler, [no_link, non_strict]]),
+            ok = rpc:call(Manager1, meck, expect, [leo_s3_bucket_data_handler, insert,
+                                                   fun(_DBInfo, _BucketData) ->
+                                                           ok
+                                                   end]),
+            ok = leo_s3_bucket:change_bucket_owner(?ACCESS_KEY_2, ?Bucket0),
+        
+            %% update_providers
+            Manager2 = list_to_atom("manager_2@" ++ Hostname),
+            ok = leo_s3_bucket:update_providers([Manager2]),
+        
+            %% teardown
+            slave:stop(Manager1),
+            net_kernel:stop(),
+            meck:unload(),
+            true end)]}.
 
 
 -undef(ACCESS_KEY_0).

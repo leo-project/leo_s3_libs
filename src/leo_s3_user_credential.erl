@@ -142,7 +142,8 @@ find_by_access_key_id(AccessKeyId) ->
 %% @doc Retrieve all records
 %%
 -spec(find_all() ->
-             {ok, list(#user_credential{})} | {error, any()}).
+             {ok, list(#user_credential{})} |
+             not_found | {error, any()}).
 find_all() ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(?USER_CREDENTIAL_TABLE)]),
@@ -155,7 +156,8 @@ find_all() ->
 %% @doc Retrieve all records with role
 %%
 -spec(find_all_with_role() ->
-             {ok, list(#user_credential{})} | {error, any()}).
+             {ok, list(#user_credential{})} |
+             not_found | {error, any()}).
 find_all_with_role() ->
     case find_all() of
         {ok, RetL} ->

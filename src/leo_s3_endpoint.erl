@@ -100,6 +100,8 @@ set_endpoint(EndPoint) ->
                    {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint   = EndPoint,
                                                                created_at = leo_date:now()}}),
             ok;
+        not_found ->
+            {error, "Could not get endpoint-info"};
         Error ->
             Error
     end.

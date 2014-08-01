@@ -92,7 +92,7 @@ create_table(Mode, Nodes) ->
 %% @doc Insert a End-Point into the Mnesia or ETS
 %%
 -spec(set_endpoint(binary()) ->
-             ok | {error, any()}).
+             ok | not_found | {error, any()}).
 set_endpoint(EndPoint) ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB}} ->
@@ -110,7 +110,7 @@ set_endpoint(EndPoint) ->
 %% @doc Retrieve a End-Point from the Mnesia or ETS
 %%
 -spec(get_endpoints() ->
-             {ok, list()} | {error, any()}).
+             {ok, list()} | not_found | {error, any()}).
 get_endpoints() ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB,
@@ -124,11 +124,13 @@ get_endpoints() ->
 %% @doc Remove a End-Point from the Mnesia or ETS
 %%
 -spec(delete_endpoint(any()) ->
-             ok | not_found | {error, any()}).
+             ok | {error, any()}).
 delete_endpoint(EndPoint) ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB}} ->
             leo_s3_libs_data_handler:delete({DB, ?ENDPOINT_TABLE}, EndPoint);
+        not_found = Cause ->
+            {error, Cause};
         Error ->
             Error
     end.

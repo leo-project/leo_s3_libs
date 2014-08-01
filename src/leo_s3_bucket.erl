@@ -138,7 +138,7 @@ find_buckets_by_id(AccessKey) ->
     end.
 
 -spec(find_buckets_by_id(binary(), string()) ->
-             {ok, list()} | {ok, match} | {error, any()}).
+             {ok, list()} | {ok, match} | not_found | {error, any()}).
 find_buckets_by_id(AccessKey, Checksum0) ->
     case get_info() of
         {ok, #bucket_info{db = DB}} when DB == mnesia ->
@@ -554,6 +554,8 @@ head(AccessKey, Bucket) ->
             Error
     end.
 
+-spec(head(binary(), binary(), atom(), [atom()]) ->
+             ok | not_found | {error, any()}).
 head(AccessKey, Bucket, DB, Provider) ->
     case find_buckets_by_id_1(AccessKey, DB, Provider) of
         {ok, _} ->
@@ -667,7 +669,7 @@ put_all_values(DB, [H|T]) ->
 
 %% @doc Retrieve buckets by id
 %% @private
--spec(find_buckets_by_id_1(binary(), ets|mnesia, list()) ->
+-spec(find_buckets_by_id_1(binary(), ets|mnesia, [atom()]) ->
              {ok, list()} | {error, any()}).
 find_buckets_by_id_1(AccessKey, DB, Providers) ->
     {Value0, CRC} = case leo_s3_bucket_data_handler:lookup(
@@ -706,8 +708,7 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
                                     leo_s3_bucket_data_handler:insert(
                                       {DB, ?BUCKET_TABLE},
                                       Bucket#?BUCKET{del = true,
-                                                     last_modified_at = leo_date:now()
-                                                    });
+                                                     last_modified_at = leo_date:now()});
                                 _ ->
                                     leo_s3_bucket_data_handler:delete(
                                       {DB, ?BUCKET_TABLE}, Bucket)

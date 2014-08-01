@@ -66,7 +66,7 @@ create_table(Mode, Nodes) ->
 %% @doc Create a user account w/access-key-id/secret-access-key
 %%
 -spec(put(#user_credential{} | binary()) ->
-             {ok, string()} | {error, any()}).
+             ok | {ok, [_]} | {error, any()}).
 put(UserCredential) when is_record(UserCredential, user_credential) ->
     leo_s3_libs_data_handler:insert({mnesia, ?USER_CREDENTIAL_TABLE},
                                     {[], UserCredential});

@@ -164,6 +164,8 @@ update(#?S3_USER{id       = UserId,
                                                            created_at = CreatedAt,
                                                            updated_at = leo_date:now()
                                                           }});
+        not_found = Cause ->
+            {error, Cause};
         Error ->
             Error
     end.
@@ -185,6 +187,8 @@ delete(UserId) ->
                 Error ->
                     Error
             end;
+        not_found = Cause ->
+            {error, Cause};
         Error ->
             Error
     end.
@@ -246,6 +250,8 @@ auth(UserId, PW0) ->
                             {error, invalid_values}
                     end
             end;
+        not_found = Cause ->
+            {error, Cause};
         _Other ->
             {error, invalid_values}
     end.

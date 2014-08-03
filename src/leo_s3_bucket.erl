@@ -919,14 +919,16 @@ transform() ->
 
 %% @doc the record is the current verion
 %% @private
-transform_1(#?BUCKET{name = Name} = Bucket) ->
-    Bucket#?BUCKET{name = leo_misc:any_to_binary(Name)};
+transform_1(#?BUCKET{name = Name,
+                     access_key_id = AccessKey} = Bucket) ->
+    Bucket#?BUCKET{name = leo_misc:any_to_binary(Name),
+                   access_key_id = leo_misc:any_to_binary(AccessKey)};
 
 %% @doc migrate a record from 0.16.0 to the current version
 %% @private
 transform_1({bucket, Name, AccessKey, CreatedAt}) ->
     #?BUCKET{name                = leo_misc:any_to_binary(Name),
-             access_key_id       = AccessKey,
+             access_key_id       = leo_misc:any_to_binary(AccessKey),
              acls                = [],
              last_synchroized_at = 0,
              created_at          = CreatedAt,
@@ -937,7 +939,7 @@ transform_1({bucket, Name, AccessKey, CreatedAt}) ->
 transform_1({bucket, Name, AccessKey, Acls,
              LastSynchronizedAt, CreatedAt, LastModifiedAt}) ->
     #?BUCKET{name                = leo_misc:any_to_binary(Name),
-             access_key_id       = AccessKey,
+             access_key_id       = leo_misc:any_to_binary(AccessKey),
              acls                = Acls,
              last_synchroized_at = LastSynchronizedAt,
              created_at          = CreatedAt,
@@ -950,7 +952,7 @@ transform_1(#bucket_0_16_0{name                = Name,
                            created_at          = CreatedAt,
                            last_modified_at    = LastModifiedAt}) ->
     #?BUCKET{name                = leo_misc:any_to_binary(Name),
-             access_key_id       = AccessKey,
+             access_key_id       = leo_misc:any_to_binary(AccessKey),
              acls                = Acls,
              last_synchroized_at = LastSynchronizedAt,
              created_at          = CreatedAt,

@@ -920,12 +920,12 @@ transform() ->
 %% @doc the record is the current verion
 %% @private
 transform_1(#?BUCKET{name = Name} = Bucket) ->
-    Bucket#?BUCKET{name = bucket_name_to_binary(Name)};
+    Bucket#?BUCKET{name = leo_misc:any_to_binary(Name)};
 
 %% @doc migrate a record from 0.16.0 to the current version
 %% @private
 transform_1({bucket, Name, AccessKey, CreatedAt}) ->
-    #?BUCKET{name                = bucket_name_to_binary(Name),
+    #?BUCKET{name                = leo_misc:any_to_binary(Name),
              access_key_id       = AccessKey,
              acls                = [],
              last_synchroized_at = 0,
@@ -936,7 +936,7 @@ transform_1({bucket, Name, AccessKey, CreatedAt}) ->
 %% @private
 transform_1({bucket, Name, AccessKey, Acls,
              LastSynchronizedAt, CreatedAt, LastModifiedAt}) ->
-    #?BUCKET{name                = bucket_name_to_binary(Name),
+    #?BUCKET{name                = leo_misc:any_to_binary(Name),
              access_key_id       = AccessKey,
              acls                = Acls,
              last_synchroized_at = LastSynchronizedAt,
@@ -949,7 +949,7 @@ transform_1(#bucket_0_16_0{name                = Name,
                            last_synchroized_at = LastSynchronizedAt,
                            created_at          = CreatedAt,
                            last_modified_at    = LastModifiedAt}) ->
-    #?BUCKET{name                = bucket_name_to_binary(Name),
+    #?BUCKET{name                = leo_misc:any_to_binary(Name),
              access_key_id       = AccessKey,
              acls                = Acls,
              last_synchroized_at = LastSynchronizedAt,
@@ -975,10 +975,3 @@ transform_2([#?BUCKET{cluster_id = undefined} = Bucket|Rest], ClusterId) ->
     transform_2(Rest, ClusterId);
 transform_2([_|Rest], ClusterId) ->
     transform_2(Rest, ClusterId).
-
-%% @private
-bucket_name_to_binary(Name) ->
-    case is_list(Name) of
-        true  -> list_to_binary(Name);
-        false -> Name
-    end.

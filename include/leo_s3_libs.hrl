@@ -39,8 +39,8 @@
 
 %% @doc Checksum of entire tables
 -record(s3_tbls_checksum, {
-          auth   = 0 :: pos_integer(),
-          bucket = 0 :: pos_integer(),
-          user   = 0 :: pos_integer(),
-          credential = 0 :: pos_integer()
+          auth   = 0     :: non_neg_integer(),
+          bucket = 0     :: non_neg_integer(),
+          user   = 0     :: non_neg_integer(),
+          credential = 0 :: non_neg_integer()
          }).

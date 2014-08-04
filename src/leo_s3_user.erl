@@ -74,11 +74,13 @@ create_table(Mode, Nodes) ->
              ok | {error, any()}).
 put(#?S3_USER{id = UserId,
               updated_at = UpdatedAt_1} = User) ->
+    User_1 = User#?S3_USER{id = leo_misc:any_to_binary(UserId)},
+
     case find_by_id(UserId) of
         {ok, #?S3_USER{updated_at = UpdatedAt_2}} when UpdatedAt_1 > UpdatedAt_2 ->
-            put_1(User);
+            put_1(User_1);
         not_found ->
-            put_1(User);
+            put_1(User_1);
         _ ->
             ok
     end.
@@ -92,7 +94,7 @@ put_1(User) ->
 %% @doc Create a user account
 %%
 -spec(put(binary(), binary(), boolean()) ->
-             {ok, list(tuple())} | {error, any()}).
+             ok | {ok, [tuple()]} |{error, any()}).
 put(UserId, Password, WithS3Keys) ->
     case find_by_id(UserId) of
         not_found ->
@@ -120,8 +122,8 @@ put_1(UserId, Password, WithS3Keys) ->
                 true ->
                     leo_s3_user_credential:put(UserId, CreatedAt);
                 false ->
-                    {ok, []}
-            end;
+                    ok
+                end;
         Error ->
             Error
     end.
@@ -129,7 +131,7 @@ put_1(UserId, Password, WithS3Keys) ->
 
 %% @doc Add buckets
 %%
--spec(bulk_put(list(#?S3_USER{})) ->
+-spec(bulk_put([#?S3_USER{}]) ->
              ok).
 bulk_put([]) ->
     ok;
@@ -196,7 +198,7 @@ delete(UserId) ->
 
 %% @doc Retrieve a user by user-id
 %%
--spec(find_by_id(string()|binary()) ->
+-spec(find_by_id(binary()) ->
              {ok, #?S3_USER{}} | not_found | {error, any()}).
 find_by_id(UserId) ->
     F = fun() ->
@@ -219,7 +221,7 @@ find_by_id(UserId) ->
 
 %% @doc Retrieve all records
 -spec(find_all() ->
-             {ok, list(#?S3_USER{})} | not_found | {error, any()}).
+             {ok, [#?S3_USER{}]} | not_found | {error, any()}).
 find_all() ->
     case leo_s3_bucket_data_handler:find_all({mnesia, ?USERS_TABLE}) of
         {ok, RetL} ->
@@ -260,7 +262,7 @@ auth(UserId, PW0) ->
 %% @doc Retrieve checksum of the table
 %%
 -spec(checksum() ->
-             {ok, pos_integer()} | not_found | {error, any()}).
+             {ok, non_neg_integer()} | not_found | {error, any()}).
 checksum() ->
     case find_all() of
         {ok, RetL} ->
@@ -281,15 +283,17 @@ transform() ->
 
 %% @doc the record is the current verion
 %% @private
-transform_1(#?S3_USER{} = User) ->
-    User;
+transform_1(#?S3_USER{id = Id,
+                      password = Password} = User) ->
+    User#?S3_USER{id = leo_misc:any_to_binary(Id),
+                  password = leo_misc:any_to_binary(Password)};
 transform_1(#user{id = Id,
                   password = Password,
                   role_id  = RoleId,
                   created_at = CreatedAt,
                   del = DelFlag}) ->
-    #?S3_USER{id = Id,
-              password = Password,
+    #?S3_USER{id = leo_misc:any_to_binary(Id),
+              password = leo_misc:any_to_binary(Password),
               role_id  = RoleId,
               created_at = CreatedAt,
               updated_at = CreatedAt,

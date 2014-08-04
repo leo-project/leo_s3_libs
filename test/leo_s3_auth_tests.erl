@@ -35,7 +35,7 @@
 %%--------------------------------------------------------------------
 -ifdef(EUNIT).
 
--define(USER_ID, "leofs").
+-define(USER_ID, <<"leofs">>).
 
 
 auth_test_() ->

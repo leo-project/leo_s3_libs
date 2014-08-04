@@ -1,6 +1,7 @@
 ## Dialyzer - ignore warnings
 ##
-##
 ## leo_s3_endpoint.erl
 ##
 Cons will produce an improper list since its 2nd argument is none()
+## leo_bucket.erl
+The pattern 'true' can never match the type 'false'    

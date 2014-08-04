@@ -121,7 +121,7 @@ create_table_old_for_test(Mode, Nodes) ->
 %% @doc Retrieve buckets by AccessKey
 %%
 -spec(find_buckets_by_id(binary()) ->
-             {ok, list()} | not_found | {error, any()}).
+             {ok, [#?BUCKET{}]} | not_found | {error, any()}).
 find_buckets_by_id(AccessKey) ->
     case get_info() of
         %% Retrieve value from local-mnesia.
@@ -138,14 +138,14 @@ find_buckets_by_id(AccessKey) ->
     end.
 
 -spec(find_buckets_by_id(binary(), string()) ->
-             {ok, list()} | {ok, match} | not_found | {error, any()}).
-find_buckets_by_id(AccessKey, Checksum0) ->
+             {ok, [#?BUCKET{}]} | {ok, match} | not_found | {error, any()}).
+find_buckets_by_id(AccessKey, Checksum) ->
     case get_info() of
         {ok, #bucket_info{db = DB}} when DB == mnesia ->
             case find_buckets_by_id(AccessKey) of
                 {ok, Value} ->
                     case erlang:crc32(term_to_binary(Value)) of
-                        Checksum0 ->
+                        Checksum ->
                             {ok, match};
                         _ ->
                             {ok, Value}
@@ -159,11 +159,69 @@ find_buckets_by_id(AccessKey, Checksum0) ->
             Error
     end.
 
+%% @doc Retrieve buckets by id
+%% @private
+-spec(find_buckets_by_id_1(binary(), ets|mnesia, [atom()]) ->
+             {ok, [#?BUCKET{}]} | not_found | {error, any()}).
+find_buckets_by_id_1(AccessKey, DB, Providers) ->
+    {Value, CRC} = case leo_s3_bucket_data_handler:lookup(
+                          {DB, ?BUCKET_TABLE}, AccessKey) of
+                       {ok, Val} ->
+                           {Val, erlang:crc32(term_to_binary(Val))};
+                       _Other ->
+                           {[], -1}
+                   end,
+
+    Ret = lists:foldl(
+            fun(Node, []) ->
+                    find_buckets_by_id_2(AccessKey, DB, Node, Value, CRC);
+               (Node, {error, _Cause}) ->
+                    find_buckets_by_id_2(AccessKey, DB, Node, Value, CRC);
+               (_Node, SoFar) ->
+                    SoFar
+            end, [], Providers),
+    Ret.
+
+%% @private
+-spec(find_buckets_by_id_2(binary(), ets|mnesia, atom(), [], integer()) ->
+             {ok, [#?BUCKET{}]} | not_found | {error, any()}).
+find_buckets_by_id_2(AccessKey, DB, Node, Value, CRC) ->
+    RPCKey = rpc:async_call(Node, leo_s3_bucket, find_buckets_by_id,
+                            [AccessKey, CRC]),
+    case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
+        {value, {ok, match}} when Value == [] ->
+            not_found;
+        {value, {ok, match}} when Value /= [] ->
+            {ok, Value};
+        {value, {ok, Value_1}} ->
+            lists:foreach(
+              fun(Bucket) ->
+                      case DB of
+                          mnesia ->
+                              leo_s3_bucket_data_handler:insert(
+                                {DB, ?BUCKET_TABLE},
+                                Bucket#?BUCKET{del = true,
+                                               last_modified_at = leo_date:now()});
+                          _ ->
+                              leo_s3_bucket_data_handler:delete(
+                                {DB, ?BUCKET_TABLE}, Bucket)
+                      end
+              end, Value),
+            ok = put_all_values(ets, Value_1),
+            {ok, Value_1};
+        {value, not_found} ->
+            not_found;
+        _ when Value == [] ->
+            not_found;
+        _ ->
+            {ok, Value}
+    end.
+
 
 %% @doc Retrieve a bucket by bucket-name
 %%
--spec(find_bucket_by_name(string() | binary()) ->
-             {ok, []} | {ok, #?BUCKET{}} | not_found | {error, any()}).
+-spec(find_bucket_by_name(binary()) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()}).
 find_bucket_by_name(Bucket) ->
     case get_info() of
         %% Retrieve value from local-mnesia.
@@ -204,7 +262,7 @@ find_bucket_by_name(Bucket, LastModifiedAt) ->
 %% @doc Retrieve all buckets
 %%
 -spec(find_all() ->
-             {ok, list()} | {error, any()}).
+             {ok, [#?BUCKET{}]} | not_found | {error, any()}).
 find_all() ->
     case get_info() of
         {ok, #bucket_info{db = DB}} ->
@@ -217,7 +275,7 @@ find_all() ->
 %% @doc Retrieve all buckets and owner
 %%
 -spec(find_all_including_owner() ->
-             {ok, list()} | {error, any()}).
+             {ok, list()} | not_found | {error, any()}).
 find_all_including_owner() ->
     case find_all() of
         {ok, Buckets} ->
@@ -257,7 +315,10 @@ find_all_including_owner_1([_Other|Rest], Acc) ->
 -spec(put(#?BUCKET{}) ->
              ok | {error, any()}).
 put(#?BUCKET{name = Name,
+             access_key_id = AccessKeyId,
              last_modified_at = UpdatedAt_1} = Bucket) ->
+    Bucket_1 = Bucket#?BUCKET{name = leo_misc:any_to_binary(Name),
+                              access_key_id = leo_misc:any_to_binary(AccessKeyId)},
     DB_1 = case get_info() of
                {ok, #bucket_info{db = DB}} ->
                    DB;
@@ -266,9 +327,9 @@ put(#?BUCKET{name = Name,
            end,
     case find_bucket_by_name(Name) of
         {ok, #?BUCKET{last_modified_at = UpdatedAt_2}} when UpdatedAt_1 > UpdatedAt_2 ->
-            put_1(DB_1, Bucket);
+            put_1(DB_1, Bucket_1);
         not_found ->
-            put_1(DB_1, Bucket);
+            put_1(DB_1, Bucket_1);
         _ ->
             ok
     end.
@@ -538,7 +599,7 @@ head(AccessKey, Bucket) ->
                           provider = Provider}} ->
             case leo_s3_bucket_data_handler:find_by_name(
                    {DB, ?BUCKET_TABLE}, AccessKey, Bucket) of
-                {ok, _Value0} ->
+                {ok, _Value} ->
                     ok;
                 not_found when Type == slave->
                     case head(AccessKey, Bucket, DB, Provider) of
@@ -555,7 +616,7 @@ head(AccessKey, Bucket) ->
     end.
 
 -spec(head(binary(), binary(), atom(), [atom()]) ->
-             ok | not_found | {error, any()}).
+             {ok, #?BUCKET{}} | not_found | {error, any()}).
 head(AccessKey, Bucket, DB, Provider) ->
     case find_buckets_by_id_1(AccessKey, DB, Provider) of
         {ok, _} ->
@@ -667,144 +728,67 @@ put_all_values(DB, [H|T]) ->
     put_all_values(DB, T).
 
 
-%% @doc Retrieve buckets by id
-%% @private
--spec(find_buckets_by_id_1(binary(), ets|mnesia, [atom()]) ->
-             {ok, list()} | {error, any()}).
-find_buckets_by_id_1(AccessKey, DB, Providers) ->
-    {Value0, CRC} = case leo_s3_bucket_data_handler:lookup(
-                           {DB, ?BUCKET_TABLE}, AccessKey) of
-                        {ok, Val} ->
-                            {Val, erlang:crc32(term_to_binary(Val))};
-                        _Other ->
-                            {[], -1}
-                    end,
-
-    Ret = lists:foldl(
-            fun(Node, []) ->
-                    find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC);
-               (Node, {error, _Cause}) ->
-                    find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC);
-               (_Node, Acc) ->
-                    Acc
-            end, [], Providers),
-    Ret.
-
--spec(find_buckets_by_id_2(binary(), ets|mnesia, atom(), list(), integer()) ->
-             {ok, list()} | {error, any()}).
-find_buckets_by_id_2(AccessKey, DB, Node, Value0, CRC) ->
-    RPCKey = rpc:async_call(Node, leo_s3_bucket, find_buckets_by_id,
-                            [AccessKey, CRC]),
-    Ret = case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
-              {value, {ok, match}} when Value0 == [] ->
-                  not_found;
-              {value, {ok, match}} when Value0 /= [] ->
-                  {ok, Value0};
-              {value, {ok, Value1}} ->
-                  lists:foreach(
-                    fun(Bucket) ->
-                            case DB of
-                                mnesia ->
-                                    leo_s3_bucket_data_handler:insert(
-                                      {DB, ?BUCKET_TABLE},
-                                      Bucket#?BUCKET{del = true,
-                                                     last_modified_at = leo_date:now()});
-                                _ ->
-                                    leo_s3_bucket_data_handler:delete(
-                                      {DB, ?BUCKET_TABLE}, Bucket)
-                            end
-                    end, Value0),
-                  ok = put_all_values(ets, Value1),
-                  {ok, Value1};
-              {value, not_found} ->
-                  not_found;
-              {value, {error, Cause}} ->
-                  error_logger:error_msg("~p,~p,~p,~p~n",
-                                         [{module, ?MODULE_STRING},
-                                          {function, "find_buckets_by_id_2/5"},
-                                          {line, ?LINE}, {body, Cause}]),
-                  {ok, Value0};
-              {value, {badrpc, Cause}} ->
-                  error_logger:error_msg("~p,~p,~p,~p~n",
-                                         [{module, ?MODULE_STRING},
-                                          {function, "find_buckets_by_id_2/5"},
-                                          {line, ?LINE}, {body, Cause}]),
-                  {ok, Value0};
-              timeout ->
-                  {ok, Value0}
-          end,
-    Ret.
 
 
 %% @doc Retrieve buckets by name
 %% @private
--spec(find_bucket_by_name_1(string(), ets|mnesia, list()) ->
-             {ok, []} | {ok, #?BUCKET{}} | not_found | {error, any()}).
+-spec(find_bucket_by_name_1(binary(), ets|mnesia, list()) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()}).
 find_bucket_by_name_1(Bucket, DB, Providers) ->
-    Value0 = case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
-                 {ok, Val} ->
-                     Val;
-                 _Other ->
-                     []
-             end,
+    Value = case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
+                {ok, Val} ->
+                    Val;
+                _Other ->
+                    null
+            end,
 
     Ret = lists:foldl(
-            fun(Node, []) ->
-                    find_bucket_by_name_2(Bucket, DB, Node, Value0);
+            fun(Node, null) ->
+                    find_bucket_by_name_2(Bucket, DB, Node, Value);
                (Node, {error, _Cause}) ->
-                    find_bucket_by_name_2(Bucket, DB, Node, Value0);
-               (_Node, Acc) ->
-                    Acc
-            end, [], Providers),
+                    find_bucket_by_name_2(Bucket, DB, Node, Value);
+               (_Node, SoFar) ->
+                    SoFar
+            end, null, Providers),
     Ret.
 
--spec(find_bucket_by_name_2(binary(), ets|mnesia, atom(), list()) ->
-             {ok, []} | {ok, #?BUCKET{}} | not_found | {error, any()}).
-find_bucket_by_name_2(Bucket, DB, Node, Value0) ->
-    LastModifiedAt = case Value0 == [] of
+-spec(find_bucket_by_name_2(binary(), ets|mnesia, atom(), #?BUCKET{}|null) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()}).
+find_bucket_by_name_2(Bucket, DB, Node, Value) ->
+    LastModifiedAt = case (Value == null) of
                          true ->
                              0;
                          false ->
-                             Value0#?BUCKET.last_modified_at
+                             Value#?BUCKET.last_modified_at
                      end,
     RPCKey = rpc:async_call(Node, leo_s3_bucket, find_bucket_by_name,
                             [Bucket, LastModifiedAt]),
     Ret = case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
-              {value, {ok, match}} when Value0 == [] ->
+              {value, {ok, match}} when Value == null ->
                   not_found;
-              {value, {ok, match}} when Value0 /= [] ->
-                  {ok, Value0};
-              {value, {ok, Value1}} ->
-                  NewBucketVal = Value1#?BUCKET{last_synchroized_at = leo_date:now()},
+              {value, {ok, match}} when Value /= null ->
+                  {ok, Value};
+              {value, {ok, Value_1}} ->
+                  NewBucketVal = Value_1#?BUCKET{last_synchroized_at = leo_date:now()},
                   case DB of
                       mnesia ->
                           catch leo_s3_bucket_data_handler:insert(
                                   {DB, ?BUCKET_TABLE},
-                                  Value0#?BUCKET{del = true,
-                                                 last_modified_at = leo_date:now()
-                                                });
+                                  Value#?BUCKET{del = true,
+                                                last_modified_at = leo_date:now()
+                                               });
                       _ ->
                           catch leo_s3_bucket_data_handler:delete(
-                                  {DB, ?BUCKET_TABLE}, Value0)
+                                  {DB, ?BUCKET_TABLE}, Value)
                   end,
                   leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
                   {ok, NewBucketVal};
               {value, not_found} ->
                   not_found;
-              {value, {error, Cause}} ->
-                  error_logger:error_msg("~p,~p,~p,~p~n",
-                                         [{module, ?MODULE_STRING},
-                                          {function, "find_bucket_by_name_2/4"},
-                                          {line, ?LINE}, {body, Cause}]),
-                  {ok, Value0};
-              {value, {badrpc, Cause}} ->
-                  error_logger:error_msg("~p,~p,~p,~p~n",
-                                         [{module, ?MODULE_STRING},
-                                          {function, "find_bucket_by_name_2/4"},
-                                          {line, ?LINE}, {body, Cause}]),
-                  {ok, Value0};
-              timeout ->
-                  {ok, Value0}
+              _ when Value == null ->
+                  not_found;
+              _ ->
+                  {ok, Value}
           end,
     Ret.
 
@@ -938,14 +922,16 @@ transform() ->
 
 %% @doc the record is the current verion
 %% @private
-transform_1(#?BUCKET{} = Bucket) ->
-    Bucket;
+transform_1(#?BUCKET{name = Name,
+                     access_key_id = AccessKey} = Bucket) ->
+    Bucket#?BUCKET{name = leo_misc:any_to_binary(Name),
+                   access_key_id = leo_misc:any_to_binary(AccessKey)};
 
 %% @doc migrate a record from 0.16.0 to the current version
 %% @private
 transform_1({bucket, Name, AccessKey, CreatedAt}) ->
-    #?BUCKET{name                = Name,
-             access_key_id       = AccessKey,
+    #?BUCKET{name                = leo_misc:any_to_binary(Name),
+             access_key_id       = leo_misc:any_to_binary(AccessKey),
              acls                = [],
              last_synchroized_at = 0,
              created_at          = CreatedAt,
@@ -955,8 +941,8 @@ transform_1({bucket, Name, AccessKey, CreatedAt}) ->
 %% @private
 transform_1({bucket, Name, AccessKey, Acls,
              LastSynchronizedAt, CreatedAt, LastModifiedAt}) ->
-    #?BUCKET{name                = Name,
-             access_key_id       = AccessKey,
+    #?BUCKET{name                = leo_misc:any_to_binary(Name),
+             access_key_id       = leo_misc:any_to_binary(AccessKey),
              acls                = Acls,
              last_synchroized_at = LastSynchronizedAt,
              created_at          = CreatedAt,
@@ -968,8 +954,8 @@ transform_1(#bucket_0_16_0{name                = Name,
                            last_synchroized_at = LastSynchronizedAt,
                            created_at          = CreatedAt,
                            last_modified_at    = LastModifiedAt}) ->
-    #?BUCKET{name                = Name,
-             access_key_id       = AccessKey,
+    #?BUCKET{name                = leo_misc:any_to_binary(Name),
+             access_key_id       = leo_misc:any_to_binary(AccessKey),
              acls                = Acls,
              last_synchroized_at = LastSynchronizedAt,
              created_at          = CreatedAt,

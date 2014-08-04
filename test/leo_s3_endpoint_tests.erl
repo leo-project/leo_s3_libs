@@ -34,7 +34,7 @@
 %%--------------------------------------------------------------------
 -ifdef(EUNIT).
 
--define(USER_ID, "leofs").
+-define(USER_ID, <<"leofs">>).
 
 
 auth_test_() ->
@@ -59,13 +59,13 @@ mnesia_suite_(_) ->
     ok = leo_s3_endpoint:create_table(ram_copies, [node()]),
     not_found = leo_s3_endpoint:get_endpoints(),
 
-    ok = leo_s3_endpoint:set_endpoint("photo.leofs.org"),
-    ok = leo_s3_endpoint:set_endpoint("backup.leofs.org"),
+    ok = leo_s3_endpoint:set_endpoint(<<"photo.leofs.org">>),
+    ok = leo_s3_endpoint:set_endpoint(<<"backup.leofs.org">>),
 
     {ok, EndPoints0} = leo_s3_endpoint:get_endpoints(),
     ?assertEqual(2, length(EndPoints0)),
 
-    ok = leo_s3_endpoint:delete_endpoint("photo.leofs.org"),
+    ok = leo_s3_endpoint:delete_endpoint(<<"photo.leofs.org">>),
     {ok, EndPoints1} = leo_s3_endpoint:get_endpoints(),
     ?assertEqual(1, length(EndPoints1)),
 

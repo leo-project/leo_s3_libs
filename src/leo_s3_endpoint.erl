@@ -97,7 +97,7 @@ set_endpoint(EndPoint) ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB}} ->
             ok = leo_s3_libs_data_handler:insert(
-                   {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint   = EndPoint,
+                   {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint   = leo_misc:any_to_binary(EndPoint),
                                                                created_at = leo_date:now()}}),
             ok;
         not_found ->
@@ -110,7 +110,7 @@ set_endpoint(EndPoint) ->
 %% @doc Retrieve a End-Point from the Mnesia or ETS
 %%
 -spec(get_endpoints() ->
-             {ok, list()} | not_found | {error, any()}).
+             {ok, [#endpoint{}]} | not_found | {error, any()}).
 get_endpoints() ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB,
@@ -138,7 +138,7 @@ delete_endpoint(EndPoint) ->
 
 %% @doc Retrieve checksum of the table
 -spec(checksum() ->
-             {ok, pos_integer()} | not_found | {error, any()}).
+             {ok, non_neg_integer()} | not_found | {error, any()}).
 checksum() ->
     case leo_s3_libs_data_handler:all({mnesia, ?ENDPOINT_TABLE}) of
         {ok, RetL} ->

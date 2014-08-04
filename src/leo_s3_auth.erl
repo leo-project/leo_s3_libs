@@ -134,8 +134,8 @@ bulk_put([Credential|Rest]) ->
 
 %% @doc Generate access-key-id and secret-access-key
 %%
--spec(create_key(string()) ->
-             {ok, list()} | {error, any()}).
+-spec(create_key(binary()) ->
+             {ok, [tuple()]} | {error, any()}).
 create_key(UserId) ->
     Clock = integer_to_list(leo_date:clock()),
 
@@ -143,14 +143,34 @@ create_key(UserId) ->
         {ok, #auth_info{db = ets}} ->
             {error, not_generated};
         {ok, #auth_info{db = mnesia}} ->
+            ClockBin = leo_misc:any_to_binary(Clock),
             Digest0 = list_to_binary(string:sub_string(
                                        leo_hex:binary_to_hex(
                                          crypto:hash(sha, term_to_binary({UserId, Clock}))),1,20)),
             Digest1 = list_to_binary(leo_hex:binary_to_hex(
-                                       crypto:hash(sha,
-                                                   list_to_binary(lists:append([UserId,"/",Clock]))))),
-            create_key1(UserId, Digest0, Digest1);
+                                       crypto:hash(sha, << UserId/binary, "/", ClockBin/binary >> ))),
+            create_key_1(UserId, Digest0, Digest1);
         not_found ->
+            {error, not_initialized}
+    end.
+
+
+%% @doc Generate a credential
+%% @private
+-spec(create_key_1(binary(), binary(), binary()) ->
+             {ok, [tuple()]} | {error, any()}).
+create_key_1(UserId, Digest0, Digest1) ->
+    case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, Digest0) of
+        {ok, _} ->
+            create_key(UserId);
+        not_found ->
+            _ = leo_s3_libs_data_handler:insert(
+                  {mnesia, ?AUTH_TABLE}, {[], #credential{access_key_id     = Digest0,
+                                                          secret_access_key = Digest1,
+                                                          created_at        = leo_date:now()}}),
+            {ok, [{access_key_id,     Digest0},
+                  {secret_access_key, Digest1}]};
+        _ ->
             {error, not_initialized}
     end.
 
@@ -327,26 +347,6 @@ setup(DB, Provider) ->
     true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = DB,
                                                  provider = Provider}}),
     ok.
-
-
-%% @doc Generate a credential
-%% @private
--spec(create_key1(string(), binary(), binary()) ->
-             {ok, list()} | {error, any()}).
-create_key1(UserId, Digest0, Digest1) ->
-    case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, Digest0) of
-        {ok, _} ->
-            create_key(UserId);
-        not_found ->
-            _ = leo_s3_libs_data_handler:insert(
-                  {mnesia, ?AUTH_TABLE}, {[], #credential{access_key_id     = Digest0,
-                                                          secret_access_key = Digest1,
-                                                          created_at        = leo_date:now()}}),
-            {ok, [{access_key_id,     Digest0},
-                  {secret_access_key, Digest1}]};
-        _ ->
-            {error, not_initialized}
-    end.
 
 
 %% @doc Authenticate#1

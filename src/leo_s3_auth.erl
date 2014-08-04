@@ -55,37 +55,38 @@
 %%--------------------------------------------------------------------
 %% @doc Launch or create  Mnesia/ETS
 %%
--spec(start(master | slave, list()) ->
+-spec(start(master | slave, [atom()]) ->
              ok).
-start(slave, Provider) ->
+start(slave, Providers) ->
     catch ets:new(?AUTH_TABLE, [named_table, set, public, {read_concurrency, true}]),
     catch ets:new(?AUTH_INFO,  [named_table, set, public, {read_concurrency, true}]),
 
-    case Provider of
+    case Providers of
         [] ->
             void;
         _ ->
-            ok = setup(ets, Provider)
+            ok = setup(ets, Providers)
     end,
     ok;
-
-start(master, Provider) ->
+start(master, Providers) ->
     catch ets:new(?AUTH_INFO,  [named_table, set, public, {read_concurrency, true}]),
-    ok = setup(mnesia, Provider),
+    ok = setup(mnesia, Providers),
     ok.
+
 
 %% @doc update_providers(slave only)
 %%
--spec(update_providers(list()) ->
+-spec(update_providers([atom()]) ->
              ok).
-update_providers(Provider) ->
+update_providers(Providers) ->
     true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = ets,
-                                                 provider = Provider}}),
+                                                 provider = Providers}}),
     ok.
+
 
 %% @doc Create credential table(mnesia)
 %%
--spec(create_table(ram_copies|disc_copies, list()) ->
+-spec(create_table(ram_copies|disc_copies, [atom()]) ->
              ok).
 create_table(Mode, Nodes) ->
     catch application:start(mnesia),
@@ -123,7 +124,7 @@ put(#credential{access_key_id = Id} = Credential) ->
 
 %% @doc Add credentials
 %%
--spec(bulk_put(list(#credential{})) ->
+-spec(bulk_put([#credential{}]) ->
              ok).
 bulk_put([]) ->
     ok;
@@ -210,7 +211,7 @@ has_credential(AccessKeyId) ->
             false
     end.
 
--spec(has_credential(list(), binary()) ->
+-spec(has_credential([atom()], binary()) ->
              boolean()).
 has_credential(MasterNodes, AccessKey) ->
     Ret = lists:foldl(
@@ -326,7 +327,7 @@ find_all() ->
 
 %% @doc Retrieve checksum of the table
 -spec(checksum() ->
-             {ok, pos_integer()} | not_found | {error, any()}).
+             {ok, non_neg_integer()} | not_found | {error, any()}).
 checksum() ->
     case find_all() of
         {ok, RetL} ->
@@ -526,11 +527,13 @@ auth_uri(Bucket, URI) ->
         _ -> URI
     end.
 
+
 %% @doc remove duplicated bucket's name from path
 %% @private
 remove_dup_bucket(Bucket, URI) ->
     SkipSize = size(Bucket) + 1,
     binary:part(URI, {SkipSize, size(URI) - SkipSize}).
+
 
 %% @doc Retrieve resources
 %% @private

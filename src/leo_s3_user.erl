@@ -46,7 +46,7 @@
 %%--------------------------------------------------------------------
 %% @doc Create user table(mnesia)
 %%
--spec(create_table(ram_copies|disc_copies, list()) ->
+-spec(create_table(ram_copies|disc_copies, [atom()]) ->
              ok).
 create_table(Mode, Nodes) ->
     {atomic, ok} =
@@ -305,7 +305,7 @@ transform_1(#user{id = Id,
 %%--------------------------------------------------------------------
 %% @doc Generate hash/salt-ed password
 %% @private
--spec(hash_and_salt_password(binary(), integer()) ->
+-spec(hash_and_salt_password(binary(), non_neg_integer()) ->
              binary()).
 hash_and_salt_password(Password, CreatedAt) ->
     Salt = list_to_binary(leo_hex:integer_to_hex(CreatedAt, 8)),

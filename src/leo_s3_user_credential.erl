@@ -216,7 +216,7 @@ get_credential_by_user_id(UserId) ->
 %% @doc Retrieve checksum of the table
 %%
 -spec(checksum() ->
-             {ok, pos_integer()} | not_found | {error, any()}).
+             {ok, non_neg_integer()} | not_found | {error, any()}).
 checksum() ->
     case leo_s3_bucket_data_handler:find_all({mnesia, ?USER_CREDENTIAL_TABLE}) of
         {ok, RetL} ->

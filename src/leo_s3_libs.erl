@@ -39,14 +39,14 @@
 %%--------------------------------------------------------------------
 %% @doc Launch or create  Mnesia/ETS
 %%
--spec(start(master | slave) ->
+-spec(start(master|slave) ->
              ok).
 start(Type) ->
     _ = application:start(crypto),
     ok = start_1(Type, [], ?DEF_BUCKET_PROP_SYNC_INTERVAL),
     ok.
 
--spec(start(master | slave, list()) ->
+-spec(start(master|slave, list()) ->
              ok).
 start(slave = Type, Options) ->
     _ = application:start(crypto),
@@ -64,6 +64,7 @@ start(master = Type, _Options) ->
     BucketPropSyncInterval = ?DEF_BUCKET_PROP_SYNC_INTERVAL,
     ok = start_1(Type, [], BucketPropSyncInterval),
     ok.
+
 
 %% @doc update_providers(slave only)
 %%
@@ -89,6 +90,7 @@ get_checksums() ->
                            bucket     = C2,
                            user       = C3,
                            credential = C4}}.
+
 
 %%--------------------------------------------------------------------
 %% INNER FUNCTION

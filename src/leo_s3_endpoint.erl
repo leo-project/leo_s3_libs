@@ -42,34 +42,35 @@
 %%--------------------------------------------------------------------
 %% @doc Launch or create  Mnesia/ETS
 %%
--spec(start(master | slave, list()) ->
+-spec(start(master|slave, [atom()]) ->
              ok).
-start(slave = Type, Provider) ->
+start(slave = Type, Providers) ->
     catch ets:new(?ENDPOINT_TABLE, [named_table, set,         public, {read_concurrency, true}]),
     catch ets:new(?ENDPOINT_INFO,  [named_table, ordered_set, public, {read_concurrency, true}]),
 
-    case Provider of
+    case Providers of
         [] ->
             void;
         _ ->
-            ok = setup(Type, ets, Provider)
+            ok = setup(Type, ets, Providers)
     end,
     ok;
-
 start(master = Type,_Provider) ->
     catch ets:new(?ENDPOINT_INFO,  [named_table, ordered_set, public, {read_concurrency, true}]),
     ok = setup(Type, mnesia, []),
     ok.
 
+
 %% @doc update_providers(slave only)
 %%
--spec(update_providers(list()) ->
+-spec(update_providers([atom()]) ->
              ok).
-update_providers(Provider) ->
+update_providers(Providers) ->
     true = ets:insert(?ENDPOINT_INFO, {1, #endpoint_info{type = slave,
                                                          db   = ets,
-                                                         provider = Provider}}),
+                                                         provider = Providers}}),
     ok.
+
 
 %% @doc Create endpoint table(mnesia)
 %%
@@ -123,7 +124,7 @@ get_endpoints() ->
 
 %% @doc Remove a End-Point from the Mnesia or ETS
 %%
--spec(delete_endpoint(any()) ->
+-spec(delete_endpoint(binary()) ->
              ok | {error, any()}).
 delete_endpoint(EndPoint) ->
     case get_endpoint_info() of
@@ -162,19 +163,19 @@ setup(Type, DB, Provider) ->
 
 %% @doc Retrieve EndPoints from Mnesia/ETS
 %% @private
-get_endpoints_1(DB, Provider) ->
+get_endpoints_1(DB, Providers) ->
     case leo_s3_libs_data_handler:all({DB, ?ENDPOINT_TABLE}) of
         {ok, EndPoints} ->
             {ok, EndPoints};
         not_found when DB == ets->
-            get_endpoints_2(DB, Provider);
+            get_endpoints_2(DB, Providers);
         Error ->
             Error
     end.
 
 %% @doc Retrieve EndPoints from Remote Node
 %% @private
-get_endpoints_2(DB, Provider) ->
+get_endpoints_2(DB, Providers) ->
     case lists:foldl(
            fun(Node, [] = Acc) ->
                    RPCKey = rpc:async_call(Node, leo_s3_endpoint, get_endpoints, []),
@@ -184,7 +185,7 @@ get_endpoints_2(DB, Provider) ->
                    end;
               (_Node, Acc) ->
                    Acc
-           end, [], Provider) of
+           end, [], Providers) of
         [] ->
             {error, not_found};
         EndPoints ->
@@ -198,7 +199,7 @@ get_endpoints_2(DB, Provider) ->
 %% @doc Retrieve endpoint info from ETS
 %% @private
 -spec(get_endpoint_info() ->
-             {ok, list()} | not_fonund).
+             {ok, #endpoint_info{}} | not_fonund).
 get_endpoint_info() ->
     case catch ets:lookup(?ENDPOINT_INFO, 1) of
         [{_, EndPointInfo}|_] ->

@@ -74,11 +74,13 @@ create_table(Mode, Nodes) ->
              ok | {error, any()}).
 put(#?S3_USER{id = UserId,
               updated_at = UpdatedAt_1} = User) ->
+    User_1 = User#?S3_USER{id = leo_misc:any_to_binary(UserId)},
+
     case find_by_id(UserId) of
         {ok, #?S3_USER{updated_at = UpdatedAt_2}} when UpdatedAt_1 > UpdatedAt_2 ->
-            put_1(User);
+            put_1(User_1);
         not_found ->
-            put_1(User);
+            put_1(User_1);
         _ ->
             ok
     end.

@@ -26,7 +26,7 @@
 %% @doc Endpoint Info
 %%
 -record(endpoint, {
-          endpoint   = []   :: string(),
+          endpoint   = <<>> :: binary(),
           created_at = 0    :: integer()
          }).
 

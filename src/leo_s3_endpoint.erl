@@ -97,7 +97,7 @@ set_endpoint(EndPoint) ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB}} ->
             ok = leo_s3_libs_data_handler:insert(
-                   {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint   = EndPoint,
+                   {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint   = leo_misc:any_to_binary(EndPoint),
                                                                created_at = leo_date:now()}}),
             ok;
         not_found ->

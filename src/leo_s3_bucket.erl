@@ -315,7 +315,10 @@ find_all_including_owner_1([_Other|Rest], Acc) ->
 -spec(put(#?BUCKET{}) ->
              ok | {error, any()}).
 put(#?BUCKET{name = Name,
+             access_key_id = AccessKeyId,
              last_modified_at = UpdatedAt_1} = Bucket) ->
+    Bucket_1 = Bucket#?BUCKET{name = leo_misc:any_to_binary(Name),
+                              access_key_id = leo_misc:any_to_binary(AccessKeyId)},
     DB_1 = case get_info() of
                {ok, #bucket_info{db = DB}} ->
                    DB;
@@ -324,9 +327,9 @@ put(#?BUCKET{name = Name,
            end,
     case find_bucket_by_name(Name) of
         {ok, #?BUCKET{last_modified_at = UpdatedAt_2}} when UpdatedAt_1 > UpdatedAt_2 ->
-            put_1(DB_1, Bucket);
+            put_1(DB_1, Bucket_1);
         not_found ->
-            put_1(DB_1, Bucket);
+            put_1(DB_1, Bucket_1);
         _ ->
             ok
     end.

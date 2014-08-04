@@ -66,7 +66,7 @@ create_table(Mode, Nodes) ->
 %% @doc Create a user account w/access-key-id/secret-access-key
 %%
 -spec(put(#user_credential{} | binary()) ->
-             ok | {ok, [_]} | {error, any()}).
+             ok | {ok, [tuple()]} | {error, any()}).
 put(UserCredential) when is_record(UserCredential, user_credential) ->
     leo_s3_libs_data_handler:insert({mnesia, ?USER_CREDENTIAL_TABLE},
                                     {[], UserCredential});
@@ -76,11 +76,10 @@ put(UserId) ->
 
 %% @doc Create a user account w/access-key-id/secret-access-key
 %%
+-spec(put(binary(), non_neg_integer()) ->
+             ok | {ok, [tuple()]} | {error, any()}).
 put(UserId, CreatedAt) ->
-    UserId_1 = case is_binary(UserId) of
-                   true  -> binary_to_list(UserId);
-                   false -> UserId
-               end,
+    UserId_1 = leo_misc:any_to_binary(UserId),
 
     case leo_s3_auth:create_key(UserId_1) of
         {ok, Keys} ->

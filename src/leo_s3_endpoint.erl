@@ -110,7 +110,7 @@ set_endpoint(EndPoint) ->
 %% @doc Retrieve a End-Point from the Mnesia or ETS
 %%
 -spec(get_endpoints() ->
-             {ok, list()} | not_found | {error, any()}).
+             {ok, [#endpoint{}]} | not_found | {error, any()}).
 get_endpoints() ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB,
@@ -138,7 +138,7 @@ delete_endpoint(EndPoint) ->
 
 %% @doc Retrieve checksum of the table
 -spec(checksum() ->
-             {ok, pos_integer()} | not_found | {error, any()}).
+             {ok, non_neg_integer()} | not_found | {error, any()}).
 checksum() ->
     case leo_s3_libs_data_handler:all({mnesia, ?ENDPOINT_TABLE}) of
         {ok, RetL} ->

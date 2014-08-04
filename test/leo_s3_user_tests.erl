@@ -62,7 +62,7 @@ suite_(_) ->
     ok = leo_s3_user_credential:create_table(ram_copies, [node()]),
     ok = leo_s3_auth:create_table(ram_copies, [node()]),
 
-    UserId    = "Name is Leo",
+    UserId    = <<"Name is Leo">>,
     Password0 = <<"Type is FS">>,
 
     %% %% create-user
@@ -88,10 +88,10 @@ suite_(_) ->
     ?assertEqual(AccessKeyId, Res2#user_credential.access_key_id),
 
     %% %% find_all
-    {ok, _} = leo_s3_user:put(UserId ++ "_1", Password0, true),
-    {ok, _} = leo_s3_user:put(UserId ++ "_2", Password0, true),
-    {ok, _} = leo_s3_user:put(UserId ++ "_3", Password0, true),
-    {ok, _} = leo_s3_user:put(UserId ++ "_4", Password0, true),
+    {ok, _} = leo_s3_user:put(<< UserId/binary, "_1" >>, Password0, true),
+    {ok, _} = leo_s3_user:put(<< UserId/binary, "_2" >>, Password0, true),
+    {ok, _} = leo_s3_user:put(<< UserId/binary, "_3" >>, Password0, true),
+    {ok, _} = leo_s3_user:put(<< UserId/binary, "_4" >>, Password0, true),
     {ok, Users_1} = leo_s3_user_credential:find_all(),
     {ok, Users_2} = leo_s3_user_credential:find_all_with_role(),
     ?debugVal(Users_1),

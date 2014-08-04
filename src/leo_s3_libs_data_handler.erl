@@ -37,7 +37,7 @@
 %% Retrieve all records from the table.
 %%
 -spec(all({mnesia|ets, atom()}) ->
-             tuple() | list() | {error, any()}).
+             {ok, [_]} | not_found | {error, any()}).
 all({mnesia, Table}) ->
     case catch mnesia:ets(fun ets:tab2list/1, [Table]) of
         {'EXIT', Cause} ->
@@ -64,7 +64,7 @@ all({ets, Table}) ->
 %% Retrieve a record by key from the table.
 %%
 -spec(lookup({mnesia|ets, atom()}, any()) ->
-             {ok, any()} | list() | {error, any()}).
+             {ok, any()} | not_found | {error, any()}).
 lookup({mnesia, Table}, Id) ->
     case catch mnesia:ets(fun ets:lookup/2, [Table, Id]) of
         [Value|_] ->
@@ -104,7 +104,7 @@ insert({ets, Table}, {Id, Value}) ->
 %% @doc Remove a record from the table.
 %%
 -spec(delete({mnesia|ets, atom()}, any()) ->
-             ok | not_found | {error, any()}).
+             ok | {error, any()}).
 delete({mnesia, Table}, Id) ->
     case lookup({mnesia, Table}, Id) of
         {ok, Value} ->
@@ -112,6 +112,8 @@ delete({mnesia, Table}, Id) ->
                           mnesia:delete_object(Table, Value, write)
                   end,
             leo_mnesia:delete(Fun);
+        not_found = Cause ->
+            {error, Cause};
         Error ->
             Error
     end;

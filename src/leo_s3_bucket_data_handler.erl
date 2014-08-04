@@ -37,8 +37,8 @@
 
 %% Retrieve a record by key from the table.
 %%
--spec(lookup({mnesia|ets, atom()}, integer()) ->
-             tuple() | list() | {error, any()}).
+-spec(lookup({mnesia|ets, atom()}, binary()) ->
+             {ok, [#?BUCKET{}]} | not_found | {error, any()}).
 lookup({mnesia, Table}, AccessKey) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table),
@@ -68,18 +68,18 @@ lookup({ets, Table}, AccessKey0) ->
 
 %% @doc Retrieve a record by name
 %%
--spec(find_by_name({mnesia|ets, atom()}, string()) ->
-             {ok, list()} | {error, any()}).
+-spec(find_by_name({mnesia|ets, atom()}, binary()) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()}).
 find_by_name(DBInfo, Name) ->
     find_by_name(DBInfo, <<>>, Name, false).
 
--spec(find_by_name({mnesia|ets, atom()}, string(), string()) ->
-             {ok, list()} | {error, any()}).
+-spec(find_by_name({mnesia|ets, atom()}, binary(), binary()) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()}).
 find_by_name(Provider, AccessKey0, Name) ->
     find_by_name(Provider, AccessKey0, Name, true).
 
--spec(find_by_name({mnesia|ets, atom()}, string(), string(), boolean()) ->
-             {ok, list()} | {error, any()}).
+-spec(find_by_name({mnesia|ets, atom()}, binary(), binary(), boolean()) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()}).
 find_by_name({mnesia, Table}, AccessKey0, Name, NeedAccessKey) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table),
@@ -115,7 +115,7 @@ find_by_name({ets, Table}, AccessKey0, Name0, NeedAccessKey) ->
 %% @doc Retrieve all buckets.
 %%
 -spec(find_all({mnesia|ets, atom()}) ->
-             {ok, list()} | {error, any()}).
+             {ok, [#?BUCKET{}]} | not_found | {error, any()}).
 find_all({mnesia, Table}) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table)]),
@@ -163,6 +163,8 @@ delete({mnesia, Table}, #?BUCKET{name = Name,
                            mnesia:delete_object(Table, Value, write)
                    end,
             leo_mnesia:delete(Fun2);
+        not_found = Cause ->
+            {error, Cause};
         Error ->
             Error
     end;
@@ -185,7 +187,7 @@ delete({ets, Table}, #?BUCKET{name = Name,
 %% @doc Retrieve total of records.
 %%
 -spec(size({mnesia|ets, atom()}) ->
-             integer()).
+             non_neg_integer()).
 size({mnesia, Table}) ->
     mnesia:ets(fun ets:info/2, [Table, size]);
 size({ets, Table}) ->

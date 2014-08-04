@@ -55,37 +55,38 @@
 %%--------------------------------------------------------------------
 %% @doc Launch or create  Mnesia/ETS
 %%
--spec(start(master | slave, list()) ->
+-spec(start(master | slave, [atom()]) ->
              ok).
-start(slave, Provider) ->
+start(slave, Providers) ->
     catch ets:new(?AUTH_TABLE, [named_table, set, public, {read_concurrency, true}]),
     catch ets:new(?AUTH_INFO,  [named_table, set, public, {read_concurrency, true}]),
 
-    case Provider of
+    case Providers of
         [] ->
             void;
         _ ->
-            ok = setup(ets, Provider)
+            ok = setup(ets, Providers)
     end,
     ok;
-
-start(master, Provider) ->
+start(master, Providers) ->
     catch ets:new(?AUTH_INFO,  [named_table, set, public, {read_concurrency, true}]),
-    ok = setup(mnesia, Provider),
+    ok = setup(mnesia, Providers),
     ok.
+
 
 %% @doc update_providers(slave only)
 %%
--spec(update_providers(list()) ->
+-spec(update_providers([atom()]) ->
              ok).
-update_providers(Provider) ->
+update_providers(Providers) ->
     true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = ets,
-                                                 provider = Provider}}),
+                                                 provider = Providers}}),
     ok.
+
 
 %% @doc Create credential table(mnesia)
 %%
--spec(create_table(ram_copies|disc_copies, list()) ->
+-spec(create_table(ram_copies|disc_copies, [atom()]) ->
              ok).
 create_table(Mode, Nodes) ->
     catch application:start(mnesia),
@@ -123,7 +124,7 @@ put(#credential{access_key_id = Id} = Credential) ->
 
 %% @doc Add credentials
 %%
--spec(bulk_put(list(#credential{})) ->
+-spec(bulk_put([#credential{}]) ->
              ok).
 bulk_put([]) ->
     ok;
@@ -134,8 +135,8 @@ bulk_put([Credential|Rest]) ->
 
 %% @doc Generate access-key-id and secret-access-key
 %%
--spec(create_key(string()) ->
-             {ok, list()} | {error, any()}).
+-spec(create_key(binary()) ->
+             {ok, [tuple()]} | {error, any()}).
 create_key(UserId) ->
     Clock = integer_to_list(leo_date:clock()),
 
@@ -143,14 +144,34 @@ create_key(UserId) ->
         {ok, #auth_info{db = ets}} ->
             {error, not_generated};
         {ok, #auth_info{db = mnesia}} ->
+            ClockBin = leo_misc:any_to_binary(Clock),
             Digest0 = list_to_binary(string:sub_string(
                                        leo_hex:binary_to_hex(
                                          crypto:hash(sha, term_to_binary({UserId, Clock}))),1,20)),
             Digest1 = list_to_binary(leo_hex:binary_to_hex(
-                                       crypto:hash(sha,
-                                                   list_to_binary(lists:append([UserId,"/",Clock]))))),
-            create_key1(UserId, Digest0, Digest1);
+                                       crypto:hash(sha, << UserId/binary, "/", ClockBin/binary >> ))),
+            create_key_1(UserId, Digest0, Digest1);
         not_found ->
+            {error, not_initialized}
+    end.
+
+
+%% @doc Generate a credential
+%% @private
+-spec(create_key_1(binary(), binary(), binary()) ->
+             {ok, [tuple()]} | {error, any()}).
+create_key_1(UserId, Digest0, Digest1) ->
+    case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, Digest0) of
+        {ok, _} ->
+            create_key(UserId);
+        not_found ->
+            _ = leo_s3_libs_data_handler:insert(
+                  {mnesia, ?AUTH_TABLE}, {[], #credential{access_key_id     = Digest0,
+                                                          secret_access_key = Digest1,
+                                                          created_at        = leo_date:now()}}),
+            {ok, [{access_key_id,     Digest0},
+                  {secret_access_key, Digest1}]};
+        _ ->
             {error, not_initialized}
     end.
 
@@ -190,7 +211,7 @@ has_credential(AccessKeyId) ->
             false
     end.
 
--spec(has_credential(list(), binary()) ->
+-spec(has_credential([atom()], binary()) ->
              boolean()).
 has_credential(MasterNodes, AccessKey) ->
     Ret = lists:foldl(
@@ -306,7 +327,7 @@ find_all() ->
 
 %% @doc Retrieve checksum of the table
 -spec(checksum() ->
-             {ok, pos_integer()} | not_found | {error, any()}).
+             {ok, non_neg_integer()} | not_found | {error, any()}).
 checksum() ->
     case find_all() of
         {ok, RetL} ->
@@ -327,26 +348,6 @@ setup(DB, Provider) ->
     true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = DB,
                                                  provider = Provider}}),
     ok.
-
-
-%% @doc Generate a credential
-%% @private
--spec(create_key1(string(), binary(), binary()) ->
-             {ok, list()} | {error, any()}).
-create_key1(UserId, Digest0, Digest1) ->
-    case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, Digest0) of
-        {ok, _} ->
-            create_key(UserId);
-        not_found ->
-            _ = leo_s3_libs_data_handler:insert(
-                  {mnesia, ?AUTH_TABLE}, {[], #credential{access_key_id     = Digest0,
-                                                          secret_access_key = Digest1,
-                                                          created_at        = leo_date:now()}}),
-            {ok, [{access_key_id,     Digest0},
-                  {secret_access_key, Digest1}]};
-        _ ->
-            {error, not_initialized}
-    end.
 
 
 %% @doc Authenticate#1
@@ -526,11 +527,13 @@ auth_uri(Bucket, URI) ->
         _ -> URI
     end.
 
+
 %% @doc remove duplicated bucket's name from path
 %% @private
 remove_dup_bucket(Bucket, URI) ->
     SkipSize = size(Bucket) + 1,
     binary:part(URI, {SkipSize, size(URI) - SkipSize}).
+
 
 %% @doc Retrieve resources
 %% @private

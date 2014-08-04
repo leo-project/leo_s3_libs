@@ -49,8 +49,8 @@
 -type permissions() :: [permission()].
 
 -record(bucket_acl_info, {
-          user_id = <<>>   :: binary(),      %% correspond with user table's user_id
-          permissions = [] :: permissions()  %% permissions
+          user_id = <<>> :: binary(), %% correspond with user table's user_id
+          permissions = full_control :: permissions()  %% permissions
          }).
 
 -type acls() :: [#bucket_acl_info{}].
@@ -105,7 +105,7 @@
           type          :: atom(), %% [master | slave]
           db            :: atom(), %% db-type:[ets | mnesia]
           provider = [] :: list(), %% auth-info provides
-          sync_interval :: pos_integer() %% interval in seconrd to use syncing local records with manager's
+          sync_interval = 0 :: non_neg_integer() %% interval in seconrd to use syncing local records with manager's
          }).
 
 %% {Name, Owner_1, Permissions_1, CreatedAt}

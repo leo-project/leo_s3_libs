@@ -66,7 +66,7 @@ create_table(Mode, Nodes) ->
 %% @doc Create a user account w/access-key-id/secret-access-key
 %%
 -spec(put(#user_credential{} | binary()) ->
-             {ok, string()} | {error, any()}).
+             ok | {ok, [tuple()]} | {error, any()}).
 put(UserCredential) when is_record(UserCredential, user_credential) ->
     leo_s3_libs_data_handler:insert({mnesia, ?USER_CREDENTIAL_TABLE},
                                     {[], UserCredential});
@@ -76,11 +76,10 @@ put(UserId) ->
 
 %% @doc Create a user account w/access-key-id/secret-access-key
 %%
+-spec(put(binary(), non_neg_integer()) ->
+             ok | {ok, [tuple()]} | {error, any()}).
 put(UserId, CreatedAt) ->
-    UserId_1 = case is_binary(UserId) of
-                   true  -> binary_to_list(UserId);
-                   false -> UserId
-               end,
+    UserId_1 = leo_misc:any_to_binary(UserId),
 
     case leo_s3_auth:create_key(UserId_1) of
         {ok, Keys} ->
@@ -142,7 +141,8 @@ find_by_access_key_id(AccessKeyId) ->
 %% @doc Retrieve all records
 %%
 -spec(find_all() ->
-             {ok, list(#user_credential{})} | {error, any()}).
+             {ok, list(#user_credential{})} |
+             not_found | {error, any()}).
 find_all() ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(?USER_CREDENTIAL_TABLE)]),
@@ -155,7 +155,8 @@ find_all() ->
 %% @doc Retrieve all records with role
 %%
 -spec(find_all_with_role() ->
-             {ok, list(#user_credential{})} | {error, any()}).
+             {ok, list(#user_credential{})} |
+             not_found | {error, any()}).
 find_all_with_role() ->
     case find_all() of
         {ok, RetL} ->
@@ -215,7 +216,7 @@ get_credential_by_user_id(UserId) ->
 %% @doc Retrieve checksum of the table
 %%
 -spec(checksum() ->
-             {ok, pos_integer()} | not_found | {error, any()}).
+             {ok, non_neg_integer()} | not_found | {error, any()}).
 checksum() ->
     case leo_s3_bucket_data_handler:find_all({mnesia, ?USER_CREDENTIAL_TABLE}) of
         {ok, RetL} ->

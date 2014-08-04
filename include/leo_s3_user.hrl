@@ -50,7 +50,7 @@
 
 %% @doc S3 User and Credential Info
 -record(user_credential, {
-          user_id = []         :: string(),
+          user_id = <<>>       :: binary(),
           access_key_id = <<>> :: binary(),
           created_at = 0       :: integer()
          }).

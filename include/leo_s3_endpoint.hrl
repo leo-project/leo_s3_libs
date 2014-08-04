@@ -26,12 +26,12 @@
 %% @doc Endpoint Info
 %%
 -record(endpoint, {
-          endpoint   = []   :: string(),
+          endpoint   = <<>> :: binary(),
           created_at = 0    :: integer()
          }).
 
 -record(endpoint_info, {
-          type          :: atom(), %% [master | slave]
-          db            :: atom(), %% db-type:[ets | mnesia]
-          provider = [] :: list()  %% auth-info provides
+          type          :: atom(),  %% [master | slave]
+          db            :: atom(),  %% db-type:[ets | mnesia]
+          provider = [] :: [atom()] %% auth-info provides
          }).

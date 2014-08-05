@@ -312,6 +312,8 @@ transform_2() ->
 %% @private
 transform_3([]) ->
     ok;
+transform_3([#?S3_USER{id = Id}|Rest]) when is_binary(Id) ->
+    transform_3(Rest);
 transform_3([#?S3_USER{id = Id} = User|Rest]) ->
     case leo_s3_user_credential:get_credential_by_user_id(Id) of
         {ok, Values} ->
@@ -322,8 +324,7 @@ transform_3([#?S3_USER{id = Id} = User|Rest]) ->
             leo_s3_user_credential:put(
               #user_credential{user_id = IdBin,
                                access_key_id = AccessKey,
-                               created_at = CreatedAt
-                              }),
+                               created_at = CreatedAt}),
             put_1(User#?S3_USER{id = IdBin}),
 
             case leo_s3_libs_data_handler:delete({mnesia, ?USERS_TABLE}, Id) of

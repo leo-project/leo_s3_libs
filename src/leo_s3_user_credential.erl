@@ -188,7 +188,7 @@ find_all_with_role_1([#user_credential{user_id = UserId,
 %% @doc Retrieve credential by user-id
 %%
 -spec(get_credential_by_user_id(binary()) ->
-             {ok, list(tuple())} | not_found | {error, any()}).
+             {ok, [tuple()]} | not_found | {error, any()}).
 get_credential_by_user_id(UserId) ->
     F = fun() ->
                 Q = qlc:q([X || X <- mnesia:table(?USER_CREDENTIAL_TABLE),

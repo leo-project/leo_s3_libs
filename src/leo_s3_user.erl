@@ -279,25 +279,68 @@ transform() ->
     {atomic, ok} = mnesia:transform_table(
                      ?USERS_TABLE, fun transform_1/1,
                      record_info(fields, ?S3_USER), ?S3_USER),
+    transform_2(),
     ok.
 
 %% @doc the record is the current verion
 %% @private
-transform_1(#?S3_USER{id = Id,
+transform_1(#?S3_USER{id =_Id,
                       password = Password} = User) ->
-    User#?S3_USER{id = leo_misc:any_to_binary(Id),
-                  password = leo_misc:any_to_binary(Password)};
+    PwBin = leo_misc:any_to_binary(Password),
+    User#?S3_USER{password = PwBin};
 transform_1(#user{id = Id,
                   password = Password,
                   role_id  = RoleId,
                   created_at = CreatedAt,
                   del = DelFlag}) ->
-    #?S3_USER{id = leo_misc:any_to_binary(Id),
+    #?S3_USER{id = Id,
               password = leo_misc:any_to_binary(Password),
               role_id  = RoleId,
               created_at = CreatedAt,
               updated_at = CreatedAt,
               del = DelFlag}.
+
+%% @private
+transform_2() ->
+    case find_all() of
+        {ok, RetL} ->
+            transform_3(RetL);
+        _ ->
+            ok
+    end.
+
+%% @private
+transform_3([]) ->
+    ok;
+transform_3([#?S3_USER{id = Id} = User|Rest]) ->
+    case leo_s3_user_credential:get_credential_by_user_id(Id) of
+        {ok, Values} ->
+            IdBin = leo_misc:any_to_binary(Id),
+            AccessKey = leo_misc:get_value('access_key_id', Values, <<>>),
+            CreatedAt = leo_misc:get_value('created_at', Values, leo_date:now()),
+
+            leo_s3_user_credential:put(
+              #user_credential{user_id = IdBin,
+                               access_key_id = AccessKey,
+                               created_at = CreatedAt
+                              }),
+            put_1(User#?S3_USER{id = IdBin}),
+
+            case leo_s3_libs_data_handler:delete({mnesia, ?USERS_TABLE}, Id) of
+                ok ->
+                    case leo_s3_user_credential:delete(Id) of
+                        ok ->
+                            ok;
+                        _ ->
+                            void
+                    end;
+                _ ->
+                    void
+            end;
+        _ ->
+            void
+    end,
+    transform_3(Rest).
 
 
 %%--------------------------------------------------------------------
@@ -313,4 +356,3 @@ hash_and_salt_password(Password, CreatedAt) ->
     Context2 = crypto:hash_update(Context1, Password),
     Context3 = crypto:hash_update(Context2, Salt),
     crypto:hash_final(Context3).
-

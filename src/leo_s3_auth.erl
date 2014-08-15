@@ -236,22 +236,22 @@ has_credential(MasterNodes, AccessKey) ->
 authenticate(Authorization, #sign_params{uri = <<"/">>} = SignParams, _IsCreateBucketOp) ->
     [AccWithAWS,Signature|_] = binary:split(Authorization, <<":">>),
     <<"AWS ", AccessKeyId/binary>> = AccWithAWS,
-    authenticate1(#auth_params{access_key_id = AccessKeyId,
-                               signature     = Signature,
-                               sign_params   = SignParams});
+    authenticate_1(#auth_params{access_key_id = AccessKeyId,
+                                signature     = Signature,
+                                sign_params   = SignParams});
 
 authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreateBucketOp) ->
     [AccWithAWS,Signature|_] = binary:split(Authorization, <<":">>),
     <<"AWS ", AccessKeyId/binary>> = AccWithAWS,
     case {leo_s3_bucket:head(AccessKeyId, Bucket), IsCreateBucketOp} of
         {ok, false} ->
-            authenticate1(#auth_params{access_key_id = AccessKeyId,
-                                       signature     = Signature,
-                                       sign_params   = SignParams#sign_params{bucket = Bucket}});
+            authenticate_1(#auth_params{access_key_id = AccessKeyId,
+                                        signature     = Signature,
+                                        sign_params   = SignParams#sign_params{bucket = Bucket}});
         {not_found, true} ->
-            authenticate1(#auth_params{access_key_id = AccessKeyId,
-                                       signature     = Signature,
-                                       sign_params   = SignParams#sign_params{bucket = Bucket}});
+            authenticate_1(#auth_params{access_key_id = AccessKeyId,
+                                        signature     = Signature,
+                                        sign_params   = SignParams#sign_params{bucket = Bucket}});
         _Other ->
             {error, unmatch}
     end.
@@ -352,32 +352,32 @@ setup(DB, Provider) ->
 
 %% @doc Authenticate#1
 %% @private
--spec(authenticate1(#auth_params{}) ->
+-spec(authenticate_1(#auth_params{}) ->
              {ok, binary()} | {error, any()}).
-authenticate1(AuthParams) ->
+authenticate_1(AuthParams) ->
     case get_auth_info() of
         {ok, AuthInfo} ->
-            authenticate2(AuthParams#auth_params{auth_info = AuthInfo});
+            authenticate_2(AuthParams#auth_params{auth_info = AuthInfo});
         _ ->
             {error, not_initialized}
     end.
 
 %% @doc Authenticate#2
 %% @private
--spec(authenticate2(#auth_params{}) ->
+-spec(authenticate_2(#auth_params{}) ->
              {ok, binary()} | {error, any()}).
-authenticate2(AuthParams) ->
+authenticate_2(AuthParams) ->
     #auth_params{access_key_id = AccessKeyId,
                  auth_info     = #auth_info{db = DB}} = AuthParams,
 
     case leo_s3_libs_data_handler:lookup({DB, ?AUTH_TABLE}, AccessKeyId) of
         {ok, #credential{secret_access_key = SecretAccessKey}} ->
-            authenticate3(AuthParams#auth_params{secret_access_key = SecretAccessKey});
+            authenticate_3(AuthParams#auth_params{secret_access_key = SecretAccessKey});
         not_found when DB == ets ->
-            authenticate4(AuthParams);
+            authenticate_4(AuthParams);
         {error, Cause} ->
             error_logger:error_msg("~p,~p,~p,~p~n",
-                                   [{module, ?MODULE_STRING}, {function, "authenticate2/1"},
+                                   [{module, ?MODULE_STRING}, {function, "authenticate_2/1"},
                                     {line, ?LINE}, {body, Cause}]),
             {error, unmatch}
     end.
@@ -385,20 +385,19 @@ authenticate2(AuthParams) ->
 
 %% @doc Authenticate#3
 %% @private
--spec(authenticate3(#auth_params{}) ->
+-spec(authenticate_3(#auth_params{}) ->
              {ok, binary()} | {error, any()}).
-authenticate3(#auth_params{secret_access_key = SecretAccessKey,
-                           access_key_id     = AccessKeyId,
-                           signature         = Signature,
-                           sign_params       = SignParams}) ->
+authenticate_3(#auth_params{secret_access_key = SecretAccessKey,
+                            access_key_id     = AccessKeyId,
+                            signature         = Signature,
+                            sign_params       = SignParams}) ->
     %% ?debugVal({Signature, SignParams}),
-
     case get_signature(SecretAccessKey, SignParams) of
         Signature ->
             {ok, AccessKeyId};
         WrongSig ->
             error_logger:error_msg("~p,~p,~p,~p~n",
-                                   [{module, ?MODULE_STRING}, {function, "authenticate3/1"},
+                                   [{module, ?MODULE_STRING}, {function, "authenticate_3/1"},
                                     {line, ?LINE}, {body, WrongSig}]),
             {error, unmatch}
     end.
@@ -406,9 +405,9 @@ authenticate3(#auth_params{secret_access_key = SecretAccessKey,
 
 %% @doc Authenticate#4
 %% @private
--spec(authenticate4(#auth_params{}) ->
+-spec(authenticate_4(#auth_params{}) ->
              {ok, binary()} | {error, any()}).
-authenticate4(AuthParams) ->
+authenticate_4(AuthParams) ->
     #auth_params{access_key_id = AccessKeyId,
                  auth_info     = #auth_info{provider = Provider}} = AuthParams,
 
@@ -427,12 +426,12 @@ authenticate4(AuthParams) ->
                      end, [], Provider) of
         [] ->
             error_logger:error_msg("~p,~p,~p,~p~n",
-                                   [{module, ?MODULE_STRING}, {function, "authenticate4/1"},
+                                   [{module, ?MODULE_STRING}, {function, "authenticate_4/1"},
                                     {line, ?LINE}, {body, "get_credential rpc failed"}]),
             {error, unmatch};
         Credential ->
             _ = leo_s3_libs_data_handler:insert({ets, ?AUTH_TABLE},{AccessKeyId, Credential}),
-            authenticate3(
+            authenticate_3(
               AuthParams#auth_params{
                 secret_access_key = Credential#credential.secret_access_key})
     end.
@@ -502,13 +501,13 @@ auth_uri(Bucket, URI) ->
             case URILen of
                 BucketThresholdLen1 ->
                     %% /${Bucket} pattern are should be removed
-                    remove_dup_bucket(Bucket, URI);
+                    remove_duplicated_bucket(Bucket, URI);
                 BucketThresholdLen2 ->
                     <<"/", Bucket:BucketLen/binary, LastChar:8>> = URI,
                     case LastChar == $/ of
                         true ->
                             %% /${Bucket}/ pattern are should be removed
-                            remove_dup_bucket(Bucket, URI);
+                            remove_duplicated_bucket(Bucket, URI);
                         false ->
                             %% ex. /${Bucket}.
                             URI
@@ -518,19 +517,20 @@ auth_uri(Bucket, URI) ->
                     case SegmentLen >= 3 of
                         true ->
                             %% ex. /${Bucket}/path_to_file
-                            remove_dup_bucket(Bucket, URI);
+                            remove_duplicated_bucket(Bucket, URI);
                         false ->
                             %% /${Bucket}[^/]+ pattern are should not be removed
                             URI
                     end
             end;
-        _ -> URI
+        _ ->
+            URI
     end.
 
 
 %% @doc remove duplicated bucket's name from path
 %% @private
-remove_dup_bucket(Bucket, URI) ->
+remove_duplicated_bucket(Bucket, URI) ->
     SkipSize = size(Bucket) + 1,
     binary:part(URI, {SkipSize, size(URI) - SkipSize}).
 

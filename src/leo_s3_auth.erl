@@ -502,8 +502,7 @@ auth_uri(Bucket, URI) ->
 
             case URILen of
                 BucketThresholdLen1 ->
-                    %% remove_duplicated_bucket(Bucket, URI);
-                    URI;
+                    remove_duplicated_bucket(Bucket, URI);
                 BucketThresholdLen2 ->
                     <<"/", Bucket:BucketLen/binary, LastChar:8>> = URI,
                     case LastChar == $/ of
@@ -601,7 +600,7 @@ auth_sub_resources(QueryStr) ->
 
 auth_uri_test() ->
     Bucket = <<"photo">>,
-    <<"/photo">> = auth_uri(Bucket, <<"/photo">>),
+    <<"">> = auth_uri(Bucket, <<"/photo">>),
     <<"/">> = auth_uri(Bucket, <<"/photo/">>),
     <<"/photo.txt">> = auth_uri(Bucket, <<"/photo/photo.txt">>),
     <<"/photo.txt">> = auth_uri(Bucket, <<"/photo.txt">>).

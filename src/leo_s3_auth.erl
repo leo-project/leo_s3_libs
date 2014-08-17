@@ -287,28 +287,29 @@ get_signature(SecretAccessKey, SignParams) ->
     #sign_params{http_verb    = HTTPVerb,
                  content_md5  = ETag,
                  content_type = ContentType,
-                 date         = Date0,
-                 bucket       = Bucket0,
-                 uri          = URI0,
+                 date         = Date,
+                 bucket       = Bucket,
+                 uri          = URI,
                  query_str    = QueryStr,
                  amz_headers  = AmzHeaders
                 } = SignParams,
 
-    Date1   = auth_date(Date0, AmzHeaders),
-    Sub0    = auth_resources(AmzHeaders),
-    Sub1    = auth_sub_resources(QueryStr),
-    Bucket1 = auth_bucket(URI0, Bucket0, QueryStr),
-    URI1    = auth_uri(Bucket0, URI0),
+    Date_1  = auth_date(Date, AmzHeaders),
+    Sub_1   = auth_resources(AmzHeaders),
+    Sub_2   = auth_sub_resources(QueryStr),
+    Bucket1 = auth_bucket(URI, Bucket, QueryStr),
+    URI_1   = auth_uri(Bucket, URI),
     BinToSign = <<HTTPVerb/binary,    "\n",
                   ETag/binary,        "\n",
                   ContentType/binary, "\n",
-                  Date1/binary,       "\n",
-                  Sub0/binary, Bucket1/binary, URI1/binary, Sub1/binary>>,
+                  Date_1/binary,       "\n",
+                  Sub_1/binary, Bucket1/binary, URI_1/binary, Sub_2/binary>>,
     %% ?debugVal(binary_to_list(BinToSign)),
+
     Context = crypto:hmac_init(sha, SecretAccessKey),
-    Context2 = crypto:hmac_update(Context, BinToSign),
-    Mac = crypto:hmac_final(Context2),
-    Signature = base64:encode(Mac),
+    Context_1 = crypto:hmac_update(Context, BinToSign),
+    HMac = crypto:hmac_final(Context_1),
+    Signature = base64:encode(HMac),
     %% ?debugVal(Signature),
     Signature.
 
@@ -452,12 +453,12 @@ get_auth_info() ->
 
 %% @doc Retrieve date
 %% @private
-auth_date(Date0, CannonocalizedResources) ->
+auth_date(Date, CannonocalizedResources) ->
     case lists:keysearch("x-amz-date", 1, CannonocalizedResources) of
         {value, _} ->
             <<>>;
         false ->
-            << Date0/binary >>
+            << Date/binary >>
     end.
 
 
@@ -498,10 +499,11 @@ auth_uri(Bucket, URI) ->
             BucketThresholdLen1 = BucketLen + 1,
             BucketThresholdLen2 = BucketLen + 2,
             URILen = byte_size(URI),
+
             case URILen of
                 BucketThresholdLen1 ->
-                    %% /${Bucket} pattern are should be removed
-                    remove_duplicated_bucket(Bucket, URI);
+                    %% remove_duplicated_bucket(Bucket, URI);
+                    URI;
                 BucketThresholdLen2 ->
                     <<"/", Bucket:BucketLen/binary, LastChar:8>> = URI,
                     case LastChar == $/ of
@@ -514,7 +516,7 @@ auth_uri(Bucket, URI) ->
                     end;
                 _ ->
                     SegmentLen = length(binary:split(URI, <<"/">>, [global])),
-                    case SegmentLen >= 3 of
+                    case (SegmentLen >= 3) of
                         true ->
                             %% ex. /${Bucket}/path_to_file
                             remove_duplicated_bucket(Bucket, URI);
@@ -598,9 +600,10 @@ auth_sub_resources(QueryStr) ->
 -ifdef(TEST).
 
 auth_uri_test() ->
-    <<"">> = auth_uri(<<"bbb">>, <<"/bbb">>),
-    <<"/">> = auth_uri(<<"bbb">>, <<"/bbb/">>),
-    <<"/bbb.txt">> = auth_uri(<<"bbb">>, <<"/bbb/bbb.txt">>),
-    <<"/bbb.txt">> = auth_uri(<<"bbb">>, <<"/bbb.txt">>).
+    Bucket = <<"photo">>,
+    <<"/photo">> = auth_uri(Bucket, <<"/photo">>),
+    <<"/">> = auth_uri(Bucket, <<"/photo/">>),
+    <<"/photo.txt">> = auth_uri(Bucket, <<"/photo/photo.txt">>),
+    <<"/photo.txt">> = auth_uri(Bucket, <<"/photo.txt">>).
 
 -endif.

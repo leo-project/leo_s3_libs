@@ -233,7 +233,7 @@ has_credential(MasterNodes, AccessKey) ->
 %%
 -spec(authenticate(binary(), #sign_params{}, boolean()) ->
              {ok, binary()} | {error, any()}).
-authenticate(Authorization, #sign_params{uri = <<"/">>} = SignParams, _IsCreateBucketOp) ->
+authenticate(Authorization, #sign_params{raw_uri = <<"/">>} = SignParams, _IsCreateBucketOp) ->
     [AccWithAWS,Signature|_] = binary:split(Authorization, <<":">>),
     <<"AWS ", AccessKeyId/binary>> = AccWithAWS,
     authenticate_1(#auth_params{access_key_id = AccessKeyId,
@@ -284,21 +284,22 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
 -spec(get_signature(binary(), #sign_params{}) ->
              binary()).
 get_signature(SecretAccessKey, SignParams) ->
-    #sign_params{http_verb    = HTTPVerb,
-                 content_md5  = ETag,
-                 content_type = ContentType,
-                 date         = Date,
-                 bucket       = Bucket,
-                 uri          = URI,
-                 query_str    = QueryStr,
-                 amz_headers  = AmzHeaders
+    #sign_params{http_verb     = HTTPVerb,
+                 content_md5   = ETag,
+                 content_type  = ContentType,
+                 date          = Date,
+                 bucket        = Bucket,
+                 raw_uri       = URI,
+                 requested_uri = RequestedURI,
+                 query_str     = QueryStr,
+                 amz_headers   = AmzHeaders
                 } = SignParams,
 
     Date_1  = auth_date(Date, AmzHeaders),
     Sub_1   = auth_resources(AmzHeaders),
     Sub_2   = auth_sub_resources(QueryStr),
     Bucket1 = auth_bucket(URI, Bucket, QueryStr),
-    URI_1   = auth_uri(Bucket, URI),
+    URI_1   = auth_uri(Bucket, URI, RequestedURI),
     BinToSign = <<HTTPVerb/binary,    "\n",
                   ETag/binary,        "\n",
                   ContentType/binary, "\n",
@@ -490,9 +491,11 @@ auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 %% +-----------------+------------------------+-------------------+
 %% | <<"bucket">>    | <<"/bucket.ext">>      | <<"/bucket.ext">> |
 %% +-----------------+------------------------+-------------------+
-auth_uri(<<>>, URI) ->
+auth_uri(<<>>, URI,_URI) ->
     URI;
-auth_uri(Bucket, URI) ->
+auth_uri(_Bucket,<<"/">> = URI,_URI) ->
+    URI;
+auth_uri(Bucket,_URI, URI) ->
     case binary:match(URI, Bucket) of
         {1, _} ->
             BucketLen = byte_size(Bucket),
@@ -600,9 +603,11 @@ auth_sub_resources(QueryStr) ->
 
 auth_uri_test() ->
     Bucket = <<"photo">>,
-    <<"">> = auth_uri(Bucket, <<"/photo">>),
-    <<"/">> = auth_uri(Bucket, <<"/photo/">>),
-    <<"/photo.txt">> = auth_uri(Bucket, <<"/photo/photo.txt">>),
-    <<"/photo.txt">> = auth_uri(Bucket, <<"/photo.txt">>).
+    <<"">> = auth_uri(Bucket, <<"/photo">>, <<"/photo">>),
+    <<"/photo">> = auth_uri(Bucket, <<"/photo">>, <<"/photo/photo">>),
+
+    <<"/">> = auth_uri(Bucket, <<"/photo/">>, <<"/photo/">>),
+    <<"/photo.txt">> = auth_uri(Bucket, <<"/photo/photo.txt">>, <<"/photo/photo.txt">>),
+    <<"/photo.txt">> = auth_uri(Bucket, <<"/photo.txt">>, <<"/photo.txt">>).
 
 -endif.

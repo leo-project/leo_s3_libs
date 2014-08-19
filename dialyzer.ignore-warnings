@@ -5,4 +5,5 @@ Cons will produce an improper list since its 2nd argument is none()
 ## leo_s3_bucket.erl
 The pattern 'true' can never match the type 'false'
 ## leo_s3_user
+The pattern [{'user_1', Id, _, _, _, _, _} | Rest] can never match the type []
 The pattern [User = {'user_1', Id, _, _, _, _, _} | Rest] can never match the type []

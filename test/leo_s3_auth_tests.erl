@@ -114,12 +114,14 @@ mnesia_suite_(_) ->
                              {ok, #user_credential{}}
                      end),
 
-    SignParams0 = #sign_params{http_verb    = <<"GET">>,
-                               content_md5  = <<>>,
-                               content_type = <<>>,
-                               date         = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
-                               bucket       = <<"johnsmith">>,
-                               uri          = <<"/photos/puppy.jpg">>},
+    SignParams0 = #sign_params{http_verb     = <<"GET">>,
+                               content_md5   = <<>>,
+                               content_type  = <<>>,
+                               date          = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
+                               bucket        = <<"johnsmith">>,
+                               raw_uri       = <<"/photos/puppy.jpg">>,
+                               requested_uri = <<"/photos/puppy.jpg">>
+                              },
     Signature0 = leo_s3_auth:get_signature(SecretAccessKey, SignParams0),
     Authorization0 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":">>/binary, Signature0/binary >>,
 
@@ -152,12 +154,14 @@ mnesia_suite_(_) ->
     {error, unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams0, false),
 
     %% inspect-6 - for authentication
-    SignParams1 = #sign_params{http_verb    = <<"GET">>,
-                               content_md5  = <<>>,
-                               content_type = <<>>,
-                               date         = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
-                               bucket       = <<"johnsmith">>,
-                               uri          = <<"/">>},
+    SignParams1 = #sign_params{http_verb     = <<"GET">>,
+                               content_md5   = <<>>,
+                               content_type  = <<>>,
+                               date          = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
+                               bucket        = <<"johnsmith">>,
+                               raw_uri       = <<"/">>,
+                               requested_uri = <<"/">>
+                              },
     Signature1 = leo_s3_auth:get_signature(SecretAccessKey, SignParams1),
     Authorization2 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":">>/binary, Signature1/binary >>,
 
@@ -224,12 +228,14 @@ ets_suite_(_) ->
 
     ok = leo_s3_auth:start(slave, [Manager1]),
 
-    SignParams = #sign_params{http_verb    = <<"GET">>,
-                              content_md5  = <<>>,
-                              content_type = <<>>,
-                              date         = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
-                              bucket       = <<"johnsmith">>,
-                              uri          = <<"/photos/puppy.jpg">>},
+    SignParams = #sign_params{http_verb     = <<"GET">>,
+                              content_md5   = <<>>,
+                              content_type  = <<>>,
+                              date          = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
+                              bucket        = <<"johnsmith">>,
+                              raw_uri       = <<"/photos/puppy.jpg">>,
+                              requested_uri = <<"/photos/puppy.jpg">>
+                             },
     Signature0 = leo_s3_auth:get_signature(SecretAccessKey, SignParams),
     Authorization0 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":">>/binary, Signature0/binary >>,
     Authorization1 = << <<"AWS ">>/binary, AccessKeyId/binary, <<":EXAMPLE">>/binary >>,
@@ -291,12 +297,14 @@ authenticate_0_(_) ->
     %% Tue, 27 Mar 2007 19:36:42 +0000\n
     %% /johnsmith/photos/puppy.jpg
 
-    SignParams = #sign_params{http_verb    = <<"GET">>,
-                              content_md5  = <<>>,
-                              content_type = <<>>,
-                              date         = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
-                              bucket       = <<"johnsmith">>,
-                              uri          = <<"/photos/puppy.jpg">>},
+    SignParams = #sign_params{http_verb     = <<"GET">>,
+                              content_md5   = <<>>,
+                              content_type  = <<>>,
+                              date          = <<"Tue, 27 Mar 2007 19:36:42 +0000">>,
+                              bucket        = <<"johnsmith">>,
+                              raw_uri       = <<"/photos/puppy.jpg">>,
+                              requested_uri = <<"/photos/puppy.jpg">>
+                             },
 
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"bWq2s1WEIj+Ydj0vQ697zp+IXMU=">>, Ret),
@@ -322,12 +330,14 @@ authenticate_1_(_) ->
     %% Tue, 27 Mar 2007 21:15:45 +0000\n
     %% /johnsmith/photos/puppy.jpg
 
-    SignParams = #sign_params{http_verb    = <<"PUT">>,
-                              content_md5  = <<>>,
-                              content_type = <<"image/jpeg">>,
-                              date         = <<"Tue, 27 Mar 2007 21:15:45 +0000">>,
-                              bucket       = <<"johnsmith">>,
-                              uri          = <<"/photos/puppy.jpg">>},
+    SignParams = #sign_params{http_verb     = <<"PUT">>,
+                              content_md5   = <<>>,
+                              content_type  = <<"image/jpeg">>,
+                              date          = <<"Tue, 27 Mar 2007 21:15:45 +0000">>,
+                              bucket        = <<"johnsmith">>,
+                              raw_uri       = <<"/photos/puppy.jpg">>,
+                              requested_uri = <<"/photos/puppy.jpg">>
+                             },
 
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"MyyxeRY7whkBe+bq8fHCL/2kKUg=">>, Ret),
@@ -352,13 +362,14 @@ authenticate_2_(_) ->
     %% Tue, 27 Mar 2007 19:42:41 +0000\n
     %% /johnsmith/
 
-    SignParams = #sign_params{http_verb    = <<"GET">>,
-                              content_md5  = <<>>,
-                              content_type = <<>>,
-                              date         = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
-                              bucket       = <<"johnsmith">>,
-                              uri          = <<"/">>,
-                              query_str    = <<"?prefix=photos&max-keys=50&marker=puppy">>
+    SignParams = #sign_params{http_verb     = <<"GET">>,
+                              content_md5   = <<>>,
+                              content_type  = <<>>,
+                              date          = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
+                              bucket        = <<"johnsmith">>,
+                              raw_uri       = <<"/">>,
+                              requested_uri = <<"/">>,
+                              query_str     = <<"?prefix=photos&max-keys=50&marker=puppy">>
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"htDYFYduRNen8P9ZfE/s9SuKy0U=">>, Ret),
@@ -382,13 +393,14 @@ authenticate_3_(_) ->
     %% Tue, 27 Mar 2007 19:44:46 +0000\n
     %% /johnsmith/?acl
 
-    SignParams = #sign_params{http_verb    = <<"GET">>,
-                              content_md5  = <<>>,
-                              content_type = <<>>,
-                              date         = <<"Tue, 27 Mar 2007 19:44:46 +0000">>,
-                              bucket       = <<"johnsmith">>,
-                              uri          = <<"/">>,
-                              query_str    = <<"?acl">>
+    SignParams = #sign_params{http_verb     = <<"GET">>,
+                              content_md5   = <<>>,
+                              content_type  = <<>>,
+                              date          = <<"Tue, 27 Mar 2007 19:44:46 +0000">>,
+                              bucket        = <<"johnsmith">>,
+                              raw_uri       = <<"/">>,
+                              requested_uri = <<"/">>,
+                              query_str     = <<"?acl">>
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"c2WLPFtWHVgbEmeEG93a4cG37dM=">>, Ret),
@@ -415,13 +427,14 @@ authenticate_4_(_) ->
     %% x-amz-date:Tue, 27 Mar 2007 21:20:26 +0000\n
     %% /johnsmith/photos/puppy.jpg
 
-    SignParams = #sign_params{http_verb    = <<"DELETE">>,
-                              content_md5  = <<>>,
-                              content_type = <<>>,
-                              date         = <<"Tue, 27 Mar 2007 21:20:27 +0000">>,
-                              bucket       = <<"johnsmith">>,
-                              uri          = <<"/photos/puppy.jpg">>,
-                              amz_headers  = [
+    SignParams = #sign_params{http_verb     = <<"DELETE">>,
+                              content_md5   = <<>>,
+                              content_type  = <<>>,
+                              date          = <<"Tue, 27 Mar 2007 21:20:27 +0000">>,
+                              bucket        = <<"johnsmith">>,
+                              raw_uri       = <<"/photos/puppy.jpg">>,
+                              requested_uri = <<"/photos/puppy.jpg">>,
+                              amz_headers   = [
                                               {"x-amz-date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
@@ -464,17 +477,18 @@ authenticate_5_(_) ->
     %% x-amz-meta-reviewedby:joe@johnsmith.net,jane@johnsmith.net\n
     %% /static.johnsmith.net/db-backup.dat.gz
 
-    SignParams1 = #sign_params{http_verb    = <<"PUT">>,
-                               content_md5  = <<"4gJE4saaMU4BqNR0kLY+lw==">>,
-                               content_type = <<"application/x-download">>,
-                               date         = <<"Tue, 27 Mar 2007 21:06:08 +0000">>,
-                               bucket       = <<"static.johnsmith.net">>,
-                               uri          = <<"/db-backup.dat.gz">>,
-                               amz_headers  = [{"x-amz-Acl", "public-read"},
-                                               {"x-amz-Meta-ReviewedBy", "joe@johnsmith.net"},
-                                               {"x-amz-Meta-ReviewedBy", "jane@johnsmith.net"},
-                                               {"x-amz-Meta-FileChecksum","0x02661779"},
-                                               {"x-amz-Meta-ChecksumAlgorithm", "crc32"}]},
+    SignParams1 = #sign_params{http_verb     = <<"PUT">>,
+                               content_md5   = <<"4gJE4saaMU4BqNR0kLY+lw==">>,
+                               content_type  = <<"application/x-download">>,
+                               date          = <<"Tue, 27 Mar 2007 21:06:08 +0000">>,
+                               bucket        = <<"static.johnsmith.net">>,
+                               raw_uri       = <<"/db-backup.dat.gz">>,
+                               requested_uri = <<"/db-backup.dat.gz">>,
+                               amz_headers   = [{"x-amz-Acl", "public-read"},
+                                                {"x-amz-Meta-ReviewedBy", "joe@johnsmith.net"},
+                                                {"x-amz-Meta-ReviewedBy", "jane@johnsmith.net"},
+                                                {"x-amz-Meta-FileChecksum","0x02661779"},
+                                                {"x-amz-Meta-ChecksumAlgorithm", "crc32"}]},
     Ret1 = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams1),
     ?assertEqual(<<"ilyl83RwaSoYIEdixDQcA4OnAnc=">>, Ret1),
     ok.
@@ -496,13 +510,14 @@ authenticate_6_(_) ->
     %% Wed, 28 Mar 2007 01:29:59 +0000\n
     %% /
 
-    SignParams = #sign_params{http_verb    = <<"GET">>,
-                              content_md5  = <<>>,
-                              content_type = <<>>,
-                              date         = <<"Wed, 28 Mar 2007 01:29:59 +0000">>,
-                              bucket       = <<>>,
-                              uri          = <<"/">>,
-                              amz_headers  = []},
+    SignParams = #sign_params{http_verb     = <<"GET">>,
+                              content_md5   = <<>>,
+                              content_type  = <<>>,
+                              date          = <<"Wed, 28 Mar 2007 01:29:59 +0000">>,
+                              bucket        = <<>>,
+                              raw_uri       = <<"/">>,
+                              requested_uri = <<"/">>,
+                              amz_headers   = []},
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"qGdzdERIC03wnaRNKh6OqZehG9s=">>, Ret),
     ok.
@@ -523,13 +538,14 @@ authenticate_7_(_) ->
     %% Wed, 28 Mar 2007 01:49:49 +0000\n
     %% /dictionary/fran%C3%A7ais/pr%c3%a9f%c3%a8re
 
-    SignParams = #sign_params{http_verb    = <<"GET">>,
-                              content_md5  = <<>>,
-                              content_type = <<>>,
-                              date         = <<"Wed, 28 Mar 2007 01:49:49 +0000">>,
-                              bucket       = <<>>,
-                              uri          = <<"/dictionary/fran%C3%A7ais/pr%c3%a9f%c3%a8re">>,
-                              amz_headers  = []},
+    SignParams = #sign_params{http_verb     = <<"GET">>,
+                              content_md5   = <<>>,
+                              content_type  = <<>>,
+                              date          = <<"Wed, 28 Mar 2007 01:49:49 +0000">>,
+                              bucket        = <<>>,
+                              raw_uri       = <<"/dictionary/fran%C3%A7ais/pr%c3%a9f%c3%a8re">>,
+                              requested_uri = <<"/dictionary/fran%C3%A7ais/pr%c3%a9f%c3%a8re">>,
+                              amz_headers   = []},
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"DNEZGsoieTZ92F3bUfSPQcbGmlM=">>, Ret),
     ok.
@@ -552,13 +568,14 @@ authenticate_8_(_) ->
     %% Tue, 27 Mar 2007 19:42:41 +0000\n
     %% /johnsmith/path/to/file?versionid=9
 
-    SignParams = #sign_params{http_verb    = <<"GET">>,
-                              content_md5  = <<>>,
-                              content_type = <<>>,
-                              date         = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
-                              bucket       = <<"johnsmith">>,
-                              uri          = <<"/path/to/file">>,
-                              query_str    = <<"?versionid=9">>
+    SignParams = #sign_params{http_verb     = <<"GET">>,
+                              content_md5   = <<>>,
+                              content_type  = <<>>,
+                              date          = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
+                              bucket        = <<"johnsmith">>,
+                              raw_uri       = <<"/path/to/file">>,
+                              requested_uri = <<"/path/to/file">>,
+                              query_str     = <<"?versionid=9">>
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"ld6nhMmeUif8N/zae7DGfB5xYiI=">>, Ret),
@@ -584,13 +601,14 @@ authenticate_9_(_) ->
 
     %% query params must be sorted lexicographically by param name
     %% so in this example, acl must be appeared at first
-    SignParams = #sign_params{http_verb    = <<"GET">>,
-                              content_md5  = <<>>,
-                              content_type = <<>>,
-                              date         = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
-                              bucket       = <<"johnsmith">>,
-                              uri          = <<"/path/to/file">>,
-                              query_str    = <<"?acl&versionid=9">>
+    SignParams = #sign_params{http_verb     = <<"GET">>,
+                              content_md5   = <<>>,
+                              content_type  = <<>>,
+                              date          = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
+                              bucket        = <<"johnsmith">>,
+                              raw_uri       = <<"/path/to/file">>,
+                              requested_uri = <<"/path/to/file">>,
+                              query_str     = <<"?acl&versionid=9">>
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"b3zx5W2PwpsnI/raaZH7heh1NH0=">>, Ret),
@@ -617,13 +635,14 @@ authenticate_10_(_) ->
     %% query params must be sorted lexicographically by param name
     %% so in this example, acl must be appeared at first
     %% AND query params must be URL decoded when signing
-    SignParams = #sign_params{http_verb    = <<"GET">>,
-                              content_md5  = <<>>,
-                              content_type = <<>>,
-                              date         = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
-                              bucket       = <<"johnsmith">>,
-                              uri          = <<"/path/to/file">>,
-                              query_str    = <<"?response-cache-control=No-cache&response-content-disposition=attachment%3B%20filename%3Dtesting.txt&response-content-encoding=x-gzip&response-content-language=mi%2C%20en&response-expires=Thu%2C%2001%20Dec%201994%2016:00:00%20GMT">>
+    SignParams = #sign_params{http_verb     = <<"GET">>,
+                              content_md5   = <<>>,
+                              content_type  = <<>>,
+                              date          = <<"Tue, 27 Mar 2007 19:42:41 +0000">>,
+                              bucket        = <<"johnsmith">>,
+                              raw_uri       = <<"/path/to/file">>,
+                              requested_uri = <<"/path/to/file">>,
+                              query_str     = <<"?response-cache-control=No-cache&response-content-disposition=attachment%3B%20filename%3Dtesting.txt&response-content-encoding=x-gzip&response-content-language=mi%2C%20en&response-expires=Thu%2C%2001%20Dec%201994%2016:00:00%20GMT">>
                              },
     Ret = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams),
     ?assertEqual(<<"IjeV85YN0SCCw26yHd8DXCIvBjk=">>, Ret),

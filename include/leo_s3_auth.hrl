@@ -42,14 +42,15 @@
 %% @doc AMZ-S3-API related
 %%
 -record(sign_params, {
-          http_verb    = <<>> :: binary(),
-          content_md5  = <<>> :: binary(),
-          content_type = <<>> :: binary(),
-          date         = <<>> :: binary(),
-          bucket       = <<>> :: binary(),
-          uri          = <<>> :: binary(),
-          query_str    = <<>> :: binary(),
-          sub_resource = <<>> :: binary(), %% [?acl" | "?location" | "?logging" | "?torrent"]
-          amz_headers  = []   :: list()
+          http_verb     = <<>> :: binary(),
+          content_md5   = <<>> :: binary(),
+          content_type  = <<>> :: binary(),
+          date          = <<>> :: binary(),
+          bucket        = <<>> :: binary(),
+          raw_uri       = <<>> :: binary(),
+          requested_uri = <<>> :: binary(),
+          query_str     = <<>> :: binary(),
+          sub_resource  = <<>> :: binary(), %% [?acl" | "?location" | "?logging" | "?torrent"]
+          amz_headers   = []   :: list()
          }).
 

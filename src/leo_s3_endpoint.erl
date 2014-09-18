@@ -42,8 +42,9 @@
 %%--------------------------------------------------------------------
 %% @doc Launch or create  Mnesia/ETS
 %%
--spec(start(master|slave, [atom()]) ->
-             ok).
+-spec(start(Role, Providers) ->
+             ok when Role::master|slave,
+                     Providers::[atom()]).
 start(slave = Type, Providers) ->
     catch ets:new(?ENDPOINT_TABLE, [named_table, set,         public, {read_concurrency, true}]),
     catch ets:new(?ENDPOINT_INFO,  [named_table, ordered_set, public, {read_concurrency, true}]),
@@ -63,8 +64,8 @@ start(master = Type,_Provider) ->
 
 %% @doc update_providers(slave only)
 %%
--spec(update_providers([atom()]) ->
-             ok).
+-spec(update_providers(Providers) ->
+             ok when Providers::[atom()]).
 update_providers(Providers) ->
     true = ets:insert(?ENDPOINT_INFO, {1, #endpoint_info{type = slave,
                                                          db   = ets,
@@ -74,8 +75,9 @@ update_providers(Providers) ->
 
 %% @doc Create endpoint table(mnesia)
 %%
--spec(create_table(ram_copies|disc_copies, [atom()]) ->
-             ok).
+-spec(create_table(Mode, Nodes) ->
+             ok when Mode::ram_copies|disc_copies,
+                     Nodes::[atom()]).
 create_table(Mode, Nodes) ->
     catch application:start(mnesia),
     mnesia:create_table(
@@ -92,8 +94,8 @@ create_table(Mode, Nodes) ->
 
 %% @doc Insert a End-Point into the Mnesia or ETS
 %%
--spec(set_endpoint(binary()) ->
-             ok | not_found | {error, any()}).
+-spec(set_endpoint(EndPoint) ->
+             ok | not_found | {error, any()} when EndPoint::binary()).
 set_endpoint(EndPoint) ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB}} ->
@@ -124,8 +126,8 @@ get_endpoints() ->
 
 %% @doc Remove a End-Point from the Mnesia or ETS
 %%
--spec(delete_endpoint(binary()) ->
-             ok | {error, any()}).
+-spec(delete_endpoint(EndPoint) ->
+             ok | {error, any()} when EndPoint::binary()).
 delete_endpoint(EndPoint) ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB}} ->

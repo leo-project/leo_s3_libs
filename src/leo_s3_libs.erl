@@ -39,15 +39,16 @@
 %%--------------------------------------------------------------------
 %% @doc Launch or create  Mnesia/ETS
 %%
--spec(start(master|slave) ->
-             ok).
+-spec(start(Role) ->
+             ok when Role::master|slave).
 start(Type) ->
     _ = application:start(crypto),
     ok = start_1(Type, [], ?DEF_BUCKET_PROP_SYNC_INTERVAL),
     ok.
 
--spec(start(master|slave, list()) ->
-             ok).
+-spec(start(Role, Options) ->
+             ok when Role::master|slave,
+                     Options::list()).
 start(slave = Type, Options) ->
     _ = application:start(crypto),
 
@@ -68,8 +69,8 @@ start(master = Type, _Options) ->
 
 %% @doc update_providers(slave only)
 %%
--spec(update_providers(list()) ->
-             ok).
+-spec(update_providers(Provider) ->
+             ok when Provider::list()).
 update_providers(Provider) ->
     ok = leo_s3_auth:update_providers(Provider),
     ok = leo_s3_bucket:update_providers(Provider),

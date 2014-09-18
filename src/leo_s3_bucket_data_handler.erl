@@ -37,8 +37,10 @@
 
 %% Retrieve a record by key from the table.
 %%
--spec(lookup({mnesia|ets, atom()}, binary()) ->
-             {ok, [#?BUCKET{}]} | not_found | {error, any()}).
+-spec(lookup({DB, Table}, AccessKey) ->
+             {ok, [#?BUCKET{}]} | not_found | {error, any()} when DB::mnesia|ets,
+                                                                  Table::atom(),
+                                                                  AccessKey::binary()).
 lookup({mnesia, Table}, AccessKey) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table),
@@ -68,18 +70,24 @@ lookup({ets, Table}, AccessKey0) ->
 
 %% @doc Retrieve a record by name
 %%
--spec(find_by_name({mnesia|ets, atom()}, binary()) ->
-             {ok, #?BUCKET{}} | not_found | {error, any()}).
+-spec(find_by_name(DBInfo, Name) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()} when DBInfo::{mnesia|ets, atom()},
+                                                                Name::binary()).
 find_by_name(DBInfo, Name) ->
     find_by_name(DBInfo, <<>>, Name, false).
 
--spec(find_by_name({mnesia|ets, atom()}, binary(), binary()) ->
-             {ok, #?BUCKET{}} | not_found | {error, any()}).
-find_by_name(Provider, AccessKey0, Name) ->
-    find_by_name(Provider, AccessKey0, Name, true).
+-spec(find_by_name(DBInfo, AccessKey, Name) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()} when DBInfo::{mnesia|ets, atom()},
+                                                                AccessKey::binary(),
+                                                                Name::binary()).
+find_by_name(DBInfo, AccessKey, Name) ->
+    find_by_name(DBInfo, AccessKey, Name, true).
 
--spec(find_by_name({mnesia|ets, atom()}, binary(), binary(), boolean()) ->
-             {ok, #?BUCKET{}} | not_found | {error, any()}).
+-spec(find_by_name(DBInfo, AccessKey0, Name, NeedAccessKey) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()} when DBInfo::{mnesia|ets, atom()},
+                                                                AccessKey0::binary(),
+                                                                Name::binary(),
+                                                                NeedAccessKey::boolean()).
 find_by_name({mnesia, Table}, AccessKey0, Name, NeedAccessKey) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table),
@@ -114,8 +122,8 @@ find_by_name({ets, Table}, AccessKey0, Name0, NeedAccessKey) ->
 
 %% @doc Retrieve all buckets.
 %%
--spec(find_all({mnesia|ets, atom()}) ->
-             {ok, [#?BUCKET{}]} | not_found | {error, any()}).
+-spec(find_all(DBInfo) ->
+             {ok, [#?BUCKET{}]} | not_found | {error, any()} when DBInfo::{mnesia|ets, atom()}).
 find_all({mnesia, Table}) ->
     Fun = fun() ->
                   Q1 = qlc:q([X || X <- mnesia:table(Table)]),
@@ -129,8 +137,9 @@ find_all(_) ->
 
 %% @doc Insert a record into the table.
 %%
--spec(insert({mnesia|ets, atom()}, #?BUCKET{}) ->
-             ok | {error, any()}).
+-spec(insert(DBInfo, Bucket) ->
+             ok | {error, any()} when DBInfo::{mnesia|ets, atom()},
+                                      Bucket::#?BUCKET{}).
 insert({mnesia, Table}, Bucket) ->
     Fun = fun() -> mnesia:write(Table, Bucket, write) end,
     leo_mnesia:write(Fun);
@@ -146,8 +155,9 @@ insert({ets, Table}, #?BUCKET{name = Name} = Value) ->
 
 %% @doc Remove a record from the table.
 %%
--spec(delete({mnesia|ets, atom()}, #?BUCKET{}) ->
-             ok | {error, any()}).
+-spec(delete(DBInfo, Bucket) ->
+             ok | {error, any()} when DBInfo::{mnesia|ets, atom()},
+                                      Bucket::#?BUCKET{}).
 delete({mnesia, Table}, #?BUCKET{name = Name,
                                  access_key_id = AccessKey}) ->
     Fun1 = fun() ->
@@ -186,8 +196,8 @@ delete({ets, Table}, #?BUCKET{name = Name,
 
 %% @doc Retrieve total of records.
 %%
--spec(size({mnesia|ets, atom()}) ->
-             non_neg_integer()).
+-spec(size(DBInfo) ->
+             non_neg_integer() when DBInfo::{mnesia|ets, atom()}).
 size({mnesia, Table}) ->
     mnesia:ets(fun ets:info/2, [Table, size]);
 size({ets, Table}) ->

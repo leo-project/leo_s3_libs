@@ -465,8 +465,8 @@ get_auth_info() ->
 %% @doc Retrieve date
 %% @private
 -spec(auth_date(Date, CannonocalizedResources) ->
-             {ok, #auth_info{}} | not_found when Date::binary(),
-                                                 CannonocalizedResources::list()).
+             binary() when Date::binary(),
+                           CannonocalizedResources::list()).
 auth_date(Date, CannonocalizedResources) ->
     case lists:keysearch("x-amz-date", 1, CannonocalizedResources) of
         {value, _} ->
@@ -481,9 +481,9 @@ auth_date(Date, CannonocalizedResources) ->
 %% auth_bucket("/",_Bucket, []) -> [];
 %% auth_bucket(<<"/">>, Bucket,  _) -> << <<"/">>, Bucket >>;
 -spec(auth_bucket(URI, Bucket, QueryStr) ->
-             {ok, #auth_info{}} | not_found when URI::binary(),
-                                                 Bucket::binary(),
-                                                 QueryStr::binary()).
+             binary() when URI::binary(),
+                           Bucket::binary(),
+                           QueryStr::binary()).
 auth_bucket(_, <<>>,  _) -> <<>>;
 auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 
@@ -509,9 +509,9 @@ auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 %% | <<"bucket">>    | <<"/bucket.ext">>      | <<"/bucket.ext">> |
 %% +-----------------+------------------------+-------------------+
 -spec(auth_uri(Bucket, URI, RequestedURI) ->
-             {ok, #auth_info{}} | not_found when Bucket::binary(),
-                                                 URI::binary(),
-                                                 RequestedURI::binary()).
+             binary() when Bucket::binary(),
+                           URI::binary(),
+                           RequestedURI::binary()).
 auth_uri(<<>>, URI,_URI) ->
     URI;
 auth_uri(_Bucket,<<"/">> = URI,_URI) ->

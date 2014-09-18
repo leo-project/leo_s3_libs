@@ -55,8 +55,9 @@
 %%--------------------------------------------------------------------
 %% @doc Launch or create  Mnesia/ETS
 %%
--spec(start(master | slave, [atom()]) ->
-             ok).
+-spec(start(Role, Providers) ->
+             ok when Role::master | slave,
+                     Providers::[atom()]).
 start(slave, Providers) ->
     catch ets:new(?AUTH_TABLE, [named_table, set, public, {read_concurrency, true}]),
     catch ets:new(?AUTH_INFO,  [named_table, set, public, {read_concurrency, true}]),
@@ -76,8 +77,8 @@ start(master, Providers) ->
 
 %% @doc update_providers(slave only)
 %%
--spec(update_providers([atom()]) ->
-             ok).
+-spec(update_providers(Providers) ->
+             ok when Providers::[atom()]).
 update_providers(Providers) ->
     true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = ets,
                                                  provider = Providers}}),
@@ -86,8 +87,9 @@ update_providers(Providers) ->
 
 %% @doc Create credential table(mnesia)
 %%
--spec(create_table(ram_copies|disc_copies, [atom()]) ->
-             ok).
+-spec(create_table(Mode, Nodes) ->
+             ok when Mode::ram_copies|disc_copies,
+                     Nodes::[atom()]).
 create_table(Mode, Nodes) ->
     catch application:start(mnesia),
     {atomic, ok} =
@@ -109,8 +111,8 @@ create_table(Mode, Nodes) ->
 
 %% @doc Add a credential (an authentication)
 %%
--spec(put(#credential{}) ->
-             ok | {error, any()}).
+-spec(put(Credential) ->
+             ok | {error, any()} when Credential::#credential{}).
 put(#credential{access_key_id = Id} = Credential) ->
     DB_1 = case get_auth_info() of
                {ok, #auth_info{db = DB}} ->
@@ -124,8 +126,8 @@ put(#credential{access_key_id = Id} = Credential) ->
 
 %% @doc Add credentials
 %%
--spec(bulk_put([#credential{}]) ->
-             ok).
+-spec(bulk_put(CredentialList) ->
+             ok when CredentialList::[#credential{}]).
 bulk_put([]) ->
     ok;
 bulk_put([Credential|Rest]) ->
@@ -135,8 +137,8 @@ bulk_put([Credential|Rest]) ->
 
 %% @doc Generate access-key-id and secret-access-key
 %%
--spec(create_key(binary()) ->
-             {ok, [tuple()]} | {error, any()}).
+-spec(create_key(UserId) ->
+             {ok, [tuple()]} | {error, any()} when UserId::binary()).
 create_key(UserId) ->
     Clock = integer_to_list(leo_date:clock()),
 
@@ -158,8 +160,10 @@ create_key(UserId) ->
 
 %% @doc Generate a credential
 %% @private
--spec(create_key_1(binary(), binary(), binary()) ->
-             {ok, [tuple()]} | {error, any()}).
+-spec(create_key_1(UserId, Digest0, Digest1) ->
+             {ok, [tuple()]} | {error, any()} when UserId::binary(),
+                                                   Digest0::binary(),
+                                                   Digest1::binary()).
 create_key_1(UserId, Digest0, Digest1) ->
     case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, Digest0) of
         {ok, _} ->
@@ -178,8 +182,8 @@ create_key_1(UserId, Digest0, Digest1) ->
 
 %% @doc Retrieve a credential from internal-db
 %%
--spec(get_credential(binary()) ->
-             {ok, #credential{}} | not_found | {error, any()}).
+-spec(get_credential(AccessKeyId) ->
+             {ok, #credential{}} | not_found | {error, any()} when AccessKeyId::binary()).
 get_credential(AccessKeyId) ->
     case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, AccessKeyId) of
         {ok, #credential{}} = Ret ->
@@ -201,8 +205,8 @@ get_credential(AccessKeyId) ->
 
 %% @doc Has a credential into the master-nodes?
 %%
--spec(has_credential(binary()) ->
-             boolean()).
+-spec(has_credential(AccessKeyId) ->
+             boolean() when AccessKeyId::binary()).
 has_credential(AccessKeyId) ->
     case get_credential(AccessKeyId) of
         {ok, _Credential} ->
@@ -211,8 +215,9 @@ has_credential(AccessKeyId) ->
             false
     end.
 
--spec(has_credential([atom()], binary()) ->
-             boolean()).
+-spec(has_credential(MasterNodes, AccessKey) ->
+             boolean() when MasterNodes::[atom()],
+                            AccessKey::binary()).
 has_credential(MasterNodes, AccessKey) ->
     Ret = lists:foldl(
             fun(Node, false) ->
@@ -231,8 +236,10 @@ has_credential(MasterNodes, AccessKey) ->
 
 %% @doc Authenticate
 %%
--spec(authenticate(binary(), #sign_params{}, boolean()) ->
-             {ok, binary()} | {error, any()}).
+-spec(authenticate(Authorization, SignParams, IsCreateBucketOp) ->
+             {ok, binary()} | {error, any()} when Authorization::binary(),
+                                                  SignParams::#sign_params{},
+                                                  IsCreateBucketOp::boolean()).
 authenticate(Authorization, #sign_params{raw_uri = <<"/">>} = SignParams, _IsCreateBucketOp) ->
     [AccWithAWS,Signature|_] = binary:split(Authorization, <<":">>),
     <<"AWS ", AccessKeyId/binary>> = AccWithAWS,
@@ -281,8 +288,10 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
                         <<"response-content-disposition">>,
                         <<"response-content-encoding">>]).
 
--spec(get_signature(binary(), #sign_params{}) ->
-             binary()).
+%% @doc Get AWS signature version 2
+-spec(get_signature(SecretAccessKey, SignParams) ->
+             binary() when SecretAccessKey::binary(),
+                           SignParams::#sign_params{}).
 get_signature(SecretAccessKey, SignParams) ->
     #sign_params{http_verb     = HTTPVerb,
                  content_md5   = ETag,
@@ -344,8 +353,9 @@ checksum() ->
 %%--------------------------------------------------------------------
 %% @doc Setup
 %% @private
--spec(setup(ets|mnesia, list()) ->
-             ok).
+-spec(setup(DB, Provider) ->
+             ok when DB::ets|mnesia,
+                     Provider::list()).
 setup(DB, Provider) ->
     true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = DB,
                                                  provider = Provider}}),
@@ -354,8 +364,8 @@ setup(DB, Provider) ->
 
 %% @doc Authenticate#1
 %% @private
--spec(authenticate_1(#auth_params{}) ->
-             {ok, binary()} | {error, any()}).
+-spec(authenticate_1(AuthParams) ->
+             {ok, binary()} | {error, any()} when AuthParams::#auth_params{}).
 authenticate_1(AuthParams) ->
     case get_auth_info() of
         {ok, AuthInfo} ->
@@ -366,8 +376,8 @@ authenticate_1(AuthParams) ->
 
 %% @doc Authenticate#2
 %% @private
--spec(authenticate_2(#auth_params{}) ->
-             {ok, binary()} | {error, any()}).
+-spec(authenticate_2(AuthParams) ->
+             {ok, binary()} | {error, any()} when AuthParams::#auth_params{}).
 authenticate_2(AuthParams) ->
     #auth_params{access_key_id = AccessKeyId,
                  auth_info     = #auth_info{db = DB}} = AuthParams,
@@ -387,8 +397,8 @@ authenticate_2(AuthParams) ->
 
 %% @doc Authenticate#3
 %% @private
--spec(authenticate_3(#auth_params{}) ->
-             {ok, binary()} | {error, any()}).
+-spec(authenticate_3(AuthParams) ->
+             {ok, binary()} | {error, any()} when AuthParams::#auth_params{}).
 authenticate_3(#auth_params{secret_access_key = SecretAccessKey,
                             access_key_id     = AccessKeyId,
                             signature         = Signature,
@@ -407,8 +417,8 @@ authenticate_3(#auth_params{secret_access_key = SecretAccessKey,
 
 %% @doc Authenticate#4
 %% @private
--spec(authenticate_4(#auth_params{}) ->
-             {ok, binary()} | {error, any()}).
+-spec(authenticate_4(AuthParams) ->
+             {ok, binary()} | {error, any()} when AuthParams::#auth_params{}).
 authenticate_4(AuthParams) ->
     #auth_params{access_key_id = AccessKeyId,
                  auth_info     = #auth_info{provider = Provider}} = AuthParams,
@@ -454,6 +464,9 @@ get_auth_info() ->
 
 %% @doc Retrieve date
 %% @private
+-spec(auth_date(Date, CannonocalizedResources) ->
+             {ok, #auth_info{}} | not_found when Date::binary(),
+                                                 CannonocalizedResources::list()).
 auth_date(Date, CannonocalizedResources) ->
     case lists:keysearch("x-amz-date", 1, CannonocalizedResources) of
         {value, _} ->
@@ -467,6 +480,10 @@ auth_date(Date, CannonocalizedResources) ->
 %% @private
 %% auth_bucket("/",_Bucket, []) -> [];
 %% auth_bucket(<<"/">>, Bucket,  _) -> << <<"/">>, Bucket >>;
+-spec(auth_bucket(URI, Bucket, QueryStr) ->
+             {ok, #auth_info{}} | not_found when URI::binary(),
+                                                 Bucket::binary(),
+                                                 QueryStr::binary()).
 auth_bucket(_, <<>>,  _) -> <<>>;
 auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 
@@ -491,6 +508,10 @@ auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 %% +-----------------+------------------------+-------------------+
 %% | <<"bucket">>    | <<"/bucket.ext">>      | <<"/bucket.ext">> |
 %% +-----------------+------------------------+-------------------+
+-spec(auth_uri(Bucket, URI, RequestedURI) ->
+             {ok, #auth_info{}} | not_found when Bucket::binary(),
+                                                 URI::binary(),
+                                                 RequestedURI::binary()).
 auth_uri(<<>>, URI,_URI) ->
     URI;
 auth_uri(_Bucket,<<"/">> = URI,_URI) ->
@@ -534,6 +555,9 @@ auth_uri(Bucket,_URI, URI) ->
 
 %% @doc remove duplicated bucket's name from path
 %% @private
+-spec(remove_duplicated_bucket(Bucket, URI) ->
+             binary() when Bucket::binary(),
+                            URI::binary()).
 remove_duplicated_bucket(Bucket, URI) ->
     SkipSize = size(Bucket) + 1,
     binary:part(URI, {SkipSize, size(URI) - SkipSize}).
@@ -541,6 +565,8 @@ remove_duplicated_bucket(Bucket, URI) ->
 
 %% @doc Retrieve resources
 %% @private
+-spec(auth_resources(CannonocalizedResources) ->
+             binary() when CannonocalizedResources::list()).
 auth_resources(CannonocalizedResources) ->
     case lists:foldl(fun({K0, V0}, Acc0) ->
                              K1 = string:to_lower(K0),
@@ -566,6 +592,8 @@ auth_resources(CannonocalizedResources) ->
 %% @doc Retrieve sub-resources
 %% @private
 %% QueryStr must be sorted lexicographically by param name at caller
+-spec(auth_sub_resources(QueryStr) ->
+             binary() when QueryStr::binary()).
 auth_sub_resources(QueryStr) ->
     ParamList = binary:split(QueryStr, [<<"?">>, <<"&">>], [global]),
     lists:foldl(fun(<<>>, Acc) ->

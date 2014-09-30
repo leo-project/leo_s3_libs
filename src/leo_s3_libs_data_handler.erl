@@ -36,8 +36,8 @@
 
 %% Retrieve all records from the table.
 %%
--spec(all({mnesia|ets, atom()}) ->
-             {ok, [_]} | not_found | {error, any()}).
+-spec(all(DBInfo) ->
+             {ok, [_]} | not_found | {error, any()} when DBInfo::{mnesia|ets, atom()}).
 all({mnesia, Table}) ->
     case catch mnesia:ets(fun ets:tab2list/1, [Table]) of
         {'EXIT', Cause} ->
@@ -63,8 +63,9 @@ all({ets, Table}) ->
 
 %% Retrieve a record by key from the table.
 %%
--spec(lookup({mnesia|ets, atom()}, any()) ->
-             {ok, any()} | not_found | {error, any()}).
+-spec(lookup(DBInfo, Id) ->
+             {ok, any()} | not_found | {error, any()} when DBInfo::{mnesia|ets, atom()},
+                                                           Id::any()).
 lookup({mnesia, Table}, Id) ->
     case catch mnesia:ets(fun ets:lookup/2, [Table, Id]) of
         [Value|_] ->
@@ -87,8 +88,10 @@ lookup({ets, Table}, Id) ->
 
 %% @doc Insert a record into the table.
 %%
--spec(insert({mnesia|ets, atom()}, {any(), any()}) ->
-             ok | {error, any()}).
+-spec(insert(DBInfo, {Id, Value}) ->
+             ok | {error, any()} when DBInfo::{mnesia|ets, atom()},
+                                      Id::any(),
+                                      Value::any()).
 insert({mnesia, Table}, {_Id, Value}) ->
     Fun = fun() -> mnesia:write(Table, Value, write) end,
     leo_mnesia:write(Fun);
@@ -103,8 +106,9 @@ insert({ets, Table}, {Id, Value}) ->
 
 %% @doc Remove a record from the table.
 %%
--spec(delete({mnesia|ets, atom()}, any()) ->
-             ok | {error, any()}).
+-spec(delete(DBInfo, Id) ->
+             ok | {error, any()} when DBInfo::{mnesia|ets, atom()},
+                                      Id::any()).
 delete({mnesia, Table}, Id) ->
     case lookup({mnesia, Table}, Id) of
         {ok, Value} ->
@@ -126,8 +130,8 @@ delete({ets, Table}, Id) ->
 
 %% @doc Retrieve total of records.
 %%
--spec(size({mnesia|ets, atom()}) ->
-             integer()).
+-spec(size(DBInfo) ->
+      integer() when DBInfo::{mnesia|ets, atom()}).
 size({mnesia, Table}) ->
     mnesia:ets(fun ets:info/2, [Table, size]);
 size({ets, Table}) ->

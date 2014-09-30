@@ -44,8 +44,9 @@
 
 %% @doc Create user-credential table(mnesia)
 %%
--spec(create_table(ram_copies|disc_copies, list()) ->
-             ok).
+-spec(create_table(Mode, Nodes) ->
+             ok when Mode::ram_copies|disc_copies,
+                     Nodes::list()).
 create_table(Mode, Nodes) ->
     {atomic, ok} =
         mnesia:create_table(
@@ -65,8 +66,8 @@ create_table(Mode, Nodes) ->
 
 %% @doc Create a user account w/access-key-id/secret-access-key
 %%
--spec(put(#user_credential{} | binary()) ->
-             ok | {ok, [tuple()]} | {error, any()}).
+-spec(put(UserCredential) ->
+             ok | {ok, [tuple()]} | {error, any()} when UserCredential::#user_credential{}|binary).
 put(UserCredential) when is_record(UserCredential, user_credential) ->
     leo_s3_libs_data_handler:insert({mnesia, ?USER_CREDENTIAL_TABLE},
                                     {[], UserCredential});
@@ -76,8 +77,9 @@ put(UserId) ->
 
 %% @doc Create a user account w/access-key-id/secret-access-key
 %%
--spec(put(binary(), non_neg_integer()) ->
-             ok | {ok, [tuple()]} | {error, any()}).
+-spec(put(UserId, CreatedAt) ->
+             ok | {ok, [tuple()]} | {error, any()} when UserId::binary(),
+                                                        CreatedAt::non_neg_integer()).
 put(UserId, CreatedAt) ->
     UserId_1 = leo_misc:any_to_binary(UserId),
 
@@ -102,8 +104,8 @@ put(UserId, CreatedAt) ->
 
 %% @doc Add buckets
 %%
--spec(bulk_put(list(#user_credential{})) ->
-             ok).
+-spec(bulk_put(UserCredentialList) ->
+             ok when UserCredentialList::list(#user_credential{})).
 bulk_put([]) ->
     ok;
 bulk_put([UserCredential|Rest]) ->
@@ -112,8 +114,8 @@ bulk_put([UserCredential|Rest]) ->
 
 
 %% @doc Remote a credential-user info
--spec(delete(binary()) ->
-             ok | {error, any()}).
+-spec(delete(UserId) ->
+             ok | {error, any()} when UserId::binary()).
 delete(UserId) ->
     leo_s3_libs_data_handler:delete(
       {mnesia, ?USER_CREDENTIAL_TABLE}, UserId).
@@ -122,8 +124,8 @@ delete(UserId) ->
 
 %% @doc Retrieve a use by access-key-id
 %%
--spec(find_by_access_key_id(binary()) ->
-             {ok, #user_credential{}} | not_found | {error, any()}).
+-spec(find_by_access_key_id(AccessKeyId) ->
+             {ok, #user_credential{}} | not_found | {error, any()} when AccessKeyId::binary()).
 find_by_access_key_id(AccessKeyId) ->
     F = fun() ->
                 Q = qlc:q([X || X <- mnesia:table(?USER_CREDENTIAL_TABLE),
@@ -187,8 +189,8 @@ find_all_with_role_1([#user_credential{user_id = UserId,
 
 %% @doc Retrieve credential by user-id
 %%
--spec(get_credential_by_user_id(binary()) ->
-             {ok, [tuple()]} | not_found | {error, any()}).
+-spec(get_credential_by_user_id(UserId) ->
+             {ok, [tuple()]} | not_found | {error, any()} when UserId::binary()).
 get_credential_by_user_id(UserId) ->
     F = fun() ->
                 Q = qlc:q([X || X <- mnesia:table(?USER_CREDENTIAL_TABLE),

@@ -46,8 +46,9 @@
 %%--------------------------------------------------------------------
 %% @doc Create user table(mnesia)
 %%
--spec(create_table(ram_copies|disc_copies, [atom()]) ->
-             ok).
+-spec(create_table(Mode, Nodes) ->
+             ok when Mode::ram_copies|disc_copies,
+                     Nodes::[atom()]).
 create_table(Mode, Nodes) ->
     {atomic, ok} =
         mnesia:create_table(
@@ -70,8 +71,8 @@ create_table(Mode, Nodes) ->
 
 %% @doc Insert a user
 %%
--spec(put(#?S3_USER{})  ->
-             ok | {error, any()}).
+-spec(put(User)  ->
+             ok | {error, any()} when User::#?S3_USER{}).
 put(#?S3_USER{id = UserId,
               updated_at = UpdatedAt_1} = User) ->
     User_1 = User#?S3_USER{id = leo_misc:any_to_binary(UserId)},
@@ -93,8 +94,10 @@ put_1(User) ->
 
 %% @doc Create a user account
 %%
--spec(put(binary(), binary(), boolean()) ->
-             ok | {ok, [tuple()]} |{error, any()}).
+-spec(put(UserId, Password, WithS3Keys) ->
+             ok | {ok, [tuple()]} |{error, any()} when UserId::binary(),
+                                                       Password::binary(),
+                                                       WithS3Keys::boolean()).
 put(UserId, Password, WithS3Keys) ->
     case find_by_id(UserId) of
         not_found ->
@@ -131,8 +134,8 @@ put_1(UserId, Password, WithS3Keys) ->
 
 %% @doc Add buckets
 %%
--spec(bulk_put([#?S3_USER{}]) ->
-             ok).
+-spec(bulk_put(UserList) ->
+             ok when UserList::[#?S3_USER{}]).
 bulk_put([]) ->
     ok;
 bulk_put([User|Rest]) ->
@@ -142,8 +145,8 @@ bulk_put([User|Rest]) ->
 
 %% @doc Update a user
 %%
--spec(update(#?S3_USER{}) ->
-             ok | {error, any()}).
+-spec(update(User) ->
+             ok | {error, any()} when User::#?S3_USER{}).
 update(#?S3_USER{id       = UserId,
                  role_id  = RoleId0,
                  password = Password0}) ->
@@ -175,8 +178,8 @@ update(#?S3_USER{id       = UserId,
 
 %% @doc Delete a user
 %%
--spec(delete(binary()) ->
-             ok | {error, any()}).
+-spec(delete(UserId) ->
+             ok | {error, any()} when UserId::binary()).
 delete(UserId) ->
     case find_by_id(UserId) of
         {ok, #?S3_USER{} = S3User} ->
@@ -198,8 +201,8 @@ delete(UserId) ->
 
 %% @doc Retrieve a user by user-id
 %%
--spec(find_by_id(binary()) ->
-             {ok, #?S3_USER{}} | not_found | {error, any()}).
+-spec(find_by_id(UserId) ->
+             {ok, #?S3_USER{}} | not_found | {error, any()} when UserId::binary()).
 find_by_id(UserId) ->
     F = fun() ->
                 Q = qlc:q([X || X <- mnesia:table(?USERS_TABLE),
@@ -233,8 +236,9 @@ find_all() ->
 
 %% @doc Retrieve owners (omit secret_key)
 %%
--spec(auth(binary(), binary()) ->
-             {ok, #?S3_USER{}} | {error, invalid_values}).
+-spec(auth(UserId, Passwd) ->
+             {ok, #?S3_USER{}} | {error, invalid_values} when UserId::binary(),
+                                                              Passwd::binary()).
 auth(UserId, PW0) ->
     case find_by_id(UserId) of
         {ok, #?S3_USER{password = PW1,
@@ -349,8 +353,9 @@ transform_3([#?S3_USER{id = Id} = User|Rest]) ->
 %%--------------------------------------------------------------------
 %% @doc Generate hash/salt-ed password
 %% @private
--spec(hash_and_salt_password(binary(), non_neg_integer()) ->
-             binary()).
+-spec(hash_and_salt_password(Password, CreatedAt) ->
+             binary() when Password::binary(),
+                           CreatedAt::non_neg_integer()).
 hash_and_salt_password(Password, CreatedAt) ->
     Salt = list_to_binary(leo_hex:integer_to_hex(CreatedAt, 8)),
     Context1 = crypto:hash_init(md5),

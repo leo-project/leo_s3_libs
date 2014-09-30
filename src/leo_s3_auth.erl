@@ -140,16 +140,15 @@ bulk_put([Credential|Rest]) ->
 -spec(create_key(UserId) ->
              {ok, [tuple()]} | {error, any()} when UserId::binary()).
 create_key(UserId) ->
-    Clock = integer_to_list(leo_date:clock()),
-
     case get_auth_info() of
         {ok, #auth_info{db = ets}} ->
             {error, not_generated};
         {ok, #auth_info{db = mnesia}} ->
-            ClockBin = leo_misc:any_to_binary(Clock),
-            Digest0 = list_to_binary(string:sub_string(
-                                       leo_hex:binary_to_hex(
-                                         crypto:hash(sha, term_to_binary({UserId, Clock}))),1,20)),
+            Clock    = integer_to_list(leo_date:clock()),
+            ClockBin = list_to_binary(Clock),
+            Digest0  = list_to_binary(string:sub_string(
+                                        leo_hex:binary_to_hex(
+                                          crypto:hash(sha, term_to_binary({UserId, Clock}))),1,20)),
             Digest1 = list_to_binary(leo_hex:binary_to_hex(
                                        crypto:hash(sha, << UserId/binary, "/", ClockBin/binary >> ))),
             create_key_1(UserId, Digest0, Digest1);

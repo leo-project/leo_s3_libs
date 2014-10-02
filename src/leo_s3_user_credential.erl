@@ -20,7 +20,8 @@
 %%
 %% ---------------------------------------------------------------------
 %% Leo S3 Libs - User
-%% @doc
+%% @doc The s3-user's credential record handler
+%% @reference https://github.com/leo-project/leo_s3_libs/blob/master/src/leo_s3_user_credential.erl
 %% @end
 %%======================================================================
 -module(leo_s3_user_credential).

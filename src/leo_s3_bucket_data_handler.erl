@@ -20,7 +20,8 @@
 %%
 %% ---------------------------------------------------------------------
 %% Leo S3 Libs - Bucket - ETS/Mnesia Data Handler
-%% @doc
+%% @doc The bucket record handler
+%% @reference https://github.com/leo-project/leo_s3_libs/blob/master/src/leo_s3_bucket_data_handler.erl
 %% @end
 %%======================================================================
 -module(leo_s3_bucket_data_handler).

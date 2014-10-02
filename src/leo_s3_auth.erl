@@ -20,7 +20,8 @@
 %%
 %% ---------------------------------------------------------------------
 %% Leo Libs - Auth
-%% @doc
+%% @doc The authentication API for S3-API
+%% @reference https://github.com/leo-project/leo_s3_libs/blob/master/src/leo_s3_auth.erl
 %% @end
 %%======================================================================
 -module(leo_s3_auth).
@@ -263,8 +264,6 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
     end.
 
 
-%% @doc Generate a signature.
-%% @private
 -define(SUB_RESOURCES, [<<"acl">>,
                         <<"lifecycle">>,
                         <<"location">>,

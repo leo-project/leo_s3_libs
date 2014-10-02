@@ -20,7 +20,8 @@
 %%
 %% ---------------------------------------------------------------------
 %% Leo S3 Libs
-%% @doc
+%% @doc The s3-libs API
+%% @reference https://github.com/leo-project/leo_s3_libs/blob/master/src/leo_s3_libs.erl
 %% @end
 %%======================================================================
 -module(leo_s3_libs).

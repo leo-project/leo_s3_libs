@@ -20,7 +20,8 @@
 %%
 %% ---------------------------------------------------------------------
 %% Leo S3 Libs - Bucket
-%% @doc
+%% @doc The bucket operation for S3-API
+%% @reference https://github.com/leo-project/leo_s3_libs/blob/master/src/leo_s3_bucket.erl
 %% @end
 %%======================================================================
 -module(leo_s3_bucket).

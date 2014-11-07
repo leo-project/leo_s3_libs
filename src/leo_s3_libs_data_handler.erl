@@ -20,7 +20,8 @@
 %%
 %% ---------------------------------------------------------------------
 %% Leo S3 Libs - ETS/Mnesia Data Handler
-%% @doc
+%% @doc THe s3-libs data handler
+%% @reference https://github.com/leo-project/leo_s3_libs/blob/master/src/leo_s3_libs_data_handler.erl
 %% @end
 %%======================================================================
 -module(leo_s3_libs_data_handler).

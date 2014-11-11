@@ -154,6 +154,12 @@ mnesia_suite_(_) ->
     {error, unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams0, false),
 
     %% inspect-6 - for authentication
+    _ = meck:unload(leo_s3_bucket),
+    ok = meck:new(leo_s3_bucket, [non_strict]),
+    ok = meck:expect(leo_s3_bucket, head,
+                     fun(_AccessKeyId, _Bucket) ->
+                             ok
+                     end),
     SignParams1 = #sign_params{http_verb     = <<"GET">>,
                                content_md5   = <<>>,
                                content_type  = <<>>,

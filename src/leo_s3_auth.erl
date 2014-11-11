@@ -240,7 +240,7 @@ has_credential(MasterNodes, AccessKey) ->
              {ok, binary()} | {error, any()} when Authorization::binary(),
                                                   SignParams::#sign_params{},
                                                   IsCreateBucketOp::boolean()).
-authenticate(Authorization, #sign_params{raw_uri = <<"/">>} = SignParams, _IsCreateBucketOp) ->
+authenticate(Authorization, #sign_params{bucket = <<>>} = SignParams, _IsCreateBucketOp) ->
     [AccWithAWS,Signature|_] = binary:split(Authorization, <<":">>),
     <<"AWS ", AccessKeyId/binary>> = AccWithAWS,
     authenticate_1(#auth_params{access_key_id = AccessKeyId,

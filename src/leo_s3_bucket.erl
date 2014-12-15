@@ -635,8 +635,10 @@ head(AccessKey, Bucket) ->
                           provider = Provider}} ->
             case leo_s3_bucket_data_handler:find_by_name(
                    {DB, ?BUCKET_TABLE}, AccessKey, Bucket) of
-                {ok, _Value} ->
+                {ok, #?BUCKET{del = false} = _Value} ->
                     ok;
+                {ok, _Value} ->
+                    not_found;
                 not_found when Type == slave->
                     case head(AccessKey, Bucket, DB, Provider) of
                         {ok, _} ->

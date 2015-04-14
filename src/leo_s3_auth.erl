@@ -265,6 +265,7 @@ authenticate(Authorization, #sign_params{bucket = Bucket} = SignParams, IsCreate
 
 
 -define(SUB_RESOURCES, [<<"acl">>,
+                        <<"delete">>,
                         <<"lifecycle">>,
                         <<"location">>,
                         <<"logging">>,

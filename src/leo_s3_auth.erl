@@ -262,10 +262,10 @@ authenticate(Authorization, #sign_params{sign_ver = SignVer} = SignParams, IsCre
             SignV4Params2 = #sign_v4_params{},
             {AccessKeyId2, Signature2, SignV4Params2}
     end,
+    ?debug("authenticate/3", "Access Key: ~p, Signature: ~p, SignParams: ~p, SignV4Params: ~p", [AccessKeyId, Signature, SignParams, SignV4Params]),
     authenticate_0(AccessKeyId, Signature, SignParams, SignV4Params, IsCreateBucketOp).
 
 authenticate_0(AccessKeyId, Signature, #sign_params{bucket = <<>>} = SignParams, SignV4Params, _IsCreateBucketOp) ->
-    ?debug("authenticate/3", "no_bucket Access Key: ~p, Signature: ~p, SignParams: ~p", [AccessKeyId, Signature, SignParams]),
     authenticate_1(#auth_params{access_key_id   = AccessKeyId,
                                 signature       = Signature,
                                 sign_params     = SignParams,
@@ -273,7 +273,6 @@ authenticate_0(AccessKeyId, Signature, #sign_params{bucket = <<>>} = SignParams,
                                });
 
 authenticate_0(AccessKeyId, Signature, #sign_params{bucket = Bucket} = SignParams, SignV4Params, IsCreateBucketOp) ->
-    ?debug("authenticate/3", "bucket: ~p, Access Key: ~p, Signature: ~p, SignParams: ~p", [Bucket, AccessKeyId, Signature, SignParams]),
     case {leo_s3_bucket:head(AccessKeyId, Bucket), IsCreateBucketOp} of
         {ok, false} ->
             authenticate_1(#auth_params{access_key_id   = AccessKeyId,
@@ -353,8 +352,10 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
                  _ ->
                      Hash_1
              end,
+    ?debug("get_signature_v4/3", "Hash: ~p", [Hash_2]),
 
     QueryStr_1 = list_to_binary(auth_v4_qs(QueryStr)),
+    ?debug("get_signature_v4/3", "QS: ~p", [QueryStr_1]),
 
     Request_1   = <<HTTPVerb/binary,        "\n",
                     URI_1/binary,           "\n",
@@ -459,6 +460,35 @@ setup(DB, Provider) ->
     true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = DB,
                                                  provider = Provider}}),
     ok.
+%% @doc Trim Space From Binary
+%% @private
+trim(<<>>) ->
+    <<>>;
+trim(Bin) ->
+    trim(Bin, byte_size(Bin)).
+
+trim(Bin = <<Byte:1/binary, Tail/binary>>, Size) ->
+    case is_space(Byte) of
+        true ->
+            trim(Tail, Size - 1);
+        false ->
+            trim_tail(Bin, Size)
+    end.
+
+trim_tail(Bin, Size) ->
+    SizeMinus1 = Size - 1,
+    <<Rest:SizeMinus1/binary, Byte:1/binary>> = Bin,
+    case is_space(Byte) of
+        true ->
+            trim_tail(Rest, Size - 1);
+        false ->
+            Bin
+    end.
+
+is_space(<<" ">>) ->
+    true;
+is_space(_) ->
+    false.
 
 %% @doc Extract Signature V4 Params to Record
 %% @private
@@ -470,7 +500,10 @@ extract_v4_params(ParamList) ->
 extract_v4_params([], #sign_v4_params{} = SignV4Params) ->
     SignV4Params;
 extract_v4_params([Head|Rest], #sign_v4_params{} = SignV4Params) ->
-    [Key, Val|_] = binary:split(Head, <<"=">>),
+    [Key2, Val2|_] = binary:split(Head, <<"=">>),
+    Key = trim(Key2),
+    Val = trim(Val2),
+
     SignV4Params2 = 
     case Key of
         <<"Credential">> ->
@@ -615,11 +648,12 @@ auth_v4_qs([], Acc) ->
 auth_v4_qs([<<>>|Rest], Acc) ->
     auth_v4_qs(Rest, Acc);
 auth_v4_qs([Head|Rest], Acc) ->
-    {Key, Val} = case binary:match(Head, <<"=">>) of
+    Head2 = list_to_binary(http_uri:decode(binary_to_list(Head))),
+    {Key, Val} = case binary:match(Head2, <<"=">>) of
                      nomatch ->
-                         {Head, <<>>};
+                         {Head2, <<>>};
                      _ ->
-                         [Key2, Val2] = binary:split(Head, <<"=">>),
+                         [Key2, Val2] = binary:split(Head2, <<"=">>),
                          {Key2, Val2}
                  end,
     KeyEnc = http_uri:encode(binary_to_list(Key)),

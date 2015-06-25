@@ -51,6 +51,8 @@
           requested_uri = <<>> :: binary(),
           query_str     = <<>> :: binary(),
           sub_resource  = <<>> :: binary(), %% [?acl" | "?location" | "?logging" | "?torrent"]
+          sign_ver      = v2   :: atom(),   %% [v2 | v4]
+          req                  :: cowboy_req:req(),
           amz_headers   = []   :: list()
          }).
 

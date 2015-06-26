@@ -243,9 +243,9 @@ has_credential(MasterNodes, AccessKey) ->
 %% @doc Authenticate
 %%
 -spec(authenticate(Authorization, SignParams, IsCreateBucketOp) ->
-             {ok, binary()} | {error, any()} when Authorization::binary(),
-                                                  SignParams::#sign_params{},
-                                                  IsCreateBucketOp::boolean()).
+             {ok, binary(), binary()} | {error, any()} when Authorization::binary(),
+                                                            SignParams::#sign_params{},
+                                                            IsCreateBucketOp::boolean()).
 authenticate(Authorization, #sign_params{sign_ver = SignVer} = SignParams, IsCreateBucketOp) ->
     {AccessKeyId, Signature, SignV4Params} = 
     case SignVer of
@@ -262,7 +262,8 @@ authenticate(Authorization, #sign_params{sign_ver = SignVer} = SignParams, IsCre
             SignV4Params2 = #sign_v4_params{},
             {AccessKeyId2, Signature2, SignV4Params2}
     end,
-    ?debug("authenticate/3", "Access Key: ~p, Signature: ~p, SignParams: ~p, SignV4Params: ~p", [AccessKeyId, Signature, SignParams, SignV4Params]),
+    ?debug("authenticate/3", "Access Key: ~p, Signature: ~p, Ver: ~p", [AccessKeyId, Signature, SignVer]),
+%    ?debug("authenticate/3", "Access Key: ~p, Signature: ~p, SignParams: ~p, SignV4Params: ~p", [AccessKeyId, Signature, SignParams, SignV4Params]),
     authenticate_0(AccessKeyId, Signature, SignParams, SignV4Params, IsCreateBucketOp).
 
 authenticate_0(AccessKeyId, Signature, #sign_params{bucket = <<>>} = SignParams, SignV4Params, _IsCreateBucketOp) ->
@@ -324,7 +325,7 @@ get_signature(SecretAccessKey, SignParams, SignV4Params) ->
         v4 ->
             get_signature_v4(SecretAccessKey, SignParams, SignV4Params);
         _ ->
-            get_signature_v2(SecretAccessKey, SignParams)
+            {get_signature_v2(SecretAccessKey, SignParams), <<>>, <<>>}
     end.
 
 %% @doc Get AWS signature version 4
@@ -342,7 +343,9 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
     #sign_v4_params{credential      = Credential,
                     signed_headers  = SignedHeaders
                    } = SignV4Params,
-    URI_1       = auth_uri(Bucket, URI, RequestedURI),
+%    URI_1       = auth_uri(Bucket, URI, RequestedURI),
+    URI_1       = URI,
+    ?debug("get_signature_v4/3", "Bucket: ~p, URI: ~p, RequestedURI: ~p, ConURI: ~p", [Bucket, URI, RequestedURI, URI_1]),
     Header_1    = auth_v4_headers(Req, SignedHeaders),
     {Hash_1, _} = cowboy_req:header(<<"x-amz-content-sha256">>, Req),
     Hash_2 = case Hash_1 of
@@ -374,10 +377,13 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
     Scope = <<Date_2/binary, "/", Region/binary, "/", Service/binary, "/aws4_request">>,
 
     RequestBin = list_to_binary(RequestHex),
-    BinToSign   = <<"AWS4-HMAC-SHA256",       "\n",
-                    Date_1/binary,            "\n",
-                    Scope/binary,             "\n",
-                    RequestBin/binary>>,
+
+    BinToSignHead   = <<Date_1/binary,            "\n",
+                        Scope/binary,             "\n">>,
+    BinToSign       = <<"AWS4-HMAC-SHA256\n",
+                        BinToSignHead/binary,
+                        RequestBin/binary>>,
+
     ?debug("get_signature_v4/3", "BinToSign: ~p", [BinToSign]),
 
     DateKey         = crypto:hmac(sha256, <<"AWS4", SecretAccessKey/binary>>, Date_2),
@@ -388,7 +394,7 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
     Singature       = crypto:hmac(sha256, SigningKey, BinToSign),
     SingatureHex    = leo_hex:binary_to_hex(Singature),
     ?debug("get_signature_v4/3", "Singature: ~p", [SingatureHex]),
-    list_to_binary(SingatureHex).
+    {list_to_binary(SingatureHex), BinToSignHead, SigningKey}.
 
 %% @doc Get AWS signature version 2
 %% @private
@@ -557,7 +563,7 @@ authenticate_2(AuthParams) ->
 %% @doc Authenticate#3
 %% @private
 -spec(authenticate_3(AuthParams) ->
-             {ok, binary()} | {error, any()} when AuthParams::#auth_params{}).
+             {ok, binary(), binary()} | {error, any()} when AuthParams::#auth_params{}).
 authenticate_3(#auth_params{secret_access_key = SecretAccessKey,
                             access_key_id     = AccessKeyId,
                             signature         = Signature,
@@ -566,9 +572,9 @@ authenticate_3(#auth_params{secret_access_key = SecretAccessKey,
                            }) ->
     %% ?debugVal({Signature, SignParams, SignV4Params}),
     case get_signature(SecretAccessKey, SignParams, SignV4Params) of
-        Signature ->
-            {ok, AccessKeyId};
-        WrongSig ->
+        {Signature, _SignHead, _SignKey} = Ret ->
+            {ok, AccessKeyId, Ret};
+        {WrongSig, _, _} ->
             error_logger:error_msg("~p,~p,~p,~p~n",
                                    [{module, ?MODULE_STRING}, {function, "authenticate_3/1"},
                                     {line, ?LINE}, {body, WrongSig}]),

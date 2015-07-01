@@ -39,6 +39,7 @@
           provider = [] :: list()  %% auth-info provides
          }).
 
+-type aws_sign_ver()    :: v2 | v4.
 %% @doc AMZ-S3-API related
 %%
 -record(sign_params, {
@@ -51,7 +52,7 @@
           requested_uri = <<>> :: binary(),
           query_str     = <<>> :: binary(),
           sub_resource  = <<>> :: binary(), %% [?acl" | "?location" | "?logging" | "?torrent"]
-          sign_ver      = v2   :: atom(),   %% [v2 | v4]
+          sign_ver      = v2   :: aws_sign_ver(),   %% [v2 | v4]
           req                  :: cowboy_req:req(),
           amz_headers   = []   :: list()
          }).

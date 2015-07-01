@@ -262,7 +262,7 @@ authenticate(Authorization, #sign_params{sign_ver = SignVer} = SignParams, IsCre
             SignV4Params2 = #sign_v4_params{},
             {AccessKeyId2, Signature2, SignV4Params2}
     end,
-    ?debug("authenticate/3", "Access Key: ~p, Signature: ~p, Ver: ~p", [AccessKeyId, Signature, SignVer]),
+%    ?debug("authenticate/3", "Access Key: ~p, Signature: ~p, Ver: ~p", [AccessKeyId, Signature, SignVer]),
 %    ?debug("authenticate/3", "Access Key: ~p, Signature: ~p, SignParams: ~p, SignV4Params: ~p", [AccessKeyId, Signature, SignParams, SignV4Params]),
     authenticate_0(AccessKeyId, Signature, SignParams, SignV4Params, IsCreateBucketOp).
 
@@ -320,7 +320,7 @@ authenticate_0(AccessKeyId, Signature, #sign_params{bucket = Bucket} = SignParam
                            SignParams::#sign_params{},
                            SignV4Params::#sign_v4_params{}).
 get_signature(SecretAccessKey, SignParams, SignV4Params) ->
-    ?debug("get_signature/3", "Key: ~p, Sign: ~p, SignV4: ~p", [SecretAccessKey, SignParams, SignV4Params]),
+%    ?debug("get_signature/3", "Key: ~p, Sign: ~p, SignV4: ~p", [SecretAccessKey, SignParams, SignV4Params]),
     case SignParams#sign_params.sign_ver of
         v4 ->
             get_signature_v4(SecretAccessKey, SignParams, SignV4Params);
@@ -351,7 +351,7 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
                      Hash_1
              end,
 
-    QueryStr_1 = list_to_binary(auth_v4_qs(QueryStr)),
+    QueryStr_1 = auth_v4_qs(QueryStr),
 
     Request_1   = <<HTTPVerb/binary,        "\n",
                     URI/binary,             "\n",
@@ -360,7 +360,7 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
                     SignedHeaders/binary,   "\n",
                     Hash_2/binary>>,
 
-    ?debug("get_signature_v4/3", "Request: ~p", [Request_1]),
+%    ?debug("get_signature_v4/3", "Request: ~p", [Request_1]),
     RequestHash = crypto:hash(sha256, Request_1),
 
     Date_1      = auth_date(Date, AmzHeaders, v4),
@@ -376,7 +376,7 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
                         BinToSignHead/binary,
                         RequestBin/binary>>,
 
-    ?debug("get_signature_v4/3", "BinToSign: ~p", [BinToSign]),
+%    ?debug("get_signature_v4/3", "BinToSign: ~p", [BinToSign]),
 
     DateKey         = crypto:hmac(sha256, <<"AWS4", SecretAccessKey/binary>>, Date_2),
     DateRegionKey   = crypto:hmac(sha256, DateKey, Region),
@@ -385,7 +385,7 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
 
     Signature       = crypto:hmac(sha256, SigningKey, BinToSign),
     SignatureBin    = leo_hex:binary_to_hexbin(Signature),
-    ?debug("get_signature_v4/3", "Signature: ~p", [SignatureBin]),
+%    ?debug("get_signature_v4/3", "Signature: ~p", [SignatureBin]),
     {SignatureBin, BinToSignHead, SigningKey}.
 
 %% @doc Get AWS signature version 2
@@ -638,30 +638,22 @@ auth_v4_headers(Req, [Head|Rest], Acc) ->
 %% @doc Consutrct Canonical Query String
 %% @private
 auth_v4_qs(QueryStr) ->
-    List = binary:split(QueryStr, <<"&">>, [global]),
-    auth_v4_qs(List, "").
-
-auth_v4_qs([], Acc) ->
-    Acc;
-auth_v4_qs([<<>>|Rest], Acc) ->
-    auth_v4_qs(Rest, Acc);
-auth_v4_qs([Head|Rest], Acc) ->
-    Head2 = list_to_binary(http_uri:decode(binary_to_list(Head))),
-    {Key, Val} = case binary:match(Head2, <<"=">>) of
-                     nomatch ->
-                         {Head2, <<>>};
-                     _ ->
-                         [Key2, Val2] = binary:split(Head2, <<"=">>),
-                         {Key2, Val2}
-                 end,
-    KeyEnc = http_uri:encode(binary_to_list(Key)),
-    ValEnc = http_uri:encode(binary_to_list(Val)),
-    case Acc of
-        "" ->
-            auth_v4_qs(Rest, lists:append([KeyEnc, "=", ValEnc]));
-        Acc ->
-            auth_v4_qs(Rest, lists:append([Acc, "&", KeyEnc, "=", ValEnc]))
-    end.
+    List = cow_qs:parse_qs(QueryStr),
+    lists:foldl(fun({Key, Val}, Acc) ->
+                        KeyBin = cow_qs:urlencode(Key),
+                        ValBin = case Val of
+                                     true ->
+                                         <<>>;
+                                     _ ->
+                                         cow_qs:urlencode(Val)
+                                 end,
+                        case Acc of
+                            <<>> ->
+                                <<KeyBin/binary, "=", ValBin/binary>>;
+                            _ ->
+                                <<Acc/binary, "&", KeyBin/binary, "=", ValBin/binary>>
+                        end
+                end, <<>>, List).
 
 %% @doc Retrieve date
 %% @private

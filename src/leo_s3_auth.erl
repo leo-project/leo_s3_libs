@@ -333,9 +333,7 @@ get_signature(SecretAccessKey, SignParams, SignV4Params) ->
 get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
     #sign_params{http_verb      = HTTPVerb,
                  date           = Date,
-                 bucket         = Bucket,
                  raw_uri        = URI,
-                 requested_uri  = RequestedURI,
                  query_str      = QueryStr,
                  req            = Req,
                  amz_headers    = AmzHeaders
@@ -343,9 +341,6 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
     #sign_v4_params{credential      = Credential,
                     signed_headers  = SignedHeaders
                    } = SignV4Params,
-%    URI_1       = auth_uri(Bucket, URI, RequestedURI),
-    URI_1       = URI,
-    ?debug("get_signature_v4/3", "Bucket: ~p, URI: ~p, RequestedURI: ~p, ConURI: ~p", [Bucket, URI, RequestedURI, URI_1]),
     Header_1    = auth_v4_headers(Req, SignedHeaders),
     {Hash_1, _} = cowboy_req:header(<<"x-amz-content-sha256">>, Req),
     Hash_2 = case Hash_1 of
@@ -355,13 +350,11 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
                  _ ->
                      Hash_1
              end,
-    ?debug("get_signature_v4/3", "Hash: ~p", [Hash_2]),
 
     QueryStr_1 = list_to_binary(auth_v4_qs(QueryStr)),
-    ?debug("get_signature_v4/3", "QS: ~p", [QueryStr_1]),
 
     Request_1   = <<HTTPVerb/binary,        "\n",
-                    URI_1/binary,           "\n",
+                    URI/binary,             "\n",
                     QueryStr_1/binary,      "\n",
                     Header_1/binary,        "\n",
                     SignedHeaders/binary,   "\n",
@@ -369,14 +362,13 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
 
     ?debug("get_signature_v4/3", "Request: ~p", [Request_1]),
     RequestHash = crypto:hash(sha256, Request_1),
-    RequestHex  = leo_hex:binary_to_hex(RequestHash),
 
     Date_1      = auth_date(Date, AmzHeaders, v4),
     [_AWSAccessKeyId, Date_2, Region, Service, <<"aws4_request">>] = binary:split(Credential, <<"/">>, [global]),
 
     Scope = <<Date_2/binary, "/", Region/binary, "/", Service/binary, "/aws4_request">>,
 
-    RequestBin = list_to_binary(RequestHex),
+    RequestBin = leo_hex:binary_to_hexbin(RequestHash),
 
     BinToSignHead   = <<Date_1/binary,            "\n",
                         Scope/binary,             "\n">>,
@@ -391,10 +383,10 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
     DateRegionServiceKey = crypto:hmac(sha256, DateRegionKey, Service),
     SigningKey      = crypto:hmac(sha256, DateRegionServiceKey, <<"aws4_request">>),
 
-    Singature       = crypto:hmac(sha256, SigningKey, BinToSign),
-    SingatureHex    = leo_hex:binary_to_hex(Singature),
-    ?debug("get_signature_v4/3", "Singature: ~p", [SingatureHex]),
-    {list_to_binary(SingatureHex), BinToSignHead, SigningKey}.
+    Signature       = crypto:hmac(sha256, SigningKey, BinToSign),
+    SignatureBin    = leo_hex:binary_to_hexbin(Signature),
+    ?debug("get_signature_v4/3", "Signature: ~p", [SignatureBin]),
+    {SignatureBin, BinToSignHead, SigningKey}.
 
 %% @doc Get AWS signature version 2
 %% @private

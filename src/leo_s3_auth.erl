@@ -335,23 +335,20 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
                  date           = Date,
                  raw_uri        = URI,
                  query_str      = QueryStr,
-                 req            = Req,
-                 amz_headers    = AmzHeaders
+                 headers        = Headers
                 } = SignParams,
     #sign_v4_params{credential      = Credential,
                     signed_headers  = SignedHeaders
                    } = SignV4Params,
-    Header_1    = auth_v4_headers(Req, SignedHeaders),
-    {Hash_1, _} = cowboy_req:header(<<"x-amz-content-sha256">>, Req),
-    Hash_2 = case Hash_1 of
-                 undefined ->
-                     %% Empty Payload
-                     <<"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855">>;
-                 _ ->
-                     Hash_1
-             end,
+    Header_1    = auth_v4_headers(Headers, SignedHeaders),
+    Hash_2      = case lists:keyfind(<<"x-amz-content-sha256">>, 1, Headers) of
+                      false ->
+                          <<"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855">>;
+                      {_, Hash_1} ->
+                          Hash_1
+                  end,
 
-    QueryStr_1 = auth_v4_qs(QueryStr),
+    QueryStr_1  = auth_v4_qs(QueryStr),
 
     Request_1   = <<HTTPVerb/binary,        "\n",
                     URI/binary,             "\n",
@@ -363,7 +360,7 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
 %    ?debug("get_signature_v4/3", "Request: ~p", [Request_1]),
     RequestHash = crypto:hash(sha256, Request_1),
 
-    Date_1      = auth_date(Date, AmzHeaders, v4),
+    Date_1      = auth_v4_date(Date, Headers),
     [_AWSAccessKeyId, Date_2, Region, Service, <<"aws4_request">>] = binary:split(Credential, <<"/">>, [global]),
 
     Scope = <<Date_2/binary, "/", Region/binary, "/", Service/binary, "/aws4_request">>,
@@ -402,7 +399,7 @@ get_signature_v2(SecretAccessKey, SignParams) ->
                  amz_headers   = AmzHeaders
                 } = SignParams,
 
-    Date_1  = auth_date(Date, AmzHeaders, v2),
+    Date_1  = auth_date(Date, AmzHeaders),
     Sub_1   = auth_resources(AmzHeaders),
     Sub_2   = auth_sub_resources(QueryStr),
     Bucket1 = auth_bucket(URI, Bucket, QueryStr),
@@ -622,18 +619,20 @@ get_auth_info() ->
 
 %% @doc Construct Canonical Headers
 %% @private
-auth_v4_headers(Req, SignedHeaders) ->
+auth_v4_headers(Headers, SignedHeaders) ->
     HeaderList = binary:split(SignedHeaders, <<";">>, [global]),
-    auth_v4_headers(Req, HeaderList, <<>>).
+    auth_v4_headers(Headers, HeaderList, <<>>).
 
-auth_v4_headers(_Req, [], Acc) ->
+auth_v4_headers(_Headers, [], Acc) ->
     Acc;
-auth_v4_headers(Req, [Head|Rest], Acc) ->
-    Val = case cowboy_req:header(Head, Req) of
-              {undefined, _} -> <<>>;
-              {Bin, _}       -> Bin
+auth_v4_headers(Headers, [Head|Rest], Acc) ->
+    Val = case lists:keyfind(Head, 1, Headers) of
+              false ->
+                  <<>>;
+              {_, Bin} ->
+                  trim(Bin)
           end,
-    auth_v4_headers(Req, Rest, <<Acc/binary, Head/binary, ":", Val/binary, "\n">>).
+    auth_v4_headers(Headers, Rest, <<Acc/binary, Head/binary, ":", Val/binary, "\n">>).
 
 %% @doc Consutrct Canonical Query String
 %% @private
@@ -654,22 +653,28 @@ auth_v4_qs(QueryStr) ->
                                 <<Acc/binary, "&", KeyBin/binary, "=", ValBin/binary>>
                         end
                 end, <<>>, List).
+%% @doc Retrieve date V4
+%%
+-spec(auth_v4_date(Date, Headers) ->
+    binary() when Date::binary(),
+                  Headers::list()).
+auth_v4_date(Date, Headers) ->
+    case lists:keyfind(<<"x-amz-date">>, 1, Headers) of
+        false ->
+            Date;
+        {<<"x-amz-date">>, Date_2} ->
+            Date_2
+    end.
 
 %% @doc Retrieve date
 %% @private
--spec(auth_date(Date, CannonocalizedResources, SignVer) ->
+-spec(auth_date(Date, CannonocalizedResources) ->
              binary() when Date::binary(),
-                           CannonocalizedResources::list(),
-                           SignVer::atom()).
-auth_date(Date, CannonocalizedResources, SignVer) ->
+                           CannonocalizedResources::list()).
+auth_date(Date, CannonocalizedResources) ->
     case lists:keysearch("x-amz-date", 1, CannonocalizedResources) of
-        {value, {"x-amz-date", AmzDate}} ->
-            case SignVer of
-                v4 ->
-                    list_to_binary(AmzDate);
-                _ ->
-                    <<>>
-            end;
+        {value, _} ->
+            <<>>;
         false ->
             << Date/binary >>
     end.

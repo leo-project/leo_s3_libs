@@ -34,7 +34,7 @@
 -include("leo_s3_user.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
--include_lib("leo_logger/include/leo_logger.hrl").
+%-include_lib("leo_logger/include/leo_logger.hrl").
 
 -export([start/2,
          create_table/2, put/1, bulk_put/1,
@@ -319,14 +319,12 @@ authenticate_0(AccessKeyId, Signature, #sign_params{bucket = Bucket} = SignParam
              binary() when SecretAccessKey::binary(),
                            SignParams::#sign_params{},
                            SignV4Params::#sign_v4_params{}).
-get_signature(SecretAccessKey, SignParams, SignV4Params) ->
-%    ?debug("get_signature/3", "Key: ~p, Sign: ~p, SignV4: ~p", [SecretAccessKey, SignParams, SignV4Params]),
-    case SignParams#sign_params.sign_ver of
-        v4 ->
-            get_signature_v4(SecretAccessKey, SignParams, SignV4Params);
-        _ ->
-            {get_signature_v2(SecretAccessKey, SignParams), <<>>, <<>>}
-    end.
+get_signature(SecretAccessKey, #sign_params{sign_ver = v2} = SignParams, _SignV4Params) ->
+%    ?debug("get_signature/3", "[V2] Key: ~p, Sign: ~p", [SecretAccessKey, SignParams]),
+    {get_signature_v2(SecretAccessKey, SignParams), <<>>, <<>>};
+get_signature(SecretAccessKey, #sign_params{sign_ver = v4} = SignParams, SignV4Params) ->
+%    ?debug("get_signature/3", "[V4] Key: ~p, Sign: ~p, SignV4: ~p", [SecretAccessKey, SignParams, SignV4Params]),
+    get_signature_v4(SecretAccessKey, SignParams, SignV4Params).
 
 %% @doc Get AWS signature version 4
 %% @private
@@ -455,35 +453,6 @@ setup(DB, Provider) ->
     true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = DB,
                                                  provider = Provider}}),
     ok.
-%% @doc Trim Space From Binary
-%% @private
-trim(<<>>) ->
-    <<>>;
-trim(Bin) ->
-    trim(Bin, byte_size(Bin)).
-
-trim(Bin = <<Byte:1/binary, Tail/binary>>, Size) ->
-    case is_space(Byte) of
-        true ->
-            trim(Tail, Size - 1);
-        false ->
-            trim_tail(Bin, Size)
-    end.
-
-trim_tail(Bin, Size) ->
-    SizeMinus1 = Size - 1,
-    <<Rest:SizeMinus1/binary, Byte:1/binary>> = Bin,
-    case is_space(Byte) of
-        true ->
-            trim_tail(Rest, Size - 1);
-        false ->
-            Bin
-    end.
-
-is_space(<<" ">>) ->
-    true;
-is_space(_) ->
-    false.
 
 %% @doc Extract Signature V4 Params to Record
 %% @private
@@ -496,8 +465,8 @@ extract_v4_params([], #sign_v4_params{} = SignV4Params) ->
     SignV4Params;
 extract_v4_params([Head|Rest], #sign_v4_params{} = SignV4Params) ->
     [Key2, Val2|_] = binary:split(Head, <<"=">>),
-    Key = trim(Key2),
-    Val = trim(Val2),
+    Key = leo_hex:binary_trim(Key2),
+    Val = leo_hex:binary_trim(Val2),
 
     SignV4Params2 = 
     case Key of
@@ -630,7 +599,7 @@ auth_v4_headers(Headers, [Head|Rest], Acc) ->
               false ->
                   <<>>;
               {_, Bin} ->
-                  trim(Bin)
+                  leo_hex:binary_trim(Bin)
           end,
     auth_v4_headers(Headers, Rest, <<Acc/binary, Head/binary, ":", Val/binary, "\n">>).
 

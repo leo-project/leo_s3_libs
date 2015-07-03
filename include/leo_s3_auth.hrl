@@ -57,3 +57,7 @@
           amz_headers   = []   :: list()
          }).
 
+-record(sign_v4_params, {credential     :: binary(),
+                         signature      :: binary(),
+                         signed_headers :: binary()
+                        }).

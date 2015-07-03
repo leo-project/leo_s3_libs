@@ -44,11 +44,6 @@
          find_all/0, checksum/0
         ]).
 
-
--record(sign_v4_params, {credential     :: binary(),
-                         signature      :: binary(),
-                         signed_headers :: binary()
-                        }).
 -record(auth_params, {access_key_id     :: binary(),
                       secret_access_key :: binary(),
                       signature         :: binary(),
@@ -319,12 +314,12 @@ authenticate_0(AccessKeyId, Signature, #sign_params{bucket = Bucket} = SignParam
              binary() when SecretAccessKey::binary(),
                            SignParams::#sign_params{},
                            SignV4Params::#sign_v4_params{}).
-get_signature(SecretAccessKey, #sign_params{sign_ver = v2} = SignParams, _SignV4Params) ->
-%    ?debug("get_signature/3", "[V2] Key: ~p, Sign: ~p", [SecretAccessKey, SignParams]),
-    {get_signature_v2(SecretAccessKey, SignParams), <<>>, <<>>};
 get_signature(SecretAccessKey, #sign_params{sign_ver = v4} = SignParams, SignV4Params) ->
 %    ?debug("get_signature/3", "[V4] Key: ~p, Sign: ~p, SignV4: ~p", [SecretAccessKey, SignParams, SignV4Params]),
-    get_signature_v4(SecretAccessKey, SignParams, SignV4Params).
+    get_signature_v4(SecretAccessKey, SignParams, SignV4Params);
+get_signature(SecretAccessKey, SignParams, _SignV4Params) ->
+%    ?debug("get_signature/3", "[V2] Key: ~p, Sign: ~p", [SecretAccessKey, SignParams]),
+    {get_signature_v2(SecretAccessKey, SignParams), <<>>, <<>>}.
 
 %% @doc Get AWS signature version 4
 %% @private
@@ -355,7 +350,7 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
                     SignedHeaders/binary,   "\n",
                     Hash_2/binary>>,
 
-%    ?debug("get_signature_v4/3", "Request: ~p", [Request_1]),
+%%    ?debugVal(binary_to_list(Request_1)),
     RequestHash = crypto:hash(sha256, Request_1),
 
     Date_1      = auth_v4_date(Date, Headers),
@@ -371,7 +366,8 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
                         BinToSignHead/binary,
                         RequestBin/binary>>,
 
-%    ?debug("get_signature_v4/3", "BinToSign: ~p", [BinToSign]),
+    
+%%    ?debugVal(binary_to_list(BinToSign)),
 
     DateKey         = crypto:hmac(sha256, <<"AWS4", SecretAccessKey/binary>>, Date_2),
     DateRegionKey   = crypto:hmac(sha256, DateKey, Region),
@@ -380,7 +376,7 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
 
     Signature       = crypto:hmac(sha256, SigningKey, BinToSign),
     SignatureBin    = leo_hex:binary_to_hexbin(Signature),
-%    ?debug("get_signature_v4/3", "Signature: ~p", [SignatureBin]),
+%%    ?debugVal(binary_to_list(Signature)),
     {SignatureBin, BinToSignHead, SigningKey}.
 
 %% @doc Get AWS signature version 2

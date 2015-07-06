@@ -447,7 +447,7 @@ authenticate_4_(_) ->
                               raw_uri       = <<"/photos/puppy.jpg">>,
                               requested_uri = <<"/photos/puppy.jpg">>,
                               amz_headers   = [
-                                              {"x-amz-date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
+                                               {"x-amz-date", "Tue, 27 Mar 2007 21:20:26 +0000"}]
                              },
     {Ret, _, _} = leo_s3_auth:get_signature(?AWSSecretAccessKey, SignParams, #sign_v4_params{}),
     ?assertEqual(<<"R4dJ53KECjStyBO5iTBJZ4XVOaI=">>, Ret),
@@ -738,7 +738,7 @@ authenticate_v4_2(_) ->
                                   },
     {Signature, _, _} = leo_s3_auth:get_signature(SecretAccessKey, SignParams, SignV4Params),
     Authorization = <<"AWS4-HMAC-SHA256 ",
-                      "Credential=", Credential/binary, ", ", 
+                      "Credential=", Credential/binary, ", ",
                       "SignedHeaders=", SignedHeaders/binary, ", ",
                       "Signature=", Signature/binary>>,
     {ok, AccessKeyId, _} = leo_s3_auth:authenticate(Authorization, SignParams, false),
@@ -754,9 +754,9 @@ authenticate_v4_3(_) ->
     %% Host: examplebucket.s3.amazonaws.com
     %% Date: Fri, 24 May 2013 00:00:00 GMT
     %% Authorization: SignatureToBeCalculated
-    %% Range: bytes=0-9 
+    %% Range: bytes=0-9
     %% x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-    %% x-amz-date: 20130524T000000Z 
+    %% x-amz-date: 20130524T000000Z
 
     %% == Canonical Request ==
     %% GET
@@ -768,7 +768,7 @@ authenticate_v4_3(_) ->
     %% x-amz-date:20130524T000000Z
     %%
     %% host;range;x-amz-content-sha256;x-amz-date
-    %% e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855  
+    %% e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
     %% == StringToSign ==
     %% AWS4-HMAC-SHA256
@@ -805,7 +805,7 @@ authenticate_v4_4(_) ->
     %% Date: Fri, 24 May 2013 00:00:00 GMT
     %%
     %% Authorization: SignatureToBeCalculated
-    %% x-amz-date: 20130524T000000Z 
+    %% x-amz-date: 20130524T000000Z
     %% x-amz-storage-class: REDUCED_REDUNDANCY
     %% x-amz-content-sha256: 44ce7dd67c959e0d3524ffac1771dfbba87d2b6b4b4e99e42034a8b803f8b072
     %%
@@ -858,7 +858,7 @@ authenticate_v4_5(_) ->
     %% GET ?lifecycle HTTP/1.1
     %% Host: examplebucket.s3.amazonaws.com
     %% Authorization: SignatureToBeCalculated
-    %% x-amz-date: 20130524T000000Z 
+    %% x-amz-date: 20130524T000000Z
     %% x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
     %% == Canonical Request ==
@@ -904,7 +904,7 @@ authenticate_v4_6(_) ->
     %% GET ?max-keys=2&prefix=J HTTP/1.1
     %% Host: examplebucket.s3.amazonaws.com
     %% Authorization: SignatureToBeCalculated
-    %% x-amz-date: 20130524T000000Z 
+    %% x-amz-date: 20130524T000000Z
     %% x-amz-content-sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
 
     %% == Canonical Request ==

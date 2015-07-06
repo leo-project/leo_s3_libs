@@ -34,7 +34,6 @@
 -include("leo_s3_user.hrl").
 -include_lib("eunit/include/eunit.hrl").
 -include_lib("stdlib/include/qlc.hrl").
-%-include_lib("leo_logger/include/leo_logger.hrl").
 
 -export([start/2,
          create_table/2, put/1, bulk_put/1,
@@ -242,23 +241,21 @@ has_credential(MasterNodes, AccessKey) ->
                                                             SignParams::#sign_params{},
                                                             IsCreateBucketOp::boolean()).
 authenticate(Authorization, #sign_params{sign_ver = SignVer} = SignParams, IsCreateBucketOp) ->
-    {AccessKeyId, Signature, SignV4Params} = 
-    case SignVer of
-        v4 ->
-            [<<"AWS4", _Method/binary>>, Params] = binary:split(Authorization, <<" ">>),
-            ParamList = binary:split(Params, <<",">>, [global]),
-            SignV4Params2 = extract_v4_params(ParamList),
-            [AccessKeyId2|_] = binary:split(SignV4Params2#sign_v4_params.credential, <<"/">>),
-            Signature2 = SignV4Params2#sign_v4_params.signature,
-            {AccessKeyId2, Signature2, SignV4Params2};
-        _ ->
-            [AccWithAWS,Signature2|_] = binary:split(Authorization, <<":">>),
-            <<"AWS ", AccessKeyId2/binary>> = AccWithAWS,
-            SignV4Params2 = #sign_v4_params{},
-            {AccessKeyId2, Signature2, SignV4Params2}
-    end,
-%    ?debug("authenticate/3", "Access Key: ~p, Signature: ~p, Ver: ~p", [AccessKeyId, Signature, SignVer]),
-%    ?debug("authenticate/3", "Access Key: ~p, Signature: ~p, SignParams: ~p, SignV4Params: ~p", [AccessKeyId, Signature, SignParams, SignV4Params]),
+    {AccessKeyId, Signature, SignV4Params} =
+        case SignVer of
+            v4 ->
+                [<<"AWS4", _Method/binary>>, Params] = binary:split(Authorization, <<" ">>),
+                ParamList = binary:split(Params, <<",">>, [global]),
+                SignV4Params2 = extract_v4_params(ParamList),
+                [AccessKeyId2|_] = binary:split(SignV4Params2#sign_v4_params.credential, <<"/">>),
+                Signature2 = SignV4Params2#sign_v4_params.signature,
+                {AccessKeyId2, Signature2, SignV4Params2};
+            _ ->
+                [AccWithAWS,Signature2|_] = binary:split(Authorization, <<":">>),
+                <<"AWS ", AccessKeyId2/binary>> = AccWithAWS,
+                SignV4Params2 = #sign_v4_params{},
+                {AccessKeyId2, Signature2, SignV4Params2}
+        end,
     authenticate_0(AccessKeyId, Signature, SignParams, SignV4Params, IsCreateBucketOp).
 
 authenticate_0(AccessKeyId, Signature, #sign_params{bucket = <<>>} = SignParams, SignV4Params, _IsCreateBucketOp) ->
@@ -315,10 +312,8 @@ authenticate_0(AccessKeyId, Signature, #sign_params{bucket = Bucket} = SignParam
                            SignParams::#sign_params{},
                            SignV4Params::#sign_v4_params{}).
 get_signature(SecretAccessKey, #sign_params{sign_ver = v4} = SignParams, SignV4Params) ->
-%    ?debug("get_signature/3", "[V4] Key: ~p, Sign: ~p, SignV4: ~p", [SecretAccessKey, SignParams, SignV4Params]),
     get_signature_v4(SecretAccessKey, SignParams, SignV4Params);
 get_signature(SecretAccessKey, SignParams, _SignV4Params) ->
-%    ?debug("get_signature/3", "[V2] Key: ~p, Sign: ~p", [SecretAccessKey, SignParams]),
     {get_signature_v2(SecretAccessKey, SignParams), <<>>, <<>>}.
 
 %% @doc Get AWS signature version 4
@@ -340,9 +335,7 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
                       {_, Hash_1} ->
                           Hash_1
                   end,
-
     QueryStr_1  = auth_v4_qs(QueryStr),
-
     Request_1   = <<HTTPVerb/binary,        "\n",
                     URI/binary,             "\n",
                     QueryStr_1/binary,      "\n",
@@ -350,33 +343,23 @@ get_signature_v4(SecretAccessKey, SignParams, SignV4Params) ->
                     SignedHeaders/binary,   "\n",
                     Hash_2/binary>>,
 
-%%    ?debugVal(binary_to_list(Request_1)),
     RequestHash = crypto:hash(sha256, Request_1),
-
     Date_1      = auth_v4_date(Date, Headers),
     [_AWSAccessKeyId, Date_2, Region, Service, <<"aws4_request">>] = binary:split(Credential, <<"/">>, [global]),
-
     Scope = <<Date_2/binary, "/", Region/binary, "/", Service/binary, "/aws4_request">>,
-
     RequestBin = leo_hex:binary_to_hexbin(RequestHash),
-
-    BinToSignHead   = <<Date_1/binary,            "\n",
-                        Scope/binary,             "\n">>,
+    BinToSignHead   = <<Date_1/binary, "\n",
+                        Scope/binary,  "\n">>,
     BinToSign       = <<"AWS4-HMAC-SHA256\n",
                         BinToSignHead/binary,
                         RequestBin/binary>>,
 
-    
-%%    ?debugVal(binary_to_list(BinToSign)),
-
     DateKey         = crypto:hmac(sha256, <<"AWS4", SecretAccessKey/binary>>, Date_2),
     DateRegionKey   = crypto:hmac(sha256, DateKey, Region),
     DateRegionServiceKey = crypto:hmac(sha256, DateRegionKey, Service),
-    SigningKey      = crypto:hmac(sha256, DateRegionServiceKey, <<"aws4_request">>),
-
-    Signature       = crypto:hmac(sha256, SigningKey, BinToSign),
-    SignatureBin    = leo_hex:binary_to_hexbin(Signature),
-%%    ?debugVal(binary_to_list(Signature)),
+    SigningKey   = crypto:hmac(sha256, DateRegionServiceKey, <<"aws4_request">>),
+    Signature    = crypto:hmac(sha256, SigningKey, BinToSign),
+    SignatureBin = leo_hex:binary_to_hexbin(Signature),
     {SignatureBin, BinToSignHead, SigningKey}.
 
 %% @doc Get AWS signature version 2
@@ -392,7 +375,6 @@ get_signature_v2(SecretAccessKey, SignParams) ->
                  query_str     = QueryStr,
                  amz_headers   = AmzHeaders
                 } = SignParams,
-
     Date_1  = auth_date(Date, AmzHeaders),
     Sub_1   = auth_resources(AmzHeaders),
     Sub_2   = auth_sub_resources(QueryStr),
@@ -403,13 +385,10 @@ get_signature_v2(SecretAccessKey, SignParams) ->
                   ContentType/binary, "\n",
                   Date_1/binary,       "\n",
                   Sub_1/binary, Bucket1/binary, URI_1/binary, Sub_2/binary>>,
-    %% ?debugVal(binary_to_list(BinToSign)),
-
     Context = crypto:hmac_init(sha, SecretAccessKey),
     Context_1 = crypto:hmac_update(Context, BinToSign),
     HMac = crypto:hmac_final(Context_1),
     Signature = base64:encode(HMac),
-    %% ?debugVal(Signature),
     Signature.
 
 
@@ -464,20 +443,20 @@ extract_v4_params([Head|Rest], #sign_v4_params{} = SignV4Params) ->
     Key = leo_hex:binary_trim(Key2),
     Val = leo_hex:binary_trim(Val2),
 
-    SignV4Params2 = 
-    case Key of
-        <<"Credential">> ->
-            SignV4Params#sign_v4_params{
-              credential = Val};
-        <<"Signature">> ->
-            SignV4Params#sign_v4_params{
-              signature = Val};
-        <<"SignedHeaders">> ->
-            SignV4Params#sign_v4_params{
-              signed_headers = Val};
-        _ ->
-            SignV4Params
-    end,
+    SignV4Params2 =
+        case Key of
+            <<"Credential">> ->
+                SignV4Params#sign_v4_params{
+                  credential = Val};
+            <<"Signature">> ->
+                SignV4Params#sign_v4_params{
+                  signature = Val};
+            <<"SignedHeaders">> ->
+                SignV4Params#sign_v4_params{
+                  signed_headers = Val};
+            _ ->
+                SignV4Params
+        end,
     extract_v4_params(Rest, SignV4Params2).
 
 
@@ -524,7 +503,6 @@ authenticate_3(#auth_params{secret_access_key = SecretAccessKey,
                             sign_params       = SignParams,
                             sign_v4_params    = SignV4Params
                            }) ->
-    %% ?debugVal({Signature, SignParams, SignV4Params}),
     case get_signature(SecretAccessKey, SignParams, SignV4Params) of
         {Signature, _SignHead, _SignKey} = Ret ->
             {ok, AccessKeyId, Ret};
@@ -543,7 +521,6 @@ authenticate_3(#auth_params{secret_access_key = SecretAccessKey,
 authenticate_4(AuthParams) ->
     #auth_params{access_key_id = AccessKeyId,
                  auth_info     = #auth_info{provider = Provider}} = AuthParams,
-
     %% Retrieve auth-info from a provider
     %%
     case lists:foldl(fun(Node, [] = Acc) ->
@@ -588,6 +565,7 @@ auth_v4_headers(Headers, SignedHeaders) ->
     HeaderList = binary:split(SignedHeaders, <<";">>, [global]),
     auth_v4_headers(Headers, HeaderList, <<>>).
 
+%% @private
 auth_v4_headers(_Headers, [], Acc) ->
     Acc;
 auth_v4_headers(Headers, [Head|Rest], Acc) ->
@@ -598,6 +576,7 @@ auth_v4_headers(Headers, [Head|Rest], Acc) ->
                   leo_hex:binary_trim(Bin)
           end,
     auth_v4_headers(Headers, Rest, <<Acc/binary, Head/binary, ":", Val/binary, "\n">>).
+
 
 %% @doc Consutrct Canonical Query String
 %% @private
@@ -618,11 +597,13 @@ auth_v4_qs(QueryStr) ->
                                 <<Acc/binary, "&", KeyBin/binary, "=", ValBin/binary>>
                         end
                 end, <<>>, List).
+
+
 %% @doc Retrieve date V4
-%%
+%% @private
 -spec(auth_v4_date(Date, Headers) ->
-    binary() when Date::binary(),
-                  Headers::list()).
+             binary() when Date::binary(),
+                           Headers::list()).
 auth_v4_date(Date, Headers) ->
     case lists:keyfind(<<"x-amz-date">>, 1, Headers) of
         false ->
@@ -726,7 +707,7 @@ auth_uri(Bucket,_URI, URI) ->
 %% @private
 -spec(remove_duplicated_bucket(Bucket, URI) ->
              binary() when Bucket::binary(),
-                            URI::binary()).
+                           URI::binary()).
 remove_duplicated_bucket(Bucket, URI) ->
     SkipSize = size(Bucket) + 1,
     binary:part(URI, {SkipSize, size(URI) - SkipSize}).
@@ -796,8 +777,8 @@ auth_sub_resources(QueryStr) ->
                         end
                 end, <<>>, ParamList).
 
--ifdef(TEST).
 
+-ifdef(TEST).
 auth_uri_test() ->
     Bucket = <<"photo">>,
     <<"">> = auth_uri(Bucket, <<"/photo">>, <<"/photo">>),

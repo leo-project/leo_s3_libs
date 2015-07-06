@@ -39,7 +39,10 @@
           provider = [] :: list()  %% auth-info provides
          }).
 
--type aws_sign_ver()    :: v2 | v4.
+-define(AWS_SIGN_VER_2, 'v2').
+-define(AWS_SIGN_VER_4, 'v4').
+-type aws_sign_ver()  :: ?AWS_SIGN_VER_2 | ?AWS_SIGN_VER_4.
+
 %% @doc AMZ-S3-API related
 %%
 -record(sign_params, {

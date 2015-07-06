@@ -51,11 +51,6 @@
                       auth_info         :: #auth_info{}
                      }).
 
--define(AUTH_VER_2, 'v2').
--define(AUTH_VER_4, 'v4').
--type(auth_ver() :: ?AUTH_VER_2 |
-                    ?AUTH_VER_4).
-
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
@@ -316,24 +311,22 @@ authenticate_0(AccessKeyId, Signature, #sign_params{bucket = Bucket} = SignParam
              binary() when SecretAccessKey::binary(),
                            SignParams::#sign_params{},
                            SignV4Params::#sign_v4_params{}).
-get_signature(SecretAccessKey, #sign_params{sign_ver = v4} = SignParams, SignV4Params) ->
-    get_signature_1(?AUTH_VER_4, SecretAccessKey, SignParams, SignV4Params);
-get_signature(SecretAccessKey, SignParams, _SignV4Params) ->
-    {get_signature_1(?AUTH_VER_2, SecretAccessKey, SignParams, undefined), <<>>, <<>>}.
+get_signature(SecretAccessKey, #sign_params{sign_ver = Ver} = SignParams, SignV4Params) ->
+    get_signature_1(Ver, SecretAccessKey, SignParams, SignV4Params).
 
-%% @doc Get AWS signature version 4
+
+%% @doc Get AWS signature for v4/v2
 %% @private
 -spec(get_signature_1(AuthVer, SecretAccessKey, SignParams, SignV4Params) ->
-             {SignatureBin, BinToSignHead, SigningKey} | Signature
-                 when AuthVer::auth_ver(),
+             {SignatureBin, BinToSignHead, SigningKey}
+                 when AuthVer::aws_sign_ver(),
                       SecretAccessKey::binary(),
                       SignParams::#sign_params{},
                       SignV4Params::#sign_v4_params{}|undefined,
                       SignatureBin::binary(),
                       BinToSignHead::binary(),
-                      SigningKey::binary(),
-                      Signature::binary()).
-get_signature_1(?AUTH_VER_4, SecretAccessKey, SignParams, SignV4Params) ->
+                      SigningKey::binary()).
+get_signature_1(?AWS_SIGN_VER_4, SecretAccessKey, SignParams, SignV4Params) ->
     #sign_params{http_verb      = HTTPVerb,
                  date           = Date,
                  raw_uri        = URI,
@@ -369,15 +362,15 @@ get_signature_1(?AUTH_VER_4, SecretAccessKey, SignParams, SignV4Params) ->
                         BinToSignHead/binary,
                         RequestBin/binary>>,
 
-    DateKey         = crypto:hmac(sha256, <<"AWS4", SecretAccessKey/binary>>, Date_2),
-    DateRegionKey   = crypto:hmac(sha256, DateKey, Region),
+    DateKey       = crypto:hmac(sha256, <<"AWS4", SecretAccessKey/binary>>, Date_2),
+    DateRegionKey = crypto:hmac(sha256, DateKey, Region),
     DateRegionServiceKey = crypto:hmac(sha256, DateRegionKey, Service),
     SigningKey   = crypto:hmac(sha256, DateRegionServiceKey, <<"aws4_request">>),
     Signature    = crypto:hmac(sha256, SigningKey, BinToSign),
     SignatureBin = leo_hex:binary_to_hexbin(Signature),
     {SignatureBin, BinToSignHead, SigningKey};
 
-get_signature_1(?AUTH_VER_2, SecretAccessKey, SignParams, _) ->
+get_signature_1(?AWS_SIGN_VER_2, SecretAccessKey, SignParams, _) ->
     #sign_params{http_verb     = HTTPVerb,
                  content_md5   = ETag,
                  content_type  = ContentType,
@@ -402,7 +395,7 @@ get_signature_1(?AUTH_VER_2, SecretAccessKey, SignParams, _) ->
     Context_1 = crypto:hmac_update(Context, BinToSign),
     HMac = crypto:hmac_final(Context_1),
     Signature = base64:encode(HMac),
-    Signature.
+    {Signature, <<>>, <<>>}.
 
 
 %% @doc Retrieve all records

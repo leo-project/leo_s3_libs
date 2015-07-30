@@ -308,9 +308,13 @@ authenticate_0(AccessKeyId, Signature, #sign_params{bucket = Bucket} = SignParam
                         <<"response-content-encoding">>]).
 
 -spec(get_signature(SecretAccessKey, SignParams, SignV4Params) ->
-             binary() when SecretAccessKey::binary(),
-                           SignParams::#sign_params{},
-                           SignV4Params::#sign_v4_params{}).
+             {SignatureBin, BinToSignHead, SigningKey}
+                 when SecretAccessKey::binary(),
+                      SignParams::#sign_params{},
+                      SignV4Params::#sign_v4_params{}|undefined,
+                      SignatureBin::binary(),
+                      BinToSignHead::binary(),
+                      SigningKey::binary()).
 get_signature(SecretAccessKey, #sign_params{sign_ver = Ver} = SignParams, SignV4Params) ->
     get_signature_1(Ver, SecretAccessKey, SignParams, SignV4Params).
 
@@ -438,7 +442,7 @@ setup(DB, Provider) ->
 %% @doc Extract Signature V4 Params to Record
 %% @private
 -spec(extract_v4_params(SignV4Params) ->
-             {ok, #sign_v4_params{}} | {error, any()} when SignV4Params :: list()).
+             #sign_v4_params{} when SignV4Params::[binary()]).
 extract_v4_params(ParamList) ->
     extract_v4_params(ParamList, #sign_v4_params{}).
 

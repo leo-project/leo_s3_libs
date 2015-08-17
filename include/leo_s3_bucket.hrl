@@ -2,7 +2,7 @@
 %%
 %% Leo Bucket
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -58,61 +58,93 @@
 
 %% - LeoFS-v0.14.9
 -record(bucket, {
-          name = <<>>        :: binary(), %% bucket name
-          access_key = <<>>  :: binary(), %% access-key-id
-          created_at = 0     :: integer() %% created date and time
+          name = <<>> :: binary(),       %% bucket name
+          access_key = <<>> :: binary(), %% access-key-id
+          created_at = 0 :: integer()    %% created date and time
          }).
 
 %% - LeoFS-v0.16.0 - v1.0.0-pre3
 -record(bucket_0_16_0, {
-          name = <<>>          :: binary(), %% bucket name
-          access_key_id = <<>> :: binary(), %% access-key-id
-          acls = []            :: acls(),   %% acl list
+          name = <<>> :: binary(),              %% bucket name
+          access_key_id = <<>> :: binary(),     %% access-key-id
+          acls = [] :: acls(),                  %% acl list
           last_synchroized_at = 0 :: integer(), %% last synchronized date and time
-          created_at          = 0 :: integer(), %% created date and time
-          last_modified_at    = 0 :: integer() %% modified date and time
+          created_at = 0 :: integer(),          %% created date and time
+          last_modified_at = 0 :: integer()     %% modified date and time
          }).
 
-%% - LeoFS-v1.0.0 -
+%% - LeoFS-v1.0.0 - v1.2.12
 -ifdef(TEST).
 -record(bucket_1, {
-          name = <<>>             :: binary(), %% bucket name
-          access_key_id = <<>>    :: binary(), %% access-key-id
-          acls = []               :: acls(),   %% acl list
-          cluster_id              :: atom(),   %% cluster_id
+          name = <<>> :: binary(),              %% bucket name
+          access_key_id = <<>> :: binary(),     %% access-key-id
+          acls = [] :: acls(),                  %% acl list
+          cluster_id :: atom(),                 %% cluster_id
           last_synchroized_at = 0 :: integer(), %% last synchronized date and time
-          created_at       = 0 :: integer(), %% created date and time
-          last_modified_at = 0 :: integer(), %% modified date and time
-          del = false :: boolean()   %% delete-flag
+          created_at = 0 :: integer(),          %% created date and time
+          last_modified_at = 0 :: integer(),    %% modified date and time
+          del = false :: boolean()              %% delete-flag
          }).
 -else.
 -record(bucket_1, {
-          name = <<>>             :: binary(), %% bucket name
-          access_key_id = <<>>    :: binary(), %% access-key-id
-          acls = []               :: acls(),   %% acl list
-          cluster_id              :: atom(),   %% cluster_id
-          last_synchroized_at = 0 :: integer(), %% last synchronized date and time
-          created_at       = leo_date:now() :: integer(), %% created date and time
-          last_modified_at = leo_date:now() :: integer(), %% modified date and time
-          del = false :: boolean()   %% delete-flag
+          name = <<>> :: binary(),
+          access_key_id = <<>> :: binary(),
+          acls = [] :: acls(),
+          cluster_id :: atom(),
+          last_synchroized_at = 0 :: integer(),
+          created_at = leo_date:now() :: integer(),
+          last_modified_at = leo_date:now() :: integer(),
+          del = false :: boolean()
          }).
 -endif.
-%% Current bucket-record is 'bucket_1'
--define(BUCKET, bucket_1).
+
+%% - LeoFS-v1.4.0 -
+-ifdef(TEST).
+-record(bucket_2, {
+          name = <<>> :: binary(),                    %% bucket name
+          access_key_id = <<>> :: binary(),           %% access-key-id
+          acls = [] :: acls(),                        %% acl list
+          cluster_id :: atom(),                       %% cluster_id
+          rep_method = 'copy' :: atom(),              %% replication method: [copy|erasure-code]
+          ec_method = undefined :: undefined|atom(),  %% erasure-code method: @DEPEND:leo_jerasure
+          ec_params = undefined :: undefined|tuple(), %% erasure-code params: @DEPEND:leo_jerasure
+          last_synchroized_at = 0 :: integer(),       %% last synchronized date and time
+          created_at = 0 :: integer(),                %% created date and time
+          last_modified_at = 0 :: integer(),          %% modified date and time
+          del = false :: boolean()                    %% delete-flag
+         }).
+-else.
+-record(bucket_2, {
+          name = <<>> :: binary(),
+          access_key_id = <<>> :: binary(),
+          acls = [] :: acls(),
+          cluster_id :: atom(),
+          rep_method = 'copy' :: atom(),
+          ec_method = undefined :: undefined|atom(),
+          ec_params = undefined :: undefined|tuple(),
+          last_synchroized_at = 0 :: integer(),
+          created_at = leo_date:now() :: integer(),
+          last_modified_at = leo_date:now() :: integer(),
+          del = false :: boolean()
+         }).
+-endif.
+
+%% Current bucket-record is 'bucket_2'
+-define(BUCKET, bucket_2).
 
 
 -record(bucket_info, {
-          type          :: atom(), %% [master | slave]
-          db            :: atom(), %% db-type:[ets | mnesia]
+          type :: atom(), %% [master | slave]
+          db :: atom(),   %% db-type:[ets | mnesia]
           provider = [] :: list(), %% auth-info provides
           sync_interval = 0 :: non_neg_integer() %% interval in seconrd to use syncing local records with manager's
          }).
 
 %% {Name, Owner_1, Permissions_1, CreatedAt}
 -record(bucket_dto, {
-          name = <<>>   :: binary(),  %% bucket name
-          owner         :: tuple(),   %% owner info
-          acls = []     :: acls(),    %% acl list
-          cluster_id    :: atom(),    %% cluster_id
+          name = <<>> :: binary(),    %% bucket name
+          owner :: tuple(),           %% owner info
+          acls = [] :: acls(),        %% acl list
+          cluster_id :: atom(),       %% cluster_id
           created_at = 0 :: integer() %% created date and time
          }).

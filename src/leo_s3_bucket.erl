@@ -2,7 +2,7 @@
 %%
 %% Leo S3-Libs
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -86,7 +86,7 @@ start(master = Type, _Provider, SyncInterval) ->
              ok when Providers::[atom()]).
 update_providers(Providers) ->
     true = ets:insert(?BUCKET_INFO, {1, #bucket_info{type = slave,
-                                                     db   = ets,
+                                                     db = ets,
                                                      provider = Providers}}),
     ok.
 
@@ -314,9 +314,9 @@ find_all_including_owner_1([#?BUCKET{name = Name,
             _ ->
                 #user_credential{}
         end,
-    find_all_including_owner_1(Rest, [#bucket_dto{name       = Name,
-                                                  owner      = Owner_1,
-                                                  acls       = ACLs,
+    find_all_including_owner_1(Rest, [#bucket_dto{name = Name,
+                                                  owner = Owner_1,
+                                                  acls = ACLs,
                                                   cluster_id = ClusterId,
                                                   created_at = CreatedAt}|Acc]);
 find_all_including_owner_1([_Other|Rest], Acc) ->
@@ -533,7 +533,7 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
                                                                acls = ACLs,
                                                                cluster_id = ClusterId,
                                                                last_synchroized_at = Now,
-                                                               last_modified_at    = Now,
+                                                               last_modified_at = Now,
                                                                created_at = CreatedAt});
                 Error ->
                     Error
@@ -630,8 +630,8 @@ get_acls(Bucket) ->
                                                   Bucket::binary()).
 head(AccessKey, Bucket) ->
     case get_info() of
-        {ok, #bucket_info{db       = DB,
-                          type     = Type,
+        {ok, #bucket_info{db = DB,
+                          type = Type,
                           provider = Provider}} ->
             case leo_s3_bucket_data_handler:find_by_name(
                    {DB, ?BUCKET_TABLE}, AccessKey, Bucket) of
@@ -698,7 +698,7 @@ change_bucket_owner(AccessKey, Bucket) ->
 
 
 change_bucket_owner_1(#bucket_info{type = Type,
-                                   db   = DB,
+                                   db = DB,
                                    provider = Provider}, AccessKey, BucketData) ->
     BucketData_1 = BucketData#?BUCKET{access_key_id = AccessKey,
                                       last_modified_at = leo_date:now()},
@@ -743,7 +743,7 @@ checksum() ->
                      SyncInterval::non_neg_integer()).
 setup(Type, DB, Provider, SyncInterval) ->
     true = ets:insert(?BUCKET_INFO, {1, #bucket_info{type = Type,
-                                                     db   = DB,
+                                                     db = DB,
                                                      provider = Provider,
                                                      sync_interval= SyncInterval}}),
     ok.
@@ -772,8 +772,6 @@ put_all_values(_, []) ->
 put_all_values(DB, [H|T]) ->
     leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, H),
     put_all_values(DB, T).
-
-
 
 
 %% @doc Retrieve buckets by name
@@ -993,40 +991,45 @@ transform_1(#?BUCKET{name = Name,
                      access_key_id = AccessKey} = Bucket) ->
     Bucket#?BUCKET{name = leo_misc:any_to_binary(Name),
                    access_key_id = leo_misc:any_to_binary(AccessKey)};
-
-%% @doc migrate a record from 0.16.0 to the current version
-%% @private
 transform_1({bucket, Name, AccessKey, CreatedAt}) ->
-    #?BUCKET{name                = leo_misc:any_to_binary(Name),
-             access_key_id       = leo_misc:any_to_binary(AccessKey),
-             acls                = [],
+    #?BUCKET{name = leo_misc:any_to_binary(Name),
+             access_key_id = leo_misc:any_to_binary(AccessKey),
+             acls = [],
              last_synchroized_at = 0,
-             created_at          = CreatedAt,
-             last_modified_at    = 0};
-
-%% @doc migrate a record from 0.14.x to the current version
-%% @private
+             created_at = CreatedAt,
+             last_modified_at = 0};
 transform_1({bucket, Name, AccessKey, Acls,
              LastSynchronizedAt, CreatedAt, LastModifiedAt}) ->
-    #?BUCKET{name                = leo_misc:any_to_binary(Name),
-             access_key_id       = leo_misc:any_to_binary(AccessKey),
-             acls                = Acls,
+    #?BUCKET{name = leo_misc:any_to_binary(Name),
+             access_key_id = leo_misc:any_to_binary(AccessKey),
+             acls = Acls,
              last_synchroized_at = LastSynchronizedAt,
-             created_at          = CreatedAt,
-             last_modified_at    = LastModifiedAt};
-
-transform_1(#bucket_0_16_0{name                = Name,
-                           access_key_id       = AccessKey,
-                           acls                = Acls,
+             created_at = CreatedAt,
+             last_modified_at = LastModifiedAt};
+transform_1(#bucket_0_16_0{name = Name,
+                           access_key_id = AccessKey,
+                           acls = Acls,
                            last_synchroized_at = LastSynchronizedAt,
-                           created_at          = CreatedAt,
-                           last_modified_at    = LastModifiedAt}) ->
-    #?BUCKET{name                = leo_misc:any_to_binary(Name),
-             access_key_id       = leo_misc:any_to_binary(AccessKey),
-             acls                = Acls,
+                           created_at = CreatedAt,
+                           last_modified_at = LastModifiedAt}) ->
+    #?BUCKET{name = leo_misc:any_to_binary(Name),
+             access_key_id = leo_misc:any_to_binary(AccessKey),
+             acls = Acls,
              last_synchroized_at = LastSynchronizedAt,
-             created_at          = CreatedAt,
-             last_modified_at    = LastModifiedAt}.
+             created_at = CreatedAt,
+             last_modified_at = LastModifiedAt};
+transform_1(#bucket_1{name = Name,
+                      access_key_id = AccessKey,
+                      acls = Acls,
+                      last_synchroized_at = LastSynchronizedAt,
+                      created_at = CreatedAt,
+                      last_modified_at = LastModifiedAt}) ->
+    #?BUCKET{name = leo_misc:any_to_binary(Name),
+             access_key_id = leo_misc:any_to_binary(AccessKey),
+             acls = Acls,
+             last_synchroized_at = LastSynchronizedAt,
+             created_at = CreatedAt,
+             last_modified_at = LastModifiedAt}.
 
 
 %% @doc Transform data

@@ -2,7 +2,7 @@
 %%
 %% Leo S3 Auth
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -26,16 +26,16 @@
 %% @doc Credential data - [- LeoFS v1.0.0]
 %%
 -record(credential, {
-          access_key_id     :: binary(),
-          secret_access_key :: binary(),
-          created_at        :: integer()
+          access_key_id = <<>> :: binary(),
+          secret_access_key = <<>> :: binary(),
+          created_at = 0 :: integer()
          }).
 
 
 %% @doc Authentication Info
 %%
 -record(auth_info, {
-          db            :: atom(), %% db-type:[ets | mnesia]
+          db :: atom(), %% db-type:[ets | mnesia]
           provider = [] :: list()  %% auth-info provides
          }).
 
@@ -60,7 +60,7 @@
           amz_headers   = []   :: list()
          }).
 
--record(sign_v4_params, {credential     :: binary(),
-                         signature      :: binary(),
-                         signed_headers :: binary()
+-record(sign_v4_params, {credential = <<>> :: binary(),
+                         signature = <<>> :: binary(),
+                         signed_headers = <<>> :: binary()
                         }).

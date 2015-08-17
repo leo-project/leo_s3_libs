@@ -2,7 +2,7 @@
 %%
 %% Leo Libs
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -26,12 +26,12 @@
 %% @doc Endpoint Info
 %%
 -record(endpoint, {
-          endpoint   = <<>> :: binary(),
-          created_at = 0    :: integer()
+          endpoint = <<>> :: binary(),
+          created_at = 0 :: integer()
          }).
 
 -record(endpoint_info, {
-          type          :: atom(),  %% [master | slave]
-          db            :: atom(),  %% db-type:[ets | mnesia]
+          type :: atom(),  %% [master | slave]
+          db :: atom(),  %% db-type:[ets | mnesia]
           provider = [] :: [atom()] %% auth-info provides
          }).

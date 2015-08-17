@@ -2,7 +2,7 @@
 %%
 %% Leo S3-Libs
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -43,12 +43,12 @@
          find_all/0, checksum/0
         ]).
 
--record(auth_params, {access_key_id     :: binary(),
-                      secret_access_key :: binary(),
-                      signature         :: binary(),
-                      sign_params       :: #sign_params{},
-                      sign_v4_params    :: #sign_v4_params{},
-                      auth_info         :: #auth_info{}
+-record(auth_params, {access_key_id = <<>> :: binary(),
+                      secret_access_key = <<>> :: binary(),
+                      signature = <<>> :: binary(),
+                      sign_params = #sign_params{} :: #sign_params{},
+                      sign_v4_params = #sign_v4_params{} :: #sign_v4_params{},
+                      auth_info = #auth_info{} :: #auth_info{}
                      }).
 
 %%--------------------------------------------------------------------
@@ -81,7 +81,7 @@ start(master, Providers) ->
 -spec(update_providers(Providers) ->
              ok when Providers::[atom()]).
 update_providers(Providers) ->
-    true = ets:insert(?AUTH_INFO, {1, #auth_info{db       = ets,
+    true = ets:insert(?AUTH_INFO, {1, #auth_info{db = ets,
                                                  provider = Providers}}),
     ok.
 
@@ -331,46 +331,44 @@ get_signature(SecretAccessKey, #sign_params{sign_ver = Ver} = SignParams, SignV4
                       BinToSignHead::binary(),
                       SigningKey::binary()).
 get_signature_1(?AWS_SIGN_VER_4, SecretAccessKey, SignParams, SignV4Params) ->
-    #sign_params{http_verb      = HTTPVerb,
-                 date           = Date,
-                 raw_uri        = URI,
-                 query_str      = QueryStr,
-                 headers        = Headers
-                } = SignParams,
-    #sign_v4_params{credential      = Credential,
-                    signed_headers  = SignedHeaders
-                   } = SignV4Params,
-    Header_1    = auth_v4_headers(Headers, SignedHeaders),
-    Hash_2      = case lists:keyfind(<<"x-amz-content-sha256">>, 1, Headers) of
-                      false ->
-                          <<"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855">>;
-                      {_, Hash_1} ->
-                          Hash_1
-                  end,
-    QueryStr_1  = auth_v4_qs(QueryStr),
-    Request_1   = <<HTTPVerb/binary,        "\n",
-                    URI/binary,             "\n",
-                    QueryStr_1/binary,      "\n",
-                    Header_1/binary,        "\n",
-                    SignedHeaders/binary,   "\n",
-                    Hash_2/binary>>,
+    #sign_params{http_verb = HTTPVerb,
+                 date = Date,
+                 raw_uri = URI,
+                 query_str = QueryStr,
+                 headers = Headers} = SignParams,
+    #sign_v4_params{credential = Credential,
+                    signed_headers = SignedHeaders} = SignV4Params,
+    Header_1 = auth_v4_headers(Headers, SignedHeaders),
+    Hash_2 = case lists:keyfind(<<"x-amz-content-sha256">>, 1, Headers) of
+                 false ->
+                     <<"e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855">>;
+                 {_, Hash_1} ->
+                     Hash_1
+             end,
+    QueryStr_1 = auth_v4_qs(QueryStr),
+    Request_1 = <<HTTPVerb/binary,        "\n",
+                  URI/binary,             "\n",
+                  QueryStr_1/binary,      "\n",
+                  Header_1/binary,        "\n",
+                  SignedHeaders/binary,   "\n",
+                  Hash_2/binary>>,
 
     RequestHash = crypto:hash(sha256, Request_1),
-    Date_1      = auth_v4_date(Date, Headers),
+    Date_1 = auth_v4_date(Date, Headers),
     [_AWSAccessKeyId, Date_2, Region, Service, <<"aws4_request">>] = binary:split(Credential, <<"/">>, [global]),
     Scope = <<Date_2/binary, "/", Region/binary, "/", Service/binary, "/aws4_request">>,
     RequestBin = leo_hex:binary_to_hexbin(RequestHash),
-    BinToSignHead   = <<Date_1/binary, "\n",
-                        Scope/binary,  "\n">>,
-    BinToSign       = <<"AWS4-HMAC-SHA256\n",
-                        BinToSignHead/binary,
-                        RequestBin/binary>>,
+    BinToSignHead = <<Date_1/binary, "\n",
+                      Scope/binary,  "\n">>,
+    BinToSign = <<"AWS4-HMAC-SHA256\n",
+                  BinToSignHead/binary,
+                  RequestBin/binary>>,
 
-    DateKey       = crypto:hmac(sha256, <<"AWS4", SecretAccessKey/binary>>, Date_2),
+    DateKey = crypto:hmac(sha256, <<"AWS4", SecretAccessKey/binary>>, Date_2),
     DateRegionKey = crypto:hmac(sha256, DateKey, Region),
     DateRegionServiceKey = crypto:hmac(sha256, DateRegionKey, Service),
-    SigningKey   = crypto:hmac(sha256, DateRegionServiceKey, <<"aws4_request">>),
-    Signature    = crypto:hmac(sha256, SigningKey, BinToSign),
+    SigningKey = crypto:hmac(sha256, DateRegionServiceKey, <<"aws4_request">>),
+    Signature = crypto:hmac(sha256, SigningKey, BinToSign),
     SignatureBin = leo_hex:binary_to_hexbin(Signature),
     {SignatureBin, BinToSignHead, SigningKey};
 
@@ -385,11 +383,11 @@ get_signature_1(?AWS_SIGN_VER_2, SecretAccessKey, SignParams, _) ->
                  query_str     = QueryStr,
                  amz_headers   = AmzHeaders
                 } = SignParams,
-    Date_1  = auth_date(Date, AmzHeaders),
-    Sub_1   = auth_resources(AmzHeaders),
-    Sub_2   = auth_sub_resources(QueryStr),
+    Date_1 = auth_date(Date, AmzHeaders),
+    Sub_1 = auth_resources(AmzHeaders),
+    Sub_2 = auth_sub_resources(QueryStr),
     Bucket1 = auth_bucket(URI, Bucket, QueryStr),
-    URI_1   = auth_uri(Bucket, URI, RequestedURI),
+    URI_1 = auth_uri(Bucket, URI, RequestedURI),
     BinToSign = <<HTTPVerb/binary,    "\n",
                   ETag/binary,        "\n",
                   ContentType/binary, "\n",
@@ -456,14 +454,11 @@ extract_v4_params([Head|Rest], #sign_v4_params{} = SignV4Params) ->
     SignV4Params2 =
         case Key of
             <<"Credential">> ->
-                SignV4Params#sign_v4_params{
-                  credential = Val};
+                SignV4Params#sign_v4_params{credential = Val};
             <<"Signature">> ->
-                SignV4Params#sign_v4_params{
-                  signature = Val};
+                SignV4Params#sign_v4_params{signature = Val};
             <<"SignedHeaders">> ->
-                SignV4Params#sign_v4_params{
-                  signed_headers = Val};
+                SignV4Params#sign_v4_params{signed_headers = Val};
             _ ->
                 SignV4Params
         end,
@@ -508,10 +503,10 @@ authenticate_2(AuthParams) ->
 -spec(authenticate_3(AuthParams) ->
              {ok, binary(), binary()} | {error, any()} when AuthParams::#auth_params{}).
 authenticate_3(#auth_params{secret_access_key = SecretAccessKey,
-                            access_key_id     = AccessKeyId,
-                            signature         = Signature,
-                            sign_params       = SignParams,
-                            sign_v4_params    = SignV4Params
+                            access_key_id = AccessKeyId,
+                            signature = Signature,
+                            sign_params = SignParams,
+                            sign_v4_params = SignV4Params
                            }) ->
     case get_signature(SecretAccessKey, SignParams, SignV4Params) of
         {Signature, _SignHead, _SignKey} = Ret ->
@@ -530,7 +525,7 @@ authenticate_3(#auth_params{secret_access_key = SecretAccessKey,
              {ok, binary()} | {error, any()} when AuthParams::#auth_params{}).
 authenticate_4(AuthParams) ->
     #auth_params{access_key_id = AccessKeyId,
-                 auth_info     = #auth_info{provider = Provider}} = AuthParams,
+                 auth_info = #auth_info{provider = Provider}} = AuthParams,
     %% Retrieve auth-info from a provider
     %%
     case lists:foldl(fun(Node, [] = Acc) ->

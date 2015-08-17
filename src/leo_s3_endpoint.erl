@@ -2,7 +2,7 @@
 %%
 %% Leo S3-Libs
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -69,7 +69,7 @@ start(master = Type,_Provider) ->
              ok when Providers::[atom()]).
 update_providers(Providers) ->
     true = ets:insert(?ENDPOINT_INFO, {1, #endpoint_info{type = slave,
-                                                         db   = ets,
+                                                         db = ets,
                                                          provider = Providers}}),
     ok.
 
@@ -101,7 +101,7 @@ set_endpoint(EndPoint) ->
     case get_endpoint_info() of
         {ok, #endpoint_info{db = DB}} ->
             ok = leo_s3_libs_data_handler:insert(
-                   {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint   = leo_misc:any_to_binary(EndPoint),
+                   {DB, ?ENDPOINT_TABLE}, {EndPoint, #endpoint{endpoint = leo_misc:any_to_binary(EndPoint),
                                                                created_at = leo_date:now()}}),
             ok;
         not_found ->
@@ -159,7 +159,7 @@ checksum() ->
 %% @private
 setup(Type, DB, Provider) ->
     true = ets:insert(?ENDPOINT_INFO, {1, #endpoint_info{type = Type,
-                                                         db   = DB,
+                                                         db = DB,
                                                          provider = Provider}}),
     ok.
 
@@ -210,4 +210,3 @@ get_endpoint_info() ->
         _ ->
             not_found
     end.
-

@@ -2,7 +2,7 @@
 %%
 %% Leo S3-Libs
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -132,9 +132,8 @@ delete({ets, Table}, Id) ->
 %% @doc Retrieve total of records.
 %%
 -spec(size(DBInfo) ->
-      integer() when DBInfo::{mnesia|ets, atom()}).
+             integer() when DBInfo::{mnesia|ets, atom()}).
 size({mnesia, Table}) ->
     mnesia:ets(fun ets:info/2, [Table, size]);
 size({ets, Table}) ->
     ets:info(Table, size).
-

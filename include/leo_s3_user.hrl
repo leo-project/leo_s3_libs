@@ -2,7 +2,7 @@
 %%
 %% Leo S3 User
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -29,29 +29,28 @@
 %% @doc S3 User Info
 %% to LeoFS v1.0.0-pre3
 -record(user, {
-          id = <<>>               :: binary(),
-          password = <<>>         :: binary(),
+          id = <<>> :: binary(),
+          password = <<>> :: binary(),
           role_id = ?ROLE_GENERAL :: integer(),
-          created_at = 0          :: integer(),
-          del = false             :: boolean()
+          created_at = 0 :: integer(),
+          del = false :: boolean()
          }).
 
 %% from LeoFS v1.0.0
 -record(user_1, {
-          id = <<>>               :: binary(),
-          password = <<>>         :: binary(),
+          id = <<>> :: binary(),
+          password = <<>> :: binary(),
           role_id = ?ROLE_GENERAL :: integer(),
           created_at = leo_date:now() :: integer(),
           updated_at = leo_date:now() :: integer(),
-          del = false             :: boolean()
+          del = false :: boolean()
          }).
 -define(S3_USER, 'user_1').
 
 
 %% @doc S3 User and Credential Info
 -record(user_credential, {
-          user_id = <<>>       :: binary(),
+          user_id = <<>> :: binary(),
           access_key_id = <<>> :: binary(),
-          created_at = 0       :: integer()
+          created_at = 0  :: integer()
          }).
-

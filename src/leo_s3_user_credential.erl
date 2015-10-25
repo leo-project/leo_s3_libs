@@ -2,7 +2,7 @@
 %%
 %% Leo S3-Libs
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -90,9 +90,9 @@ put(UserId, CreatedAt) ->
 
             case leo_s3_libs_data_handler:insert(
                    {mnesia, ?USER_CREDENTIAL_TABLE},
-                   {[], #user_credential{user_id       = UserId_1,
+                   {[], #user_credential{user_id = UserId_1,
                                          access_key_id = AccessKeyId,
-                                         created_at    = CreatedAt}}) of
+                                         created_at = CreatedAt}}) of
                 ok ->
                     {ok, Keys};
                 Error ->
@@ -199,15 +199,15 @@ get_credential_by_user_id(UserId) ->
                 qlc:e(Q)
         end,
     case leo_mnesia:read(F) of
-        {ok, [#user_credential{user_id       = UserId,
+        {ok, [#user_credential{user_id = UserId,
                                access_key_id = AccessKeyId,
-                               created_at    = CreatedAt}|_]} ->
+                               created_at = CreatedAt}|_]} ->
             case leo_s3_auth:get_credential(AccessKeyId) of
                 {ok, Credential} ->
-                    {ok, [{user_id,           UserId},
-                          {access_key_id,     AccessKeyId},
+                    {ok, [{user_id, UserId},
+                          {access_key_id, AccessKeyId},
                           {secret_access_key, Credential#credential.secret_access_key},
-                          {created_at,        CreatedAt}]};
+                          {created_at, CreatedAt}]};
                 Other ->
                     Other
             end;

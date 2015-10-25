@@ -2,7 +2,7 @@
 %%
 %% Leo S3-Libs
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -88,9 +88,9 @@ get_checksums() ->
     {ok, C2} = leo_s3_bucket:checksum(),
     {ok, C3} = leo_s3_user:checksum(),
     {ok, C4} = leo_s3_user_credential:checksum(),
-    {ok, #s3_tbls_checksum{auth       = C1,
-                           bucket     = C2,
-                           user       = C3,
+    {ok, #s3_tbls_checksum{auth = C1,
+                           bucket = C2,
+                           user = C3,
                            credential = C4}}.
 
 

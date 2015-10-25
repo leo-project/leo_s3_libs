@@ -2,7 +2,7 @@
 %%
 %% Leo S3-Libs
 %%
-%% Copyright (c) 2012-2014 Rakuten, Inc.
+%% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -117,8 +117,8 @@ put_1(UserId, Password, WithS3Keys) ->
     Digest = hash_and_salt_password(Password, CreatedAt),
 
     case leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
-                                         {[], #?S3_USER{id         = UserId,
-                                                        password   = Digest,
+                                         {[], #?S3_USER{id = UserId,
+                                                        password = Digest,
                                                         created_at = CreatedAt,
                                                         updated_at = CreatedAt}}) of
         ok ->
@@ -127,7 +127,7 @@ put_1(UserId, Password, WithS3Keys) ->
                     leo_s3_user_credential:put(UserId, CreatedAt);
                 false ->
                     ok
-                end;
+            end;
         Error ->
             Error
     end.
@@ -152,21 +152,25 @@ update(#?S3_USER{id       = UserId,
                  role_id  = RoleId0,
                  password = Password0}) ->
     case find_by_id(UserId) of
-        {ok, #?S3_USER{role_id    = RoleId1,
-                       password   = Password1,
+        {ok, #?S3_USER{role_id = RoleId1,
+                       password = Password1,
                        created_at = CreatedAt}} ->
             RoleId2 = case (RoleId0 == 0) of
-                          true  -> RoleId1;
-                          false -> RoleId0
+                          true ->
+                              RoleId1;
+                          false ->
+                              RoleId0
                       end,
             Password2 = case (Password0 == <<>>) of
-                            true  -> Password1;
-                            false -> hash_and_salt_password(Password0, CreatedAt)
+                            true ->
+                                Password1;
+                            false ->
+                                hash_and_salt_password(Password0, CreatedAt)
                         end,
             leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
-                                            {[], #?S3_USER{id         = UserId,
-                                                           role_id    = RoleId2,
-                                                           password   = Password2,
+                                            {[], #?S3_USER{id = UserId,
+                                                           role_id = RoleId2,
+                                                           password = Password2,
                                                            created_at = CreatedAt,
                                                            updated_at = leo_date:now()
                                                           }});
@@ -187,7 +191,7 @@ delete(UserId) ->
             case leo_s3_libs_data_handler:insert(
                    {mnesia, ?USERS_TABLE},
                    {[], S3User#?S3_USER{updated_at = leo_date:now(),
-                                        del        = true}}) of
+                                        del = true}}) of
                 ok ->
                     ok;
                 Error ->
@@ -295,12 +299,12 @@ transform_1(#?S3_USER{id =_Id,
     User#?S3_USER{password = PwBin};
 transform_1(#user{id = Id,
                   password = Password,
-                  role_id  = RoleId,
+                  role_id = RoleId,
                   created_at = CreatedAt,
                   del = DelFlag}) ->
     #?S3_USER{id = Id,
               password = leo_misc:any_to_binary(Password),
-              role_id  = RoleId,
+              role_id = RoleId,
               created_at = CreatedAt,
               updated_at = CreatedAt,
               del = DelFlag}.

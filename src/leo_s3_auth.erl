@@ -51,6 +51,30 @@
                       auth_info = #auth_info{} :: #auth_info{}
                      }).
 
+-define(SUB_RESOURCES, [<<"acl">>,
+                        <<"delete">>,
+                        <<"lifecycle">>,
+                        <<"location">>,
+                        <<"logging">>,
+                        <<"notification">>,
+                        <<"partNumber">>,
+                        <<"policy">>,
+                        <<"requestPayment">>,
+                        <<"torrent">>,
+                        <<"uploadId">>,
+                        <<"uploads">>,
+                        <<"versionid">>,
+                        <<"versioning">>,
+                        <<"versions">>,
+                        <<"website">>,
+                        <<"response-content-type">>,
+                        <<"response-content-language">>,
+                        <<"response-expires">>,
+                        <<"response-cache-control">>,
+                        <<"response-content-disposition">>,
+                        <<"response-content-encoding">>]).
+
+
 %%--------------------------------------------------------------------
 %% API
 %%--------------------------------------------------------------------
@@ -237,9 +261,15 @@ has_credential(MasterNodes, AccessKey) ->
 %% @doc Authenticate
 %%
 -spec(authenticate(Authorization, SignParams, IsCreateBucketOp) ->
-             {ok, binary(), binary()} | {error, any()} when Authorization::binary(),
-                                                            SignParams::#sign_params{},
-                                                            IsCreateBucketOp::boolean()).
+             {ok, AccessKeyId, {Signature, SignHead, SignKey}|undefined} |
+             {error, Cause} when Authorization::binary(),
+                                 SignParams::#sign_params{},
+                                 IsCreateBucketOp::boolean(),
+                                 AccessKeyId::binary(),
+                                 Signature::binary(),
+                                 SignHead::binary(),
+                                 SignKey::binary(),
+                                 Cause::any()).
 authenticate(Authorization, #sign_params{sign_ver = SignVer} = SignParams, IsCreateBucketOp) ->
     {AccessKeyId, Signature, SignV4Params} =
         case SignVer of
@@ -256,57 +286,139 @@ authenticate(Authorization, #sign_params{sign_ver = SignVer} = SignParams, IsCre
                 SignV4Params2 = #sign_v4_params{},
                 {AccessKeyId2, Signature2, SignV4Params2}
         end,
-    authenticate_0(AccessKeyId, Signature, SignParams, SignV4Params, IsCreateBucketOp).
+    authenticate_1(AccessKeyId, Signature, SignParams, SignV4Params, IsCreateBucketOp).
 
-authenticate_0(AccessKeyId, Signature, #sign_params{bucket = <<>>} = SignParams, SignV4Params, _IsCreateBucketOp) ->
-    authenticate_1(#auth_params{access_key_id   = AccessKeyId,
-                                signature       = Signature,
-                                sign_params     = SignParams,
-                                sign_v4_params  = SignV4Params
-                               });
-
-authenticate_0(AccessKeyId, Signature, #sign_params{bucket = Bucket} = SignParams, SignV4Params, IsCreateBucketOp) ->
+%% @private
+authenticate_1(AccessKeyId, Signature, #sign_params{bucket = <<>>} = SignParams,
+               SignV4Params, _IsCreateBucketOp) ->
+    authenticate_2(#auth_params{access_key_id = AccessKeyId,
+                                signature = Signature,
+                                sign_params = SignParams,
+                                sign_v4_params = SignV4Params});
+authenticate_1(AccessKeyId, Signature, #sign_params{bucket = Bucket} = SignParams,
+               SignV4Params, IsCreateBucketOp) ->
     case {leo_s3_bucket:head(AccessKeyId, Bucket), IsCreateBucketOp} of
         {ok, false} ->
-            authenticate_1(#auth_params{access_key_id   = AccessKeyId,
-                                        signature       = Signature,
-                                        sign_params     = SignParams#sign_params{bucket = Bucket},
-                                        sign_v4_params  = SignV4Params
-                                       });
+            authenticate_2(#auth_params{access_key_id = AccessKeyId,
+                                        signature = Signature,
+                                        sign_params = SignParams#sign_params{bucket = Bucket},
+                                        sign_v4_params = SignV4Params});
         {not_found, true} ->
-            authenticate_1(#auth_params{access_key_id   = AccessKeyId,
-                                        signature       = Signature,
-                                        sign_params     = SignParams#sign_params{bucket = Bucket},
-                                        sign_v4_params  = SignV4Params
-                                       });
+            authenticate_2(#auth_params{access_key_id = AccessKeyId,
+                                        signature = Signature,
+                                        sign_params = SignParams#sign_params{bucket = Bucket},
+                                        sign_v4_params = SignV4Params});
         _Other ->
             {error, unmatch}
     end.
 
+%% @private
+-spec(authenticate_2(AuthParams) ->
+             {ok, AccessKeyId, {Signature, SignHead, SignKey}|undefined} |
+             {error, Cause} when AuthParams::#auth_params{},
+                                 AccessKeyId::binary(),
+                                 Signature::binary(),
+                                 SignHead::binary(),
+                                 SignKey::binary(),
+                                 Cause::any()).
+authenticate_2(AuthParams) ->
+    case get_auth_info() of
+        {ok, AuthInfo} ->
+            authenticate_3(AuthParams#auth_params{auth_info = AuthInfo});
+        _ ->
+            {error, not_initialized}
+    end.
 
--define(SUB_RESOURCES, [<<"acl">>,
-                        <<"delete">>,
-                        <<"lifecycle">>,
-                        <<"location">>,
-                        <<"logging">>,
-                        <<"notification">>,
-                        <<"partNumber">>,
-                        <<"policy">>,
-                        <<"requestPayment">>,
-                        <<"torrent">>,
-                        <<"uploadId">>,
-                        <<"uploads">>,
-                        <<"versionid">>,
-                        <<"versioning">>,
-                        <<"versions">>,
-                        <<"website">>,
-                        <<"response-content-type">>,
-                        <<"response-content-language">>,
-                        <<"response-expires">>,
-                        <<"response-cache-control">>,
-                        <<"response-content-disposition">>,
-                        <<"response-content-encoding">>]).
+%% @private
+-spec(authenticate_3(AuthParams) ->
+             {ok, AccessKeyId, {Signature, SignHead, SignKey}|undefined} |
+             {error, Cause} when AuthParams::#auth_params{},
+                                 AccessKeyId::binary(),
+                                 Signature::binary(),
+                                 SignHead::binary(),
+                                 SignKey::binary(),
+                                 Cause::any()).
+authenticate_3(AuthParams) ->
+    #auth_params{access_key_id = AccessKeyId,
+                 auth_info     = #auth_info{db = DB}} = AuthParams,
 
+    case leo_s3_libs_data_handler:lookup({DB, ?AUTH_TABLE}, AccessKeyId) of
+        {ok, #credential{secret_access_key = SecretAccessKey}} ->
+            authenticate_4(AuthParams#auth_params{secret_access_key = SecretAccessKey});
+        not_found when DB == ets ->
+            authenticate_5(AuthParams);
+        {error, Cause} ->
+            error_logger:error_msg("~p,~p,~p,~p~n",
+                                   [{module, ?MODULE_STRING}, {function, "authenticate_3/1"},
+                                    {line, ?LINE}, {body, Cause}]),
+            {error, unmatch}
+    end.
+
+%% @private
+-spec(authenticate_4(AuthParams) ->
+             {ok, AccessKeyId, {Signature, SignHead, SignKey}|undefined} |
+             {error, Cause} when AuthParams::#auth_params{},
+                                 AccessKeyId::binary(),
+                                 Signature::binary(),
+                                 SignHead::binary(),
+                                 SignKey::binary(),
+                                 Cause::any()).
+authenticate_4(#auth_params{secret_access_key = SecretAccessKey,
+                            access_key_id = AccessKeyId,
+                            signature = Signature,
+                            sign_params = SignParams,
+                            sign_v4_params = SignV4Params
+                           }) ->
+    case get_signature(SecretAccessKey, SignParams, SignV4Params) of
+        {Signature, _SignHead, _SignKey} = Ret ->
+            {ok, AccessKeyId, Ret};
+        {WrongSig, _, _} ->
+            error_logger:error_msg("~p,~p,~p,~p~n",
+                                   [{module, ?MODULE_STRING}, {function, "authenticate_4/1"},
+                                    {line, ?LINE}, {body, WrongSig}]),
+            {error, unmatch}
+    end.
+
+%% @private
+-spec(authenticate_5(AuthParams) ->
+             {ok, AccessKeyId, {Signature, SignHead, SignKey}|undefined} |
+             {error, Cause} when AuthParams::#auth_params{},
+                                 AccessKeyId::binary(),
+                                 Signature::binary(),
+                                 SignHead::binary(),
+                                 SignKey::binary(),
+                                 Cause::any()).
+authenticate_5(AuthParams) ->
+    #auth_params{access_key_id = AccessKeyId,
+                 auth_info = #auth_info{provider = Provider}} = AuthParams,
+    %% Retrieve auth-info from a provider
+    %%
+    case lists:foldl(fun(Node, [] = Acc) ->
+                             RPCKey = rpc:async_call(Node, leo_s3_auth, get_credential, [AccessKeyId]),
+                             case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
+                                 {value, {ok, Value}} ->
+                                     Value;
+                                 _ ->
+                                     Acc
+                             end;
+                        (_Node, Acc) ->
+                             Acc
+                     end, [], Provider) of
+        [] ->
+            error_logger:error_msg("~p,~p,~p,~p~n",
+                                   [{module, ?MODULE_STRING}, {function, "authenticate_5/1"},
+                                    {line, ?LINE}, {body, "get_credential rpc failed"}]),
+            {error, unmatch};
+        Credential ->
+            _ = leo_s3_libs_data_handler:insert({ets, ?AUTH_TABLE},{AccessKeyId, Credential}),
+            authenticate_4(
+              AuthParams#auth_params{
+                secret_access_key = Credential#credential.secret_access_key})
+    end.
+
+
+%% @doc Retrieve a signature
+%% @private
 -spec(get_signature(SecretAccessKey, SignParams, SignV4Params) ->
              {SignatureBin, BinToSignHead, SigningKey}
                  when SecretAccessKey::binary(),
@@ -319,7 +431,7 @@ get_signature(SecretAccessKey, #sign_params{sign_ver = Ver} = SignParams, SignV4
     get_signature_1(Ver, SecretAccessKey, SignParams, SignV4Params).
 
 
-%% @doc Get AWS signature for v4/v2
+%% @doc Get AWS signature for v2 or v4
 %% @private
 -spec(get_signature_1(AuthVer, SecretAccessKey, SignParams, SignV4Params) ->
              {SignatureBin, BinToSignHead, SigningKey}
@@ -463,93 +575,6 @@ extract_v4_params([Head|Rest], #sign_v4_params{} = SignV4Params) ->
                 SignV4Params
         end,
     extract_v4_params(Rest, SignV4Params2).
-
-
-%% @doc Authenticate#1
-%% @private
--spec(authenticate_1(AuthParams) ->
-             {ok, binary()} | {error, any()} when AuthParams::#auth_params{}).
-authenticate_1(AuthParams) ->
-    case get_auth_info() of
-        {ok, AuthInfo} ->
-            authenticate_2(AuthParams#auth_params{auth_info = AuthInfo});
-        _ ->
-            {error, not_initialized}
-    end.
-
-%% @doc Authenticate#2
-%% @private
--spec(authenticate_2(AuthParams) ->
-             {ok, binary()} | {error, any()} when AuthParams::#auth_params{}).
-authenticate_2(AuthParams) ->
-    #auth_params{access_key_id = AccessKeyId,
-                 auth_info     = #auth_info{db = DB}} = AuthParams,
-
-    case leo_s3_libs_data_handler:lookup({DB, ?AUTH_TABLE}, AccessKeyId) of
-        {ok, #credential{secret_access_key = SecretAccessKey}} ->
-            authenticate_3(AuthParams#auth_params{secret_access_key = SecretAccessKey});
-        not_found when DB == ets ->
-            authenticate_4(AuthParams);
-        {error, Cause} ->
-            error_logger:error_msg("~p,~p,~p,~p~n",
-                                   [{module, ?MODULE_STRING}, {function, "authenticate_2/1"},
-                                    {line, ?LINE}, {body, Cause}]),
-            {error, unmatch}
-    end.
-
-
-%% @doc Authenticate#3
-%% @private
--spec(authenticate_3(AuthParams) ->
-             {ok, binary(), binary()} | {error, any()} when AuthParams::#auth_params{}).
-authenticate_3(#auth_params{secret_access_key = SecretAccessKey,
-                            access_key_id = AccessKeyId,
-                            signature = Signature,
-                            sign_params = SignParams,
-                            sign_v4_params = SignV4Params
-                           }) ->
-    case get_signature(SecretAccessKey, SignParams, SignV4Params) of
-        {Signature, _SignHead, _SignKey} = Ret ->
-            {ok, AccessKeyId, Ret};
-        {WrongSig, _, _} ->
-            error_logger:error_msg("~p,~p,~p,~p~n",
-                                   [{module, ?MODULE_STRING}, {function, "authenticate_3/1"},
-                                    {line, ?LINE}, {body, WrongSig}]),
-            {error, unmatch}
-    end.
-
-
-%% @doc Authenticate#4
-%% @private
--spec(authenticate_4(AuthParams) ->
-             {ok, binary()} | {error, any()} when AuthParams::#auth_params{}).
-authenticate_4(AuthParams) ->
-    #auth_params{access_key_id = AccessKeyId,
-                 auth_info = #auth_info{provider = Provider}} = AuthParams,
-    %% Retrieve auth-info from a provider
-    %%
-    case lists:foldl(fun(Node, [] = Acc) ->
-                             RPCKey = rpc:async_call(Node, leo_s3_auth, get_credential, [AccessKeyId]),
-                             case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
-                                 {value, {ok, Value}} ->
-                                     Value;
-                                 _ ->
-                                     Acc
-                             end;
-                        (_Node, Acc) ->
-                             Acc
-                     end, [], Provider) of
-        [] ->
-            error_logger:error_msg("~p,~p,~p,~p~n",
-                                   [{module, ?MODULE_STRING}, {function, "authenticate_4/1"},
-                                    {line, ?LINE}, {body, "get_credential rpc failed"}]),
-            {error, unmatch};
-        Credential ->
-            _ = leo_s3_libs_data_handler:insert({ets, ?AUTH_TABLE},{AccessKeyId, Credential}),
-            authenticate_3(
-              AuthParams#auth_params{
-                secret_access_key = Credential#credential.secret_access_key})
-    end.
 
 
 %% @doc Retrieve db-type from ETS

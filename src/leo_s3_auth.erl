@@ -303,6 +303,10 @@ authenticate_1(AccessKeyId, Signature, #sign_params{bucket = Bucket} = SignParam
                                         signature = Signature,
                                         sign_params = SignParams#sign_params{bucket = Bucket},
                                         sign_v4_params = SignV4Params});
+        {ok, true} ->
+            {error, already_yours};
+        {not_found, false} ->
+            {error, not_found};
         {not_found, true} ->
             authenticate_2(#auth_params{access_key_id = AccessKeyId,
                                         signature = Signature,

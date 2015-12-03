@@ -105,7 +105,7 @@
           access_key_id = <<>> :: binary(),           %% access-key-id
           acls = [] :: acls(),                        %% acl list
           cluster_id :: atom(),                       %% cluster_id
-          rep_method = 'copy' :: atom(),              %% replication method: [copy|erasure-code]
+          redundancy_method = 'copy' :: atom(),        %% redundancy method: [copy|erasure-code]
           ec_method = undefined :: undefined|atom(),  %% erasure-code method: @DEPEND:leo_jerasure
           ec_params = undefined :: undefined|tuple(), %% erasure-code params: @DEPEND:leo_jerasure
           last_synchroized_at = 0 :: integer(),       %% last synchronized date and time
@@ -121,7 +121,7 @@
           acls = [] :: acls(),
           cluster_id :: atom(),
           %% for the erasure-coding support
-          rep_method = 'copy' :: atom(),
+          redundancy_method = 'copy' :: atom(),
           ec_method = undefined :: undefined|atom(),
           ec_params = undefined :: undefined|tuple(),
           %% timestamps and flag

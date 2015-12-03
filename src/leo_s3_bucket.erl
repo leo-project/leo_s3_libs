@@ -47,6 +47,7 @@
          put/1, put/2, put/3, put/4, put/5, bulk_put/1,
          delete/2, delete/3, head/2, head/4,
          change_bucket_owner/2,
+         set_redundancy_method/3,
          aclinfo_to_str/1,
          checksum/0
         ]).
@@ -419,8 +420,7 @@ put(AccessKey, BucketName, CannedACL, ClusterId, DB) ->
                                                        cluster_id = ClusterId,
                                                        created_at = Now,
                                                        last_modified_at = Now,
-                                                       del = false
-                                                      });
+                                                       del = false});
         Error ->
             Error
     end.
@@ -676,16 +676,16 @@ head(AccessKey, Bucket, DB, Providers) ->
                                                   Bucket::binary()).
 change_bucket_owner(AccessKey, Bucket) ->
     case get_info() of
-        {ok, #bucket_info{db       = DB,
-                          type     = Type,
+        {ok, #bucket_info{db = DB,
+                          type = Type,
                           provider = Provider} = BucketInfo} ->
             case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
                 {ok, Value_1} ->
-                    change_bucket_owner_1(BucketInfo, AccessKey, Value_1);
+                    update_bucket(BucketInfo, AccessKey, Value_1);
                 not_found when Type == slave->
                     case find_bucket_by_name_1(Bucket, DB, Provider) of
                         {ok, Value_2} ->
-                            change_bucket_owner_1(BucketInfo, AccessKey, Value_2);
+                            update_bucket(BucketInfo, AccessKey, Value_2);
                         Other ->
                             Other
                     end;
@@ -696,18 +696,19 @@ change_bucket_owner(AccessKey, Bucket) ->
             Error
     end.
 
-
-change_bucket_owner_1(#bucket_info{type = Type,
-                                   db = DB,
-                                   provider = Provider}, AccessKey, BucketData) ->
-    BucketData_1 = BucketData#?BUCKET{access_key_id = AccessKey,
-                                      last_modified_at = leo_date:now()},
+%% @doc Update the bucket
+%% @private
+update_bucket(#bucket_info{type = Type,
+                           db = DB,
+                           provider = Provider}, AccessKey, Bucket) ->
+    Bucket_1 = Bucket#?BUCKET{access_key_id = AccessKey,
+                              last_modified_at = leo_date:now()},
     case Type of
         master ->
-            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, BucketData_1);
+            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, Bucket_1);
         slave ->
             case rpc_call(Provider, leo_s3_bucket_data_handler,
-                          insert, [{mnesia, ?BUCKET_TABLE}, BucketData]) of
+                          insert, [{mnesia, ?BUCKET_TABLE}, Bucket_1]) of
                 ok ->
                     ok;
                 _ ->
@@ -715,6 +716,45 @@ change_bucket_owner_1(#bucket_info{type = Type,
             end;
         _ ->
             {error, invalid_server_type}
+    end.
+
+
+%% @doc Set redundancy method of the bucket
+-spec(set_redundancy_method(AccessKeyId, BucketName, RedMethodStr) ->
+             ok | {error, any()} when AccessKeyId::binary(),
+                                      BucketName::binary(),
+                                      RedMethodStr::string()).
+set_redundancy_method(AccessKeyId, BucketName, "copy") ->
+    set_redundancy_method_1(AccessKeyId, BucketName, 'copy');
+set_redundancy_method(AccessKeyId, BucketName, "erasure-code") ->
+    set_redundancy_method_1(AccessKeyId, BucketName, 'erasure_code');
+set_redundancy_method(_,_,_) ->
+    {error, badargs}.
+
+%% @private
+set_redundancy_method_1(AccessKeyId, BucketName, RedMethod) ->
+    case get_info() of
+        {ok, #bucket_info{db = DB,
+                          type = Type,
+                          provider = Provider} = BucketInfo} ->
+            case leo_s3_bucket_data_handler:find_by_name(
+                   {DB, ?BUCKET_TABLE}, BucketName) of
+                {ok, Bucket_1} ->
+                    update_bucket(BucketInfo, AccessKeyId,
+                                  Bucket_1#?BUCKET{redundancy_method = RedMethod});
+                not_found when Type == slave ->
+                    case find_bucket_by_name_1(BucketName, DB, Provider) of
+                        {ok, Bucket_2} ->
+                            update_bucket(BucketInfo, AccessKeyId,
+                                          Bucket_2#?BUCKET{redundancy_method = RedMethod});
+                        Other ->
+                            Other
+                    end;
+                Other ->
+                    Other
+            end;
+        Error ->
+            Error
     end.
 
 

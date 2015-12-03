@@ -115,13 +115,16 @@
          }).
 -else.
 -record(bucket_2, {
+          %% basic items
           name = <<>> :: binary(),
           access_key_id = <<>> :: binary(),
           acls = [] :: acls(),
           cluster_id :: atom(),
+          %% for the erasure-coding support
           rep_method = 'copy' :: atom(),
           ec_method = undefined :: undefined|atom(),
           ec_params = undefined :: undefined|tuple(),
+          %% timestamps and flag
           last_synchroized_at = 0 :: integer(),
           created_at = leo_date:now() :: integer(),
           last_modified_at = leo_date:now() :: integer(),

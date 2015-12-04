@@ -146,6 +146,9 @@
 %% {Name, Owner_1, Permissions_1, CreatedAt}
 -record(bucket_dto, {
           name = <<>> :: binary(),    %% bucket name
+          redundancy_method = 'copy' :: atom(), %% redundancy method
+          ec_method = undefined :: undefined|atom(), %% erasure-coding method
+          ec_params = undefined :: undefined|tuple(), %% erasure-coding params
           owner :: tuple(),           %% owner info
           acls = [] :: acls(),        %% acl list
           cluster_id :: atom(),       %% cluster_id

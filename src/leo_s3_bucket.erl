@@ -303,11 +303,13 @@ find_all_including_owner_1([], Acc) ->
     {ok, lists:reverse(Acc)};
 find_all_including_owner_1([#?BUCKET{name = Name,
                                      access_key_id = AccessKeyId,
+                                     redundancy_method = RedMethod,
+                                     ec_method = ECMethod,
+                                     ec_params = ECParams,
                                      acls = ACLs,
                                      cluster_id = ClusterId,
                                      created_at = CreatedAt,
-                                     del = false
-                                    }|Rest], Acc) ->
+                                     del = false}|Rest], Acc) ->
     Owner_1 =
         case leo_s3_user_credential:find_by_access_key_id(AccessKeyId) of
             {ok, Owner} ->
@@ -315,11 +317,15 @@ find_all_including_owner_1([#?BUCKET{name = Name,
             _ ->
                 #user_credential{}
         end,
-    find_all_including_owner_1(Rest, [#bucket_dto{name = Name,
-                                                  owner = Owner_1,
-                                                  acls = ACLs,
-                                                  cluster_id = ClusterId,
-                                                  created_at = CreatedAt}|Acc]);
+    find_all_including_owner_1(
+      Rest, [#bucket_dto{name = Name,
+                         redundancy_method = RedMethod,
+                         ec_method = ECMethod,
+                         ec_params = ECParams,
+                         owner = Owner_1,
+                         acls = ACLs,
+                         cluster_id = ClusterId,
+                         created_at = CreatedAt}|Acc]);
 find_all_including_owner_1([_Other|Rest], Acc) ->
     find_all_including_owner_1(Rest, Acc).
 

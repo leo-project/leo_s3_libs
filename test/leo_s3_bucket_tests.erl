@@ -368,7 +368,20 @@ ets_suite_(_) ->
 
     %% Set redundancy method of a bucket
     ok = leo_s3_bucket:set_redundancy_method(
-           ?ACCESS_KEY_2, ?Bucket0, "erasure-code"),
+           ?ACCESS_KEY_2, ?Bucket0, "erasure-code", 'vandrs', {4,2}),
+    ok = leo_s3_bucket:set_redundancy_method(
+           ?ACCESS_KEY_2, ?Bucket0, "erasure-code", 'cauchyrs', {6,4}),
+    ok = leo_s3_bucket:set_redundancy_method(
+           ?ACCESS_KEY_2, ?Bucket0, "erasure-code", 'liberation', {8,4}),
+    ok = leo_s3_bucket:set_redundancy_method(
+           ?ACCESS_KEY_2, ?Bucket0, "erasure-code", 'isars', {10,4}),
+    {error,badargs} = leo_s3_bucket:set_redundancy_method(
+                        ?ACCESS_KEY_2, ?Bucket0, "erasure-code", 'vandrs', {0,0}),
+    {error,badargs} = leo_s3_bucket:set_redundancy_method(
+                        ?ACCESS_KEY_2, ?Bucket0, "erasure-code", 'vandrs', {4,6}),
+    {error,badargs} = leo_s3_bucket:set_redundancy_method(
+                        ?ACCESS_KEY_2, ?Bucket0, "erasure-code", 'invalud_class', {10,4}),
+
 
     %% update_providers
     Manager2 = list_to_atom("manager_2@" ++ Hostname),

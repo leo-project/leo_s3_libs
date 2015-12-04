@@ -47,7 +47,7 @@
          put/1, put/2, put/3, put/4, put/5, bulk_put/1,
          delete/2, delete/3, head/2, head/4,
          change_bucket_owner/2,
-         set_redundancy_method/3,
+         set_redundancy_method/3, set_redundancy_method/5,
          aclinfo_to_str/1,
          checksum/0
         ]).
@@ -726,13 +726,36 @@ update_bucket(#bucket_info{type = Type,
                                       RedMethodStr::string()).
 set_redundancy_method(AccessKeyId, BucketName, "copy") ->
     set_redundancy_method_1(AccessKeyId, BucketName, 'copy');
-set_redundancy_method(AccessKeyId, BucketName, "erasure-code") ->
-    set_redundancy_method_1(AccessKeyId, BucketName, 'erasure_code');
 set_redundancy_method(_,_,_) ->
+    {error, badargs}.
+
+-spec(set_redundancy_method(AccessKeyId, BucketName, RedMethodStr, ECClass, ECParams) ->
+             ok | {error, any()} when AccessKeyId::binary(),
+                                      BucketName::binary(),
+                                      RedMethodStr::string(),
+                                      ECClass::'vandrs'|'cauchyrs'|'liberation'|'isars',
+                                      ECParams::{CodingParam_K, CodingParam_M},
+                                      CodingParam_K::pos_integer(),
+                                      CodingParam_M::pos_integer()).
+set_redundancy_method(AccessKeyId, BucketName, "erasure-code",
+                      ECClass,
+                      {CodingParam_K, CodingParam_M} = ECParams)
+  when (ECClass == 'vandrs' orelse
+        ECClass == 'cauchyrs' orelse
+        ECClass == 'liberation' orelse
+        ECClass == 'isars') andalso
+       (CodingParam_K > 0 andalso
+        CodingParam_M > 0 andalso
+        CodingParam_M < CodingParam_K) ->
+    set_redundancy_method_1(AccessKeyId, BucketName,
+                            'erasure_code', ECClass, ECParams);
+set_redundancy_method(_,_,_,_,_) ->
     {error, badargs}.
 
 %% @private
 set_redundancy_method_1(AccessKeyId, BucketName, RedMethod) ->
+    set_redundancy_method_1(AccessKeyId, BucketName, RedMethod, undefined, undefined).
+set_redundancy_method_1(AccessKeyId, BucketName, RedMethod, ECClass, ECParams) ->
     case get_info() of
         {ok, #bucket_info{db = DB,
                           type = Type,
@@ -741,12 +764,16 @@ set_redundancy_method_1(AccessKeyId, BucketName, RedMethod) ->
                    {DB, ?BUCKET_TABLE}, BucketName) of
                 {ok, Bucket_1} ->
                     update_bucket(BucketInfo, AccessKeyId,
-                                  Bucket_1#?BUCKET{redundancy_method = RedMethod});
+                                  Bucket_1#?BUCKET{redundancy_method = RedMethod,
+                                                   ec_method = ECClass,
+                                                   ec_params = ECParams});
                 not_found when Type == slave ->
                     case find_bucket_by_name_1(BucketName, DB, Provider) of
                         {ok, Bucket_2} ->
                             update_bucket(BucketInfo, AccessKeyId,
-                                          Bucket_2#?BUCKET{redundancy_method = RedMethod});
+                                          Bucket_2#?BUCKET{redundancy_method = RedMethod,
+                                                           ec_method = ECClass,
+                                                           ec_params = ECParams});
                         Other ->
                             Other
                     end;

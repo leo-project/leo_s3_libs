@@ -99,15 +99,29 @@
 -endif.
 
 %% - LeoFS-v1.4.0 -
+-type(num_of_replicas() :: pos_integer()).
+-type(num_of_successful_write() :: pos_integer()).
+-type(num_of_successful_read() :: pos_integer()).
+-type(num_of_successful_delete() :: pos_integer()).
+-type(cp_params() :: {num_of_replicas(),
+                      num_of_successful_write(),
+                      num_of_successful_read(),
+                      num_of_successful_delete()}).
+
+-type(ec_param_k() :: pos_integer()).
+-type(ec_param_m() :: pos_integer()).
+-type(ec_params() :: {ec_param_k(), ec_param_m()}).
+
 -ifdef(TEST).
 -record(bucket_2, {
           name = <<>> :: binary(),                    %% bucket name
           access_key_id = <<>> :: binary(),           %% access-key-id
           acls = [] :: acls(),                        %% acl list
           cluster_id :: atom(),                       %% cluster_id
-          redundancy_method = 'copy' :: atom(),        %% redundancy method: [copy|erasure-code]
-          ec_method = undefined :: undefined|atom(),  %% erasure-code method: @DEPEND:leo_jerasure
-          ec_params = undefined :: undefined|tuple(), %% erasure-code params: @DEPEND:leo_jerasure
+          redundancy_method = 'copy' :: atom(),       %% redundancy method: [copy|erasure-code]
+          cp_params = undefined :: undefined|cp_params(), %% replication params
+          ec_method = undefined :: undefined|atom(),      %% erasure-code method: @DEPEND:leo_jerasure
+          ec_params = undefined :: undefined|ec_params(), %% erasure-code params: @DEPEND:leo_jerasure
           last_synchroized_at = 0 :: integer(),       %% last synchronized date and time
           created_at = 0 :: integer(),                %% created date and time
           last_modified_at = 0 :: integer(),          %% modified date and time
@@ -122,8 +136,9 @@
           cluster_id :: atom(),
           %% for the erasure-coding support
           redundancy_method = 'copy' :: atom(),
+          cp_params = undefined :: undefined|cp_params(),
           ec_method = undefined :: undefined|atom(),
-          ec_params = undefined :: undefined|tuple(),
+          ec_params = undefined :: undefined|ec_params(),
           %% timestamps and flag
           last_synchroized_at = 0 :: integer(),
           created_at = leo_date:now() :: integer(),

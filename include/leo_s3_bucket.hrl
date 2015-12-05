@@ -157,8 +157,13 @@
 -record(bucket_dto, {
           name = <<>> :: binary(),    %% bucket name
           redundancy_method = 'copy' :: atom(), %% redundancy method
+          cp_params = undefined :: undefined|{pos_integer(),
+                                              pos_integer(),
+                                              pos_integer(),
+                                              pos_integer()}, %% copy-object params
           ec_method = undefined :: undefined|atom(), %% erasure-coding method
-          ec_params = undefined :: undefined|tuple(), %% erasure-coding params
+          ec_params = undefined :: undefined|{pos_integer(),
+                                              pos_integer()}, %% erasure-coding params
           owner :: tuple(),           %% owner info
           acls = [] :: acls(),        %% acl list
           cluster_id :: atom(),       %% cluster_id

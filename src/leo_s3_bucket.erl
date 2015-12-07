@@ -42,6 +42,7 @@
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
          find_all_including_owner/0,
          get_acls/1, update_acls/3,
+         get_latest_bucket/1,
          update_acls2private/2, update_acls2public_read/2,
          update_acls2public_read_write/2, update_acls2authenticated_read/2,
          put/1, put/2, put/3, put/4, put/5, bulk_put/1,
@@ -595,31 +596,43 @@ update_acls2authenticated_read(AccessKey, Bucket) ->
 %% @doc Retrive acls by a bucket
 %%
 -spec(get_acls(Bucket) ->
-             {ok, acls() }| not_found | {error, any()} when Bucket::binary()).
+             {ok, acls()} | not_found | {error, any()} when Bucket::binary()).
 get_acls(Bucket) ->
+    case get_latest_bucket(Bucket) of
+        {ok, #?BUCKET{acls = ACLs} = _BucketInfo} ->
+            {ok, ACLs};
+        Error ->
+            Error
+    end.
+
+
+%% @doc Retrieve bucket's acls and the info
+-spec(get_latest_bucket(BucketName) ->
+             {ok, BucketInfo} | not_found | {error, any()} when BucketName::binary(),
+                                                                BucketInfo::#?BUCKET{}).
+get_latest_bucket(BucketName) ->
     case get_info() of
         {ok, #bucket_info{db = DB,
                           sync_interval = SyncInterval,
                           type = Type}} ->
             Now = leo_date:now(),
-            case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
-                {ok, #?BUCKET{acls = ACLs,
-                              last_synchroized_at = LastSynchronizedAt}}
+            case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, BucketName) of
+                {ok, #?BUCKET{last_synchroized_at = LastSynchronizedAt} = BucketInfo}
                   when (Now - LastSynchronizedAt) < SyncInterval ->
                     %% valid local record
-                    {ok, ACLs};
+                    {ok, BucketInfo};
                 {ok, #?BUCKET{acls = _ACLs}} ->
                     %% to be synced with manager's record
-                    case find_bucket_by_name(Bucket) of
-                        {ok, #?BUCKET{acls = NewACLs}} ->
-                            {ok, NewACLs};
+                    case find_bucket_by_name(BucketName) of
+                        {ok, #?BUCKET{} = BucketInfo} ->
+                            {ok, BucketInfo};
                         Error ->
                             Error
                     end;
                 not_found when Type == slave->
-                    case find_bucket_by_name(Bucket) of
-                        {ok, #?BUCKET{acls = NewACLs}} ->
-                            {ok, NewACLs};
+                    case find_bucket_by_name(BucketName) of
+                        {ok, #?BUCKET{} = BucketInfo} ->
+                            {ok, BucketInfo};
                         Error ->
                             Error
                     end;

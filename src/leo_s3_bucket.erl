@@ -306,7 +306,7 @@ find_all_including_owner_1([#?BUCKET{name = Name,
                                      access_key_id = AccessKeyId,
                                      redundancy_method = RedMethod,
                                      cp_params = CPParams,
-                                     ec_method = ECMethod,
+                                     ec_lib = ECMethod,
                                      ec_params = ECParams,
                                      acls = ACLs,
                                      cluster_id = ClusterId,
@@ -323,7 +323,7 @@ find_all_including_owner_1([#?BUCKET{name = Name,
       Rest, [#bucket_dto{name = Name,
                          redundancy_method = RedMethod,
                          cp_params = CPParams,
-                         ec_method = ECMethod,
+                         ec_lib = ECMethod,
                          ec_params = ECParams,
                          owner = Owner_1,
                          acls = ACLs,
@@ -750,33 +750,33 @@ set_redundancy_method(AccessKeyId, BucketName, "copy") ->
 set_redundancy_method(_,_,_) ->
     {error, badargs}.
 
--spec(set_redundancy_method(AccessKeyId, BucketName, RedMethodStr, ECClass, ECParams) ->
+-spec(set_redundancy_method(AccessKeyId, BucketName, RedMethodStr, ECLib, ECParams) ->
              ok | {error, any()} when AccessKeyId::binary(),
                                       BucketName::binary(),
                                       RedMethodStr::string(),
-                                      ECClass::'vandrs'|'cauchyrs'|'liberation'|'isars',
+                                      ECLib::'vandrs'|'cauchyrs'|'liberation'|'isars',
                                       ECParams::{CodingParam_K, CodingParam_M},
                                       CodingParam_K::pos_integer(),
                                       CodingParam_M::pos_integer()).
 set_redundancy_method(AccessKeyId, BucketName, "erasure-code",
-                      ECClass,
+                      ECLib,
                       {CodingParam_K, CodingParam_M} = ECParams)
-  when (ECClass == 'vandrs' orelse
-        ECClass == 'cauchyrs' orelse
-        ECClass == 'liberation' orelse
-        ECClass == 'isars') andalso
+  when (ECLib == 'vandrs' orelse
+        ECLib == 'cauchyrs' orelse
+        ECLib == 'liberation' orelse
+        ECLib == 'isars') andalso
        (CodingParam_K > 0 andalso
         CodingParam_M > 0 andalso
         CodingParam_M < CodingParam_K) ->
     set_redundancy_method_1(AccessKeyId, BucketName,
-                            'erasure_code', ECClass, ECParams);
+                            'erasure_code', ECLib, ECParams);
 set_redundancy_method(_,_,_,_,_) ->
     {error, badargs}.
 
 %% @private
 set_redundancy_method_1(AccessKeyId, BucketName, RedMethod) ->
     set_redundancy_method_1(AccessKeyId, BucketName, RedMethod, undefined, undefined).
-set_redundancy_method_1(AccessKeyId, BucketName, RedMethod, ECClass, ECParams) ->
+set_redundancy_method_1(AccessKeyId, BucketName, RedMethod, ECLib, ECParams) ->
     case get_info() of
         {ok, #bucket_info{db = DB,
                           type = Type,
@@ -786,14 +786,14 @@ set_redundancy_method_1(AccessKeyId, BucketName, RedMethod, ECClass, ECParams) -
                 {ok, Bucket_1} ->
                     update_bucket(BucketInfo, AccessKeyId,
                                   Bucket_1#?BUCKET{redundancy_method = RedMethod,
-                                                   ec_method = ECClass,
+                                                   ec_lib = ECLib,
                                                    ec_params = ECParams});
                 not_found when Type == slave ->
                     case find_bucket_by_name_1(BucketName, DB, Provider) of
                         {ok, Bucket_2} ->
                             update_bucket(BucketInfo, AccessKeyId,
                                           Bucket_2#?BUCKET{redundancy_method = RedMethod,
-                                                           ec_method = ECClass,
+                                                           ec_lib = ECLib,
                                                            ec_params = ECParams});
                         Other ->
                             Other

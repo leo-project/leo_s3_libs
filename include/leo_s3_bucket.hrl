@@ -110,7 +110,7 @@
                                               pos_integer(),
                                               pos_integer(),
                                               pos_integer()}, %% replication params
-          ec_method = undefined :: undefined|atom(),      %% erasure-code method: @DEPEND:leo_jerasure
+          ec_lib = undefined :: undefined|atom(),      %% erasure-code method: @DEPEND:leo_jerasure
           ec_params = undefined :: undefined|{pos_integer(),
                                               pos_integer()}, %% erasure-code params: @DEPEND:leo_jerasure
           last_synchroized_at = 0 :: integer(),       %% last synchronized date and time
@@ -131,7 +131,7 @@
                                               pos_integer(),
                                               pos_integer(),
                                               pos_integer()},
-          ec_method = undefined :: undefined|atom(),
+          ec_lib = undefined :: undefined|atom(),
           ec_params = undefined :: undefined|{pos_integer(),
                                               pos_integer()},
           %% timestamps and flag
@@ -161,7 +161,7 @@
                                               pos_integer(),
                                               pos_integer(),
                                               pos_integer()}, %% copy-object params
-          ec_method = undefined :: undefined|atom(), %% erasure-coding method
+          ec_lib = undefined :: undefined|atom(), %% erasure-coding method
           ec_params = undefined :: undefined|{pos_integer(),
                                               pos_integer()}, %% erasure-coding params
           owner :: tuple(),           %% owner info

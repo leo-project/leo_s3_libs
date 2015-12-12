@@ -45,6 +45,11 @@
 -define(CANNED_ACL_PUBLIC_READ_WRITE,  "public-read-write").
 -define(CANNED_ACL_AUTHENTICATED_READ, "authenticated-read").
 
+-define(RED_METHOD_COPY, 'copy').
+-define(RED_METHOD_EC, 'erasure-code').
+-define(RED_METHOD_STR_COPY, "copy").
+-define(RED_METHOD_STR_EC, "erasure-code").
+
 -type permission()  :: read|write|read_acp|write_acp|full_control.
 -type permissions() :: [permission()].
 
@@ -105,7 +110,7 @@
           access_key_id = <<>> :: binary(),           %% access-key-id
           acls = [] :: acls(),                        %% acl list
           cluster_id :: atom(),                       %% cluster_id
-          redundancy_method = 'copy' :: atom(),       %% redundancy method: [copy|erasure-code]
+          redundancy_method = ?RED_METHOD_COPY :: atom(), %% redundancy method: [copy|erasure-code]
           cp_params = undefined :: undefined|{pos_integer(),
                                               pos_integer(),
                                               pos_integer(),
@@ -126,7 +131,7 @@
           acls = [] :: acls(),
           cluster_id :: atom(),
           %% for the erasure-coding support
-          redundancy_method = 'copy' :: atom(),
+          redundancy_method = ?RED_METHOD_COPY :: atom(),
           cp_params = undefined :: undefined|{pos_integer(),
                                               pos_integer(),
                                               pos_integer(),
@@ -156,7 +161,7 @@
 %% {Name, Owner_1, Permissions_1, CreatedAt}
 -record(bucket_dto, {
           name = <<>> :: binary(),    %% bucket name
-          redundancy_method = 'copy' :: atom(), %% redundancy method
+          redundancy_method = ?RED_METHOD_COPY :: atom(), %% redundancy method
           cp_params = undefined :: undefined|{pos_integer(),
                                               pos_integer(),
                                               pos_integer(),

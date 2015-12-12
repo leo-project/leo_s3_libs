@@ -745,8 +745,8 @@ update_bucket(#bucket_info{type = Type,
              ok | {error, any()} when AccessKeyId::binary(),
                                       BucketName::binary(),
                                       RedMethodStr::string()).
-set_redundancy_method(AccessKeyId, BucketName, "copy") ->
-    set_redundancy_method_1(AccessKeyId, BucketName, 'copy');
+set_redundancy_method(AccessKeyId, BucketName, ?RED_METHOD_STR_COPY) ->
+    set_redundancy_method_1(AccessKeyId, BucketName, ?RED_METHOD_COPY);
 set_redundancy_method(_,_,_) ->
     {error, badargs}.
 
@@ -758,7 +758,9 @@ set_redundancy_method(_,_,_) ->
                                       ECParams::{CodingParam_K, CodingParam_M},
                                       CodingParam_K::pos_integer(),
                                       CodingParam_M::pos_integer()).
-set_redundancy_method(AccessKeyId, BucketName, "erasure-code",
+set_redundancy_method(AccessKeyId, BucketName, ?RED_METHOD_STR_COPY = RedMethod,_,_) ->
+    set_redundancy_method(AccessKeyId, BucketName, RedMethod);
+set_redundancy_method(AccessKeyId, BucketName, ?RED_METHOD_STR_EC,
                       ECLib,
                       {CodingParam_K, CodingParam_M} = ECParams)
   when (ECLib == 'vandrs' orelse
@@ -769,7 +771,7 @@ set_redundancy_method(AccessKeyId, BucketName, "erasure-code",
         CodingParam_M > 0 andalso
         CodingParam_M < CodingParam_K) ->
     set_redundancy_method_1(AccessKeyId, BucketName,
-                            'erasure_code', ECLib, ECParams);
+                            ?RED_METHOD_EC, ECLib, ECParams);
 set_redundancy_method(_,_,_,_,_) ->
     {error, badargs}.
 

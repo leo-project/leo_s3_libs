@@ -46,7 +46,7 @@
 -define(CANNED_ACL_AUTHENTICATED_READ, "authenticated-read").
 
 -define(RED_METHOD_COPY, 'copy').
--define(RED_METHOD_EC, 'erasure-code').
+-define(RED_METHOD_EC, 'erasure_code').
 -define(RED_METHOD_STR_COPY, "copy").
 -define(RED_METHOD_STR_EC, "erasure-code").
 

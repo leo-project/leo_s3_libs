@@ -929,22 +929,33 @@ find_bucket_by_name_2(Bucket, Node, Value) ->
                      end,
     RPCKey = rpc:async_call(Node, leo_s3_bucket, find_bucket_by_name,
                             [Bucket, LastModifiedAt]),
-    case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
-        {value, {ok, match}} when Value == null ->
-            not_found;
-        {value, {ok, match}} when Value /= null ->
-            {ok, Value};
-        {value, {ok, Value_1}} ->
-            {ok, Value_1};
-        {value, not_found} ->
-            not_found;
-        _ when Value == null ->
-            not_found;
-        timeout ->
-            {error, timeout};
-        {badrpc, Reason} ->
-            {error, Reason}
-    end.
+    Ret = case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
+              {value, {ok, match}} when Value == null ->
+                  not_found;
+              {value, {ok, match}} when Value /= null ->
+                  {ok, Value};
+              {value, {ok, Value_1}} ->
+                  {ok, Value_1};
+              {value, not_found} ->
+                  not_found;
+              _ when Value == null ->
+                  not_found;
+              timeout ->
+                  {error, timeout};
+              {badrpc, Reason} ->
+                  {error, Reason}
+          end,
+    case Ret of
+        {error, Cause} ->
+            error_logger:warning_msg("~p,~p,~p, Synchronization of Bucket Data Failed, Node:~p, Reason:~p~n",
+                                     [{module, ?MODULE_STRING}, 
+                                      {function, "find_bucket_by_name_2/3"},
+                                      {line, ?LINE},
+                                      Node, Cause]);
+        _ ->
+            void
+    end,
+    Ret.
 
 %% @doc Communicate remote node(s)
 %% @private

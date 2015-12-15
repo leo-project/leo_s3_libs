@@ -880,20 +880,47 @@ find_bucket_by_name_1(Bucket, DB, Providers) ->
 
     Ret = lists:foldl(
             fun(Node, null) ->
-                    find_bucket_by_name_2(Bucket, DB, Node, Value);
+                    find_bucket_by_name_2(Bucket, Node, Value);
                (Node, {error, _Cause}) ->
-                    find_bucket_by_name_2(Bucket, DB, Node, Value);
+                    find_bucket_by_name_2(Bucket, Node, Value);
                (_Node, SoFar) ->
                     SoFar
             end, null, Providers),
-    Ret.
+    Value_1 = case Ret of
+                  {ok, NewValue} ->
+                      NewValue;
+                  not_found ->
+                      not_found;
+                  _ ->
+                      Value
+              end,
+    case Value_1 of
+        null ->
+            not_found;
+        not_found ->
+            not_found;
+        _ ->
+            NewBucketVal = Value_1#?BUCKET{last_synchroized_at = leo_date:now()},
+            case DB of
+                mnesia ->
+                    catch leo_s3_bucket_data_handler:insert(
+                            {DB, ?BUCKET_TABLE},
+                            Value#?BUCKET{del = true,
+                                          last_modified_at = leo_date:now()
+                                         });
+                _ ->
+                    catch leo_s3_bucket_data_handler:delete(
+                            {DB, ?BUCKET_TABLE}, Value)
+            end,
+            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
+            {ok, NewBucketVal}
+    end.
 
--spec(find_bucket_by_name_2(Bucket, DB, Node, Value) ->
+-spec(find_bucket_by_name_2(Bucket, Node, Value) ->
              {ok, #?BUCKET{}} | not_found | {error, any()} when Bucket::binary(),
-                                                                DB::ets|mnesia,
                                                                 Node::atom(),
                                                                 Value::#?BUCKET{}|null).
-find_bucket_by_name_2(Bucket, DB, Node, Value) ->
+find_bucket_by_name_2(Bucket, Node, Value) ->
     LastModifiedAt = case (Value == null) of
                          true ->
                              0;
@@ -902,35 +929,22 @@ find_bucket_by_name_2(Bucket, DB, Node, Value) ->
                      end,
     RPCKey = rpc:async_call(Node, leo_s3_bucket, find_bucket_by_name,
                             [Bucket, LastModifiedAt]),
-    Ret = case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
-              {value, {ok, match}} when Value == null ->
-                  not_found;
-              {value, {ok, match}} when Value /= null ->
-                  {ok, Value};
-              {value, {ok, Value_1}} ->
-                  NewBucketVal = Value_1#?BUCKET{last_synchroized_at = leo_date:now()},
-                  case DB of
-                      mnesia ->
-                          catch leo_s3_bucket_data_handler:insert(
-                                  {DB, ?BUCKET_TABLE},
-                                  Value#?BUCKET{del = true,
-                                                last_modified_at = leo_date:now()
-                                               });
-                      _ ->
-                          catch leo_s3_bucket_data_handler:delete(
-                                  {DB, ?BUCKET_TABLE}, Value)
-                  end,
-                  leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
-                  {ok, NewBucketVal};
-              {value, not_found} ->
-                  not_found;
-              _ when Value == null ->
-                  not_found;
-              _ ->
-                  {ok, Value}
-          end,
-    Ret.
-
+    case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
+        {value, {ok, match}} when Value == null ->
+            not_found;
+        {value, {ok, match}} when Value /= null ->
+            {ok, Value};
+        {value, {ok, Value_1}} ->
+            {ok, Value_1};
+        {value, not_found} ->
+            not_found;
+        _ when Value == null ->
+            not_found;
+        timeout ->
+            {error, timeout};
+        {badrpc, Reason} ->
+            {error, Reason}
+    end.
 
 %% @doc Communicate remote node(s)
 %% @private

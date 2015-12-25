@@ -42,11 +42,13 @@
          find_buckets_by_id/1, find_buckets_by_id/2, find_all/0,
          find_all_including_owner/0,
          get_acls/1, update_acls/3,
+         get_latest_bucket/1,
          update_acls2private/2, update_acls2public_read/2,
          update_acls2public_read_write/2, update_acls2authenticated_read/2,
          put/1, put/2, put/3, put/4, put/5, bulk_put/1,
          delete/2, delete/3, head/2, head/4,
          change_bucket_owner/2,
+         set_redundancy_method/3, set_redundancy_method/5,
          aclinfo_to_str/1,
          checksum/0
         ]).
@@ -302,11 +304,14 @@ find_all_including_owner_1([], Acc) ->
     {ok, lists:reverse(Acc)};
 find_all_including_owner_1([#?BUCKET{name = Name,
                                      access_key_id = AccessKeyId,
+                                     redundancy_method = RedMethod,
+                                     cp_params = CPParams,
+                                     ec_lib = ECMethod,
+                                     ec_params = ECParams,
                                      acls = ACLs,
                                      cluster_id = ClusterId,
                                      created_at = CreatedAt,
-                                     del = false
-                                    }|Rest], Acc) ->
+                                     del = false}|Rest], Acc) ->
     Owner_1 =
         case leo_s3_user_credential:find_by_access_key_id(AccessKeyId) of
             {ok, Owner} ->
@@ -314,11 +319,16 @@ find_all_including_owner_1([#?BUCKET{name = Name,
             _ ->
                 #user_credential{}
         end,
-    find_all_including_owner_1(Rest, [#bucket_dto{name = Name,
-                                                  owner = Owner_1,
-                                                  acls = ACLs,
-                                                  cluster_id = ClusterId,
-                                                  created_at = CreatedAt}|Acc]);
+    find_all_including_owner_1(
+      Rest, [#bucket_dto{name = Name,
+                         redundancy_method = RedMethod,
+                         cp_params = CPParams,
+                         ec_lib = ECMethod,
+                         ec_params = ECParams,
+                         owner = Owner_1,
+                         acls = ACLs,
+                         cluster_id = ClusterId,
+                         created_at = CreatedAt}|Acc]);
 find_all_including_owner_1([_Other|Rest], Acc) ->
     find_all_including_owner_1(Rest, Acc).
 
@@ -419,8 +429,7 @@ put(AccessKey, BucketName, CannedACL, ClusterId, DB) ->
                                                        cluster_id = ClusterId,
                                                        created_at = Now,
                                                        last_modified_at = Now,
-                                                       del = false
-                                                      });
+                                                       del = false});
         Error ->
             Error
     end.
@@ -587,31 +596,43 @@ update_acls2authenticated_read(AccessKey, Bucket) ->
 %% @doc Retrive acls by a bucket
 %%
 -spec(get_acls(Bucket) ->
-             {ok, acls() }| not_found | {error, any()} when Bucket::binary()).
+             {ok, acls()} | not_found | {error, any()} when Bucket::binary()).
 get_acls(Bucket) ->
+    case get_latest_bucket(Bucket) of
+        {ok, #?BUCKET{acls = ACLs} = _BucketInfo} ->
+            {ok, ACLs};
+        Error ->
+            Error
+    end.
+
+
+%% @doc Retrieve bucket's acls and the info
+-spec(get_latest_bucket(BucketName) ->
+             {ok, BucketInfo} | not_found | {error, any()} when BucketName::binary(),
+                                                                BucketInfo::#?BUCKET{}).
+get_latest_bucket(BucketName) ->
     case get_info() of
         {ok, #bucket_info{db = DB,
                           sync_interval = SyncInterval,
                           type = Type}} ->
             Now = leo_date:now(),
-            case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
-                {ok, #?BUCKET{acls = ACLs,
-                              last_synchroized_at = LastSynchronizedAt}}
+            case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, BucketName) of
+                {ok, #?BUCKET{last_synchroized_at = LastSynchronizedAt} = BucketInfo}
                   when (Now - LastSynchronizedAt) < SyncInterval ->
                     %% valid local record
-                    {ok, ACLs};
+                    {ok, BucketInfo};
                 {ok, #?BUCKET{acls = _ACLs}} ->
                     %% to be synced with manager's record
-                    case find_bucket_by_name(Bucket) of
-                        {ok, #?BUCKET{acls = NewACLs}} ->
-                            {ok, NewACLs};
+                    case find_bucket_by_name(BucketName) of
+                        {ok, #?BUCKET{} = BucketInfo} ->
+                            {ok, BucketInfo};
                         Error ->
                             Error
                     end;
                 not_found when Type == slave->
-                    case find_bucket_by_name(Bucket) of
-                        {ok, #?BUCKET{acls = NewACLs}} ->
-                            {ok, NewACLs};
+                    case find_bucket_by_name(BucketName) of
+                        {ok, #?BUCKET{} = BucketInfo} ->
+                            {ok, BucketInfo};
                         Error ->
                             Error
                     end;
@@ -676,16 +697,16 @@ head(AccessKey, Bucket, DB, Providers) ->
                                                   Bucket::binary()).
 change_bucket_owner(AccessKey, Bucket) ->
     case get_info() of
-        {ok, #bucket_info{db       = DB,
-                          type     = Type,
+        {ok, #bucket_info{db = DB,
+                          type = Type,
                           provider = Provider} = BucketInfo} ->
             case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
                 {ok, Value_1} ->
-                    change_bucket_owner_1(BucketInfo, AccessKey, Value_1);
+                    update_bucket(BucketInfo, AccessKey, Value_1);
                 not_found when Type == slave->
                     case find_bucket_by_name_1(Bucket, DB, Provider) of
                         {ok, Value_2} ->
-                            change_bucket_owner_1(BucketInfo, AccessKey, Value_2);
+                            update_bucket(BucketInfo, AccessKey, Value_2);
                         Other ->
                             Other
                     end;
@@ -696,18 +717,19 @@ change_bucket_owner(AccessKey, Bucket) ->
             Error
     end.
 
-
-change_bucket_owner_1(#bucket_info{type = Type,
-                                   db = DB,
-                                   provider = Provider}, AccessKey, BucketData) ->
-    BucketData_1 = BucketData#?BUCKET{access_key_id = AccessKey,
-                                      last_modified_at = leo_date:now()},
+%% @doc Update the bucket
+%% @private
+update_bucket(#bucket_info{type = Type,
+                           db = DB,
+                           provider = Provider}, AccessKey, Bucket) ->
+    Bucket_1 = Bucket#?BUCKET{access_key_id = AccessKey,
+                              last_modified_at = leo_date:now()},
     case Type of
         master ->
-            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, BucketData_1);
+            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, Bucket_1);
         slave ->
             case rpc_call(Provider, leo_s3_bucket_data_handler,
-                          insert, [{mnesia, ?BUCKET_TABLE}, BucketData]) of
+                          insert, [{mnesia, ?BUCKET_TABLE}, Bucket_1]) of
                 ok ->
                     ok;
                 _ ->
@@ -715,6 +737,74 @@ change_bucket_owner_1(#bucket_info{type = Type,
             end;
         _ ->
             {error, invalid_server_type}
+    end.
+
+
+%% @doc Set redundancy method of the bucket
+-spec(set_redundancy_method(AccessKeyId, BucketName, RedMethodStr) ->
+             ok | {error, any()} when AccessKeyId::binary(),
+                                      BucketName::binary(),
+                                      RedMethodStr::string()).
+set_redundancy_method(AccessKeyId, BucketName, ?RED_METHOD_STR_COPY) ->
+    set_redundancy_method_1(AccessKeyId, BucketName, ?RED_METHOD_COPY);
+set_redundancy_method(_,_,_) ->
+    {error, badargs}.
+
+-spec(set_redundancy_method(AccessKeyId, BucketName, RedMethodStr, ECLib, ECParams) ->
+             ok | {error, any()} when AccessKeyId::binary(),
+                                      BucketName::binary(),
+                                      RedMethodStr::string(),
+                                      ECLib::'vandrs'|'cauchyrs'|'liberation'|'isars',
+                                      ECParams::{CodingParam_K, CodingParam_M},
+                                      CodingParam_K::pos_integer(),
+                                      CodingParam_M::pos_integer()).
+set_redundancy_method(AccessKeyId, BucketName, ?RED_METHOD_STR_COPY = RedMethod,_,_) ->
+    set_redundancy_method(AccessKeyId, BucketName, RedMethod);
+set_redundancy_method(AccessKeyId, BucketName, ?RED_METHOD_STR_EC,
+                      ECLib,
+                      {CodingParam_K, CodingParam_M} = ECParams)
+  when (ECLib == 'vandrs' orelse
+        ECLib == 'cauchyrs' orelse
+        ECLib == 'liberation' orelse
+        ECLib == 'isars') andalso
+       (CodingParam_K > 0 andalso
+        CodingParam_M > 0 andalso
+        CodingParam_M < CodingParam_K) ->
+    set_redundancy_method_1(AccessKeyId, BucketName,
+                            ?RED_METHOD_EC, ECLib, ECParams);
+set_redundancy_method(_,_,_,_,_) ->
+    {error, badargs}.
+
+%% @private
+set_redundancy_method_1(AccessKeyId, BucketName, RedMethod) ->
+    set_redundancy_method_1(AccessKeyId, BucketName, RedMethod, undefined, undefined).
+set_redundancy_method_1(AccessKeyId, BucketName, RedMethod, ECLib, ECParams) ->
+    case get_info() of
+        {ok, #bucket_info{db = DB,
+                          type = Type,
+                          provider = Provider} = BucketInfo} ->
+            case leo_s3_bucket_data_handler:find_by_name(
+                   {DB, ?BUCKET_TABLE}, BucketName) of
+                {ok, Bucket_1} ->
+                    update_bucket(BucketInfo, AccessKeyId,
+                                  Bucket_1#?BUCKET{redundancy_method = RedMethod,
+                                                   ec_lib = ECLib,
+                                                   ec_params = ECParams});
+                not_found when Type == slave ->
+                    case find_bucket_by_name_1(BucketName, DB, Provider) of
+                        {ok, Bucket_2} ->
+                            update_bucket(BucketInfo, AccessKeyId,
+                                          Bucket_2#?BUCKET{redundancy_method = RedMethod,
+                                                           ec_lib = ECLib,
+                                                           ec_params = ECParams});
+                        Other ->
+                            Other
+                    end;
+                Other ->
+                    Other
+            end;
+        Error ->
+            Error
     end.
 
 
@@ -790,20 +880,47 @@ find_bucket_by_name_1(Bucket, DB, Providers) ->
 
     Ret = lists:foldl(
             fun(Node, null) ->
-                    find_bucket_by_name_2(Bucket, DB, Node, Value);
+                    find_bucket_by_name_2(Bucket, Node, Value);
                (Node, {error, _Cause}) ->
-                    find_bucket_by_name_2(Bucket, DB, Node, Value);
+                    find_bucket_by_name_2(Bucket, Node, Value);
                (_Node, SoFar) ->
                     SoFar
             end, null, Providers),
-    Ret.
+    Value_1 = case Ret of
+                  {ok, NewValue} ->
+                      NewValue;
+                  not_found ->
+                      not_found;
+                  _ ->
+                      Value
+              end,
+    case Value_1 of
+        null ->
+            not_found;
+        not_found ->
+            not_found;
+        _ ->
+            NewBucketVal = Value_1#?BUCKET{last_synchroized_at = leo_date:now()},
+            case DB of
+                mnesia ->
+                    catch leo_s3_bucket_data_handler:insert(
+                            {DB, ?BUCKET_TABLE},
+                            Value#?BUCKET{del = true,
+                                          last_modified_at = leo_date:now()
+                                         });
+                _ ->
+                    catch leo_s3_bucket_data_handler:delete(
+                            {DB, ?BUCKET_TABLE}, Value)
+            end,
+            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
+            {ok, NewBucketVal}
+    end.
 
--spec(find_bucket_by_name_2(Bucket, DB, Node, Value) ->
+-spec(find_bucket_by_name_2(Bucket, Node, Value) ->
              {ok, #?BUCKET{}} | not_found | {error, any()} when Bucket::binary(),
-                                                                DB::ets|mnesia,
                                                                 Node::atom(),
                                                                 Value::#?BUCKET{}|null).
-find_bucket_by_name_2(Bucket, DB, Node, Value) ->
+find_bucket_by_name_2(Bucket, Node, Value) ->
     LastModifiedAt = case (Value == null) of
                          true ->
                              0;
@@ -818,29 +935,27 @@ find_bucket_by_name_2(Bucket, DB, Node, Value) ->
               {value, {ok, match}} when Value /= null ->
                   {ok, Value};
               {value, {ok, Value_1}} ->
-                  NewBucketVal = Value_1#?BUCKET{last_synchroized_at = leo_date:now()},
-                  case DB of
-                      mnesia ->
-                          catch leo_s3_bucket_data_handler:insert(
-                                  {DB, ?BUCKET_TABLE},
-                                  Value#?BUCKET{del = true,
-                                                last_modified_at = leo_date:now()
-                                               });
-                      _ ->
-                          catch leo_s3_bucket_data_handler:delete(
-                                  {DB, ?BUCKET_TABLE}, Value)
-                  end,
-                  leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
-                  {ok, NewBucketVal};
+                  {ok, Value_1};
               {value, not_found} ->
                   not_found;
               _ when Value == null ->
                   not_found;
-              _ ->
-                  {ok, Value}
+              timeout ->
+                  {error, timeout};
+              {badrpc, Reason} ->
+                  {error, Reason}
           end,
+    case Ret of
+        {error, Cause} ->
+            error_logger:warning_msg("~p,~p,~p, Synchronization of Bucket Data Failed, Node:~p, Reason:~p~n",
+                                     [{module, ?MODULE_STRING}, 
+                                      {function, "find_bucket_by_name_2/3"},
+                                      {line, ?LINE},
+                                      Node, Cause]);
+        _ ->
+            void
+    end,
     Ret.
-
 
 %% @doc Communicate remote node(s)
 %% @private

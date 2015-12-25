@@ -45,6 +45,11 @@
 -define(CANNED_ACL_PUBLIC_READ_WRITE,  "public-read-write").
 -define(CANNED_ACL_AUTHENTICATED_READ, "authenticated-read").
 
+-define(RED_METHOD_COPY, 'copy').
+-define(RED_METHOD_EC, 'erasure_code').
+-define(RED_METHOD_STR_COPY, "copy").
+-define(RED_METHOD_STR_EC, "erasure-code").
+
 -type permission()  :: read|write|read_acp|write_acp|full_control.
 -type permissions() :: [permission()].
 
@@ -105,9 +110,14 @@
           access_key_id = <<>> :: binary(),           %% access-key-id
           acls = [] :: acls(),                        %% acl list
           cluster_id :: atom(),                       %% cluster_id
-          rep_method = 'copy' :: atom(),              %% replication method: [copy|erasure-code]
-          ec_method = undefined :: undefined|atom(),  %% erasure-code method: @DEPEND:leo_jerasure
-          ec_params = undefined :: undefined|tuple(), %% erasure-code params: @DEPEND:leo_jerasure
+          redundancy_method = ?RED_METHOD_COPY :: atom(), %% redundancy method: [copy|erasure-code]
+          cp_params = undefined :: undefined|{pos_integer(),
+                                              pos_integer(),
+                                              pos_integer(),
+                                              pos_integer()}, %% replication params
+          ec_lib = undefined :: undefined|atom(),      %% erasure-code method: @DEPEND:leo_jerasure
+          ec_params = undefined :: undefined|{pos_integer(),
+                                              pos_integer()}, %% erasure-code params: @DEPEND:leo_jerasure
           last_synchroized_at = 0 :: integer(),       %% last synchronized date and time
           created_at = 0 :: integer(),                %% created date and time
           last_modified_at = 0 :: integer(),          %% modified date and time
@@ -115,13 +125,21 @@
          }).
 -else.
 -record(bucket_2, {
+          %% basic items
           name = <<>> :: binary(),
           access_key_id = <<>> :: binary(),
           acls = [] :: acls(),
           cluster_id :: atom(),
-          rep_method = 'copy' :: atom(),
-          ec_method = undefined :: undefined|atom(),
-          ec_params = undefined :: undefined|tuple(),
+          %% for the erasure-coding support
+          redundancy_method = ?RED_METHOD_COPY :: atom(),
+          cp_params = undefined :: undefined|{pos_integer(),
+                                              pos_integer(),
+                                              pos_integer(),
+                                              pos_integer()},
+          ec_lib = undefined :: undefined|atom(),
+          ec_params = undefined :: undefined|{pos_integer(),
+                                              pos_integer()},
+          %% timestamps and flag
           last_synchroized_at = 0 :: integer(),
           created_at = leo_date:now() :: integer(),
           last_modified_at = leo_date:now() :: integer(),
@@ -143,6 +161,14 @@
 %% {Name, Owner_1, Permissions_1, CreatedAt}
 -record(bucket_dto, {
           name = <<>> :: binary(),    %% bucket name
+          redundancy_method = ?RED_METHOD_COPY :: atom(), %% redundancy method
+          cp_params = undefined :: undefined|{pos_integer(),
+                                              pos_integer(),
+                                              pos_integer(),
+                                              pos_integer()}, %% copy-object params
+          ec_lib = undefined :: undefined|atom(), %% erasure-coding method
+          ec_params = undefined :: undefined|{pos_integer(),
+                                              pos_integer()}, %% erasure-coding params
           owner :: tuple(),           %% owner info
           acls = [] :: acls(),        %% acl list
           cluster_id :: atom(),       %% cluster_id

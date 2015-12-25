@@ -157,7 +157,7 @@ mnesia_suite_(_) ->
                      fun(_AccessKeyId, _Bucket) ->
                              not_found
                      end),
-    {error, unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams0, false),
+    {error, not_found} = leo_s3_auth:authenticate(Authorization0, SignParams0, false),
 
     %% inspect-6 - for authentication
     _ = meck:unload(leo_s3_bucket),

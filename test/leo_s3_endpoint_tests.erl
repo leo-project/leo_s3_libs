@@ -24,7 +24,6 @@
 %% @end
 %%====================================================================
 -module(leo_s3_endpoint_tests).
--author('Yosuke Hara').
 
 -include("leo_s3_endpoint.hrl").
 -include_lib("eunit/include/eunit.hrl").

@@ -24,7 +24,6 @@
 %% @end
 %%====================================================================
 -module(leo_s3_auth_tests).
--author('Yosuke Hara').
 
 -include("leo_s3_auth.hrl").
 -include("leo_s3_user.hrl").

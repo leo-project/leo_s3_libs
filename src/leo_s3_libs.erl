@@ -25,7 +25,6 @@
 %% @end
 %%======================================================================
 -module(leo_s3_libs).
--author('Yosuke Hara').
 
 -include("leo_s3_bucket.hrl").
 -include("leo_s3_libs.hrl").

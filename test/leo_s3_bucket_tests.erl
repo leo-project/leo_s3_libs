@@ -214,12 +214,12 @@ mnesia_suite_(_) ->
     ?assertEqual(5, length(RetL_2) - length(RetL_1)),
 
     %% generate a nfs-mount-key
-    Ret_3 = leo_s3_bucket:gen_nfs_mnt_key(
-              ?Bucket1, ?ACCESS_KEY_0, <<"10.1.2.3">>),
-    Ret_4 = leo_s3_bucket:gen_nfs_mnt_key(
-              ?Bucket1, ?ACCESS_KEY_0, <<"10.1.2.3">>),
-    Ret_5 = leo_s3_bucket:gen_nfs_mnt_key(
-              ?Bucket1, ?ACCESS_KEY_0, <<"10.1.2.4">>),
+    {ok, Ret_3} = leo_s3_bucket:gen_nfs_mnt_key(
+                    ?Bucket1, ?ACCESS_KEY_0, <<"10.1.2.3">>),
+    {ok, Ret_4} = leo_s3_bucket:gen_nfs_mnt_key(
+                    ?Bucket1, ?ACCESS_KEY_0, <<"10.1.2.3">>),
+    {ok, Ret_5} = leo_s3_bucket:gen_nfs_mnt_key(
+                    ?Bucket1, ?ACCESS_KEY_0, <<"10.1.2.4">>),
     ?assertEqual(Ret_3, Ret_4),
     ?assertEqual(true,  Ret_3 /= Ret_5),
 

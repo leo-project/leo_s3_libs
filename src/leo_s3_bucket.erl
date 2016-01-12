@@ -2,7 +2,7 @@
 %%
 %% Leo S3-Libs
 %%
-%% Copyright (c) 2012-2015 Rakuten, Inc.
+%% Copyright (c) 2012-2016 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -26,8 +26,6 @@
 %%======================================================================
 -module(leo_s3_bucket).
 
--author('Yosuke Hara').
-
 -include("leo_s3_bucket.hrl").
 -include("leo_s3_user.hrl").
 -include("leo_s3_libs.hrl").
@@ -50,7 +48,8 @@
          change_bucket_owner/2,
          set_redundancy_method/3, set_redundancy_method/5,
          aclinfo_to_str/1,
-         checksum/0
+         checksum/0,
+         gen_nfs_mnt_key/3
         ]).
 -export([transform/0, transform/1]).
 
@@ -59,7 +58,6 @@
 %% API
 %%--------------------------------------------------------------------
 %% @doc Launch a lib
-%%
 -spec(start(Role, Provider, SyncInterval) ->
              ok when Role::master|slave,
                      Provider::[atom()],
@@ -83,7 +81,6 @@ start(master = Type, _Provider, SyncInterval) ->
 
 
 %% @doc update_providers(slave only)
-%%
 -spec(update_providers(Providers) ->
              ok when Providers::[atom()]).
 update_providers(Providers) ->
@@ -93,8 +90,7 @@ update_providers(Providers) ->
     ok.
 
 
-%% Create bucket table(mnesia)
-%%
+%% @doc Create bucket table(mnesia)
 -spec(create_table(Mode, Nodes) ->
              ok when Mode::ram_copies|disc|copies,
                      Nodes::[atom()]).
@@ -126,7 +122,6 @@ create_table_old_for_test(Mode, Nodes) ->
 
 
 %% @doc Retrieve buckets by AccessKey
-%%
 -spec(find_buckets_by_id(AccessKey) ->
              {ok, [#?BUCKET{}]} | not_found | {error, any()} when AccessKey::binary()).
 find_buckets_by_id(AccessKey) ->
@@ -233,30 +228,29 @@ find_buckets_by_id_2(AccessKey, DB, Node, Value, CRC) ->
 
 
 %% @doc Retrieve a bucket by bucket-name
-%%
--spec(find_bucket_by_name(Bucket) ->
-             {ok, #?BUCKET{}} | not_found | {error, any()} when Bucket::binary()).
-find_bucket_by_name(Bucket) ->
+-spec(find_bucket_by_name(BucketName) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()} when BucketName::binary()).
+find_bucket_by_name(BucketName) ->
     case get_info() of
         %% Retrieve value from local-mnesia.
         {ok, #bucket_info{db = DB}} when DB == mnesia ->
-            leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket);
+            leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, BucketName);
         %% Inquiry bucket-checksum to manager-nodes.
         %% If local-checksum equal provider's checksum, then return local-list,
         %% but local-checksum does NOT equal provider's checksum, then return provider's list.
         {ok, #bucket_info{db = DB, provider = Provider}} when DB == ets ->
-            find_bucket_by_name_1(Bucket, DB, Provider);
+            find_bucket_by_name_1(BucketName, DB, Provider);
         Error ->
             Error
     end.
 
--spec(find_bucket_by_name(Bucket, LastModifiedAt) ->
-             {ok, #?BUCKET{}} | {ok, match} | {error, any()} when Bucket::binary(),
+-spec(find_bucket_by_name(BucketName, LastModifiedAt) ->
+             {ok, #?BUCKET{}} | {ok, match} | {error, any()} when BucketName::binary(),
                                                                   LastModifiedAt::non_neg_integer()).
-find_bucket_by_name(Bucket, LastModifiedAt) ->
+find_bucket_by_name(BucketName, LastModifiedAt) ->
     case get_info() of
         {ok, #bucket_info{db = DB}} when DB == mnesia ->
-            case find_bucket_by_name(Bucket) of
+            case find_bucket_by_name(BucketName) of
                 {ok, #?BUCKET{last_modified_at = OrgLastModifiedAt} = Value} ->
                     case LastModifiedAt == OrgLastModifiedAt of
                         true ->
@@ -275,7 +269,6 @@ find_bucket_by_name(Bucket, LastModifiedAt) ->
 
 
 %% @doc Retrieve all buckets
-%%
 -spec(find_all() ->
              {ok, [#?BUCKET{}]} | not_found | {error, any()}).
 find_all() ->
@@ -288,7 +281,6 @@ find_all() ->
 
 
 %% @doc Retrieve all buckets and owner
-%%
 -spec(find_all_including_owner() ->
              {ok, list()} | not_found | {error, any()}).
 find_all_including_owner() ->
@@ -334,7 +326,6 @@ find_all_including_owner_1([_Other|Rest], Acc) ->
 
 
 %% @doc put a bucket.
-%%
 -spec(put(Bucket) ->
              ok | {error, any()} when Bucket::#?BUCKET{}).
 put(#?BUCKET{name = Name,
@@ -436,7 +427,6 @@ put(AccessKey, BucketName, CannedACL, ClusterId, DB) ->
 
 
 %% @doc Add buckets
-%%
 -spec(bulk_put(BucketList) ->
              ok when BucketList::[#?BUCKET{}]).
 bulk_put([]) ->
@@ -447,7 +437,6 @@ bulk_put([Bucket|Rest]) ->
 
 
 %% @doc delete a bucket.
-%%
 -spec(delete(AccessKey, Bucket) ->
              ok | {error, any()} when AccessKey::binary(),
                                       Bucket::binary()).
@@ -490,7 +479,6 @@ delete(AccessKey, BucketName, DB) ->
 
 
 %% @doc update acls in a bukcet-property
-%%
 -spec(update_acls(AccessKey, Bucket, ACLs) ->
              ok | {error, any()} when AccessKey::binary(),
                                       Bucket::binary(),
@@ -553,7 +541,6 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
 
 
 %% @doc update acls to 'private'
-%%
 -spec(update_acls2private(AccessKey, Bucket) ->
              ok | {error, any()} when AccessKey::binary(),
                                       Bucket::binary()).
@@ -563,7 +550,6 @@ update_acls2private(AccessKey, Bucket) ->
 
 
 %% @doc update acls to 'public_read'
-%%
 -spec(update_acls2public_read(AccessKey, Bucket) ->
              ok | {error, any()} when AccessKey::binary(),
                                       Bucket::binary()).
@@ -573,7 +559,6 @@ update_acls2public_read(AccessKey, Bucket) ->
 
 
 %% @doc update acls to 'public_read_write'
-%%
 -spec(update_acls2public_read_write(AccessKey, Bucket) ->
              ok | {error, any()} when AccessKey::binary(),
                                       Bucket::binary()).
@@ -583,7 +568,6 @@ update_acls2public_read_write(AccessKey, Bucket) ->
 
 
 %% @doc update acls to 'authenticated_read'
-%%
 -spec(update_acls2authenticated_read(AccessKey, Bucket) ->
              ok | {error, any()} when AccessKey::binary(),
                                       Bucket::binary()).
@@ -594,7 +578,6 @@ update_acls2authenticated_read(AccessKey, Bucket) ->
 
 
 %% @doc Retrive acls by a bucket
-%%
 -spec(get_acls(Bucket) ->
              {ok, acls()} | not_found | {error, any()} when Bucket::binary()).
 get_acls(Bucket) ->
@@ -645,7 +628,6 @@ get_latest_bucket(BucketName) ->
 
 
 %% @doc Is exist a bucket into the db
-%%
 -spec(head(AccessKey, Bucket) ->
              ok | not_found | {error, any()} when AccessKey::binary(),
                                                   Bucket::binary()).
@@ -691,7 +673,6 @@ head(AccessKey, Bucket, DB, Providers) ->
 
 
 %% @doc Is exist a bucket into the db
-%%
 -spec(change_bucket_owner(AccessKey, Bucket) ->
              ok | not_found | {error, any()} when AccessKey::binary(),
                                                   Bucket::binary()).
@@ -809,7 +790,6 @@ set_redundancy_method_1(AccessKeyId, BucketName, RedMethod, ECLib, ECParams) ->
 
 
 %% @doc Retrieve checksum of the table
-%%
 -spec(checksum() ->
              {ok, non_neg_integer()} | not_found | {error, any()}).
 checksum() ->
@@ -818,6 +798,51 @@ checksum() ->
             {ok, erlang:crc32(term_to_binary(RetL))};
         _Error ->
             {ok, -1}
+    end.
+
+
+%% @doc Generate a NFS mount key
+-spec(gen_nfs_mnt_key(BucketName, AccessKey, IP) ->
+             {ok, Key} | {error, Cause} when BucketName::binary(),
+                                             AccessKey::binary(),
+                                             IP::binary(),
+                                             Key::string(),
+                                             Cause::any()).
+gen_nfs_mnt_key(BucketName, AccessKey, IP) ->
+    case find_buckets_by_id(AccessKey) of
+        {ok, BucketL} ->
+            case lists:keyfind(BucketName, 2, BucketL) of
+                #?BUCKET{} ->
+                    case leo_s3_user_credential:find_by_access_key_id(AccessKey) of
+                        {ok, #user_credential{user_id = UserId}} ->
+                            case leo_s3_user_credential:get_credential_by_user_id(UserId) of
+                                {ok, AuthInfo} ->
+                                    case leo_misc:get_value('secret_access_key', AuthInfo) of
+                                        undefined ->
+                                            {error, not_found};
+                                        SecretAccessKey ->
+                                            leo_hex:binary_to_hex(
+                                              crypto:hmac(sha, IP, << BucketName/binary,
+                                                                      AccessKey/binary,
+                                                                      SecretAccessKey/binary >>))
+                                        end;
+                                not_found = Cause ->
+                                    {error, Cause};
+                                Error ->
+                                    Error
+                            end;
+                        not_found = Cause ->
+                            {error, Cause};
+                        Error ->
+                            Error
+                    end;
+                _ ->
+                    {error, not_found}
+            end;
+        not_found = Cause ->
+            {error, Cause};
+        Error ->
+            Error
     end.
 
 
@@ -853,7 +878,6 @@ get_info() ->
 
 
 %% @doc Insert values into the mnesia.
-%%
 -spec(put_all_values(DB, BucketList) ->
              ok when DB::ets|mnesia,
                      BucketList::[#?BUCKET{}]).
@@ -948,7 +972,7 @@ find_bucket_by_name_2(Bucket, Node, Value) ->
     case Ret of
         {error, Cause} ->
             error_logger:warning_msg("~p,~p,~p, Synchronization of Bucket Data Failed, Node:~p, Reason:~p~n",
-                                     [{module, ?MODULE_STRING}, 
+                                     [{module, ?MODULE_STRING},
                                       {function, "find_bucket_by_name_2/3"},
                                       {line, ?LINE},
                                       Node, Cause]);
@@ -1091,7 +1115,6 @@ aclinfo_to_str(BucketACLInfoList) ->
 %% Transform API
 %%--------------------------------------------------------------------
 %% @doc The table schema migrate to the new one by using mnesia:transform_table
-%%
 -spec(transform() -> ok).
 transform() ->
     {atomic, ok} = mnesia:transform_table(
@@ -1148,7 +1171,6 @@ transform_1(#bucket_1{name = Name,
 
 
 %% @doc Transform data
-%%
 transform(ClusterId) ->
     case find_all() of
         {ok, RetL} ->

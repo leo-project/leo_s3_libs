@@ -789,23 +789,40 @@ find_bucket_by_name_1(Bucket, DB, Providers) ->
                 _Other ->
                     null
             end,
+    Value_1 = case lists:foldl(
+                     fun(Node, null) ->
+                             find_bucket_by_name_3(Bucket, Node, Value);
+                        (Node, {error, _Cause}) ->
+                             find_bucket_by_name_3(Bucket, Node, Value);
+                        (_Node, SoFar) ->
+                             SoFar
+                     end, null, Providers) of
+                  {ok, NewValue} ->
+                      NewValue;
+                  not_found ->
+                      not_found;
+                  _ ->
+                      Value
+              end,
+    find_bucket_by_name_2(Value_1, DB).
 
-    Ret = lists:foldl(
-            fun(Node, null) ->
-                    find_bucket_by_name_2(Bucket, DB, Node, Value);
-               (Node, {error, _Cause}) ->
-                    find_bucket_by_name_2(Bucket, DB, Node, Value);
-               (_Node, SoFar) ->
-                    SoFar
-            end, null, Providers),
-    Ret.
+%% @private
+find_bucket_by_name_2(null,_) ->
+    not_found;
+find_bucket_by_name_2(not_found,_) ->
+    not_found;
+find_bucket_by_name_2(Bucket, DB) ->
+    Bucket_1 = Bucket#?BUCKET{last_synchroized_at = leo_date:now()},
+    leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, Bucket_1),
+    {ok, Bucket_1}.
 
--spec(find_bucket_by_name_2(Bucket, DB, Node, Value) ->
+
+%% @private
+-spec(find_bucket_by_name_3(Bucket, Node, Value) ->
              {ok, #?BUCKET{}} | not_found | {error, any()} when Bucket::binary(),
-                                                                DB::ets|mnesia,
                                                                 Node::atom(),
                                                                 Value::#?BUCKET{}|null).
-find_bucket_by_name_2(Bucket, DB, Node, Value) ->
+find_bucket_by_name_3(Bucket, Node, Value) ->
     LastModifiedAt = case (Value == null) of
                          true ->
                              0;
@@ -820,27 +837,30 @@ find_bucket_by_name_2(Bucket, DB, Node, Value) ->
               {value, {ok, match}} when Value /= null ->
                   {ok, Value};
               {value, {ok, Value_1}} ->
-                  NewBucketVal = Value_1#?BUCKET{last_synchroized_at = leo_date:now()},
-                  case DB of
-                      mnesia ->
-                          catch leo_s3_bucket_data_handler:insert(
-                                  {DB, ?BUCKET_TABLE},
-                                  Value#?BUCKET{del = true,
-                                                last_modified_at = leo_date:now()
-                                               });
-                      _ ->
-                          catch leo_s3_bucket_data_handler:delete(
-                                  {DB, ?BUCKET_TABLE}, Value)
-                  end,
-                  leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
-                  {ok, NewBucketVal};
+                  {ok, Value_1};
               {value, not_found} ->
                   not_found;
               _ when Value == null ->
                   not_found;
-              _ ->
-                  {ok, Value}
+              timeout = Cause ->
+                  {error, Cause};
+              {badrpc, Cause} ->
+                  {error, Cause}
           end,
+    case Ret of
+        {error, Reason} ->
+            error_logger:warning_msg(
+              "~p,~p,~p,~p~n",
+              [{module, ?MODULE_STRING},
+               {function, "find_bucket_by_name_3/3"},
+               {line, ?LINE},
+               {body,
+                [{node, Node},
+                 {cause, {"Synchronization of Bucket Data Failed", Reason}}]}
+              ]);
+        _ ->
+            void
+    end,
     Ret.
 
 

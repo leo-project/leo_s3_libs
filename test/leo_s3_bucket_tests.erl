@@ -51,6 +51,7 @@
 -define(Bucket8,  <<"bucket8">>).
 -define(Bucket9,  <<"b01012013">>). %% https://github.com/leo-project/leofs/issues/75
 -define(Bucket10, <<"bucket10">>).
+-define(Bucket11, <<"bucket11">>).
 
 -define(BucketTooShort, <<"sh">>).
 -define(BucketInvalidStart,  <<".myawsbucket">>).
@@ -222,6 +223,19 @@ mnesia_suite_(_) ->
                     ?Bucket1, ?ACCESS_KEY_0, <<"10.1.2.4">>),
     ?assertEqual(Ret_3, Ret_4),
     ?assertEqual(true,  Ret_3 /= Ret_5),
+
+    %% Quick Setting
+    {ok, BucketInfo} = leo_s3_bucket:find_bucket_by_name(?Bucket0),
+    ok = leo_s3_bucket:put(BucketInfo),
+    ok = leo_s3_bucket:put(BucketInfo#?BUCKET{
+                                         redundancy_method = ?RED_METHOD_EC,
+                                         ec_lib = 'liberation',
+                                         ec_params = {8,4}}), 
+    {ok, #?BUCKET{name = ?Bucket0,
+                  redundancy_method = ?RED_METHOD_EC,
+                  ec_lib = 'liberation',
+                  ec_params = {8,4}}} = 
+        leo_s3_bucket:find_bucket_by_name(?Bucket0),
 
     application:stop(mnesia),
     timer:sleep(250),

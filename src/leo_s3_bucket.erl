@@ -521,17 +521,13 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
         ok ->
             case leo_s3_bucket_data_handler:find_by_name(
                    {DB, ?BUCKET_TABLE}, AccessKey, Bucket, false) of
-                {ok, #?BUCKET{cluster_id = ClusterId,
-                              created_at = CreatedAt}} ->
+                {ok, BucketInfo} ->
                     Now = leo_date:now(),
                     leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
-                                                      #?BUCKET{name = Bucket,
-                                                               access_key_id = AccessKey,
-                                                               acls = ACLs,
-                                                               cluster_id = ClusterId,
-                                                               last_synchroized_at = Now,
-                                                               last_modified_at = Now,
-                                                               created_at = CreatedAt});
+                                                      BucketInfo#?BUCKET{access_key_id = AccessKey,
+                                                                         acls = ACLs,
+                                                                         last_synchroized_at = Now,
+                                                                         last_modified_at = Now});
                 Error ->
                     Error
             end;

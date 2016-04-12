@@ -340,7 +340,7 @@ put(#?BUCKET{name = Name,
                    mnesia
            end,
     case find_bucket_by_name(Name) of
-        {ok, #?BUCKET{last_modified_at = UpdatedAt_2}} when UpdatedAt_1 > UpdatedAt_2 ->
+        {ok, #?BUCKET{last_modified_at = UpdatedAt_2}} when UpdatedAt_1 >= UpdatedAt_2 ->
             put_1(DB_1, Bucket_1);
         not_found ->
             put_1(DB_1, Bucket_1);

@@ -237,6 +237,14 @@ mnesia_suite_(_) ->
                   ec_params = {8,4}}} = 
         leo_s3_bucket:find_bucket_by_name(?Bucket0),
 
+    %% ACL Setting
+    leo_s3_bucket:update_acls2public_read(?ACCESS_KEY_0, ?Bucket0),
+    {ok, #?BUCKET{name = ?Bucket0,
+                  redundancy_method = ?RED_METHOD_EC,
+                  ec_lib = 'liberation',
+                  ec_params = {8,4}}} = 
+        leo_s3_bucket:find_bucket_by_name(?Bucket0),
+
     application:stop(mnesia),
     timer:sleep(250),
     ok.

@@ -437,28 +437,28 @@ bulk_put([Bucket|Rest]) ->
 
 
 %% @doc delete a bucket.
--spec(delete(AccessKey, Bucket) ->
+-spec(delete(AccessKey, BucketName) ->
              ok | {error, any()} when AccessKey::binary(),
-                                      Bucket::binary()).
-delete(AccessKey, Bucket) ->
+                                      BucketName::binary()).
+delete(AccessKey, BucketName) ->
     case get_info() of
         {ok, #bucket_info{type = slave,
                           provider = Provider}} ->
-            rpc_call(Provider, leo_manager_api, delete_bucket, [AccessKey, Bucket]);
+            rpc_call(Provider, leo_manager_api, delete_bucket, [AccessKey, BucketName]);
         {ok, #bucket_info{type = master, db = DB}} ->
-            delete(AccessKey, Bucket, DB);
+            delete(AccessKey, BucketName, DB);
         Error ->
             Error
     end.
 
--spec(delete(AccessKey, Bucket, DB) ->
+-spec(delete(AccessKey, BucketName, DB) ->
              ok | {error, any()} when AccessKey::binary(),
-                                      Bucket::binary(),
+                                      BucketName::binary(),
                                       DB::ets|mnesia|undefined).
-delete(AccessKey, Bucket, undefined) ->
+delete(AccessKey, BucketName, undefined) ->
     case get_info() of
         {ok, #bucket_info{db = DB}} ->
-            delete(AccessKey, Bucket, DB);
+            delete(AccessKey, BucketName, DB);
         Error ->
             Error
     end;
@@ -479,20 +479,20 @@ delete(AccessKey, BucketName, DB) ->
 
 
 %% @doc update acls in a bukcet-property
--spec(update_acls(AccessKey, Bucket, ACLs) ->
+-spec(update_acls(AccessKey, BucketName, ACLs) ->
              ok | {error, any()} when AccessKey::binary(),
-                                      Bucket::binary(),
+                                      BucketName::binary(),
                                       ACLs::acls()).
-update_acls(AccessKey, Bucket, ACLs) ->
+update_acls(AccessKey, BucketName, ACLs) ->
     case get_info() of
         {ok, #bucket_info{type = slave,
                           db   = DB,
                           provider = Provider}} ->
             case leo_s3_auth:has_credential(Provider, AccessKey) of
                 true ->
-                    case rpc_call(Provider, update_acls, [AccessKey, Bucket, ACLs]) of
+                    case rpc_call(Provider, update_acls, [AccessKey, BucketName, ACLs]) of
                         ok ->
-                            update_acls(AccessKey, Bucket, ACLs, DB);
+                            update_acls(AccessKey, BucketName, ACLs, DB);
                         _ ->
                             {error, not_stored}
                     end;
@@ -502,7 +502,7 @@ update_acls(AccessKey, Bucket, ACLs) ->
         {ok, #bucket_info{type = master, db = DB}} ->
             case leo_s3_auth:has_credential(AccessKey) of
                 true ->
-                    update_acls(AccessKey, Bucket, ACLs, DB);
+                    update_acls(AccessKey, BucketName, ACLs, DB);
                 false ->
                     {error, invalid_access}
             end;
@@ -510,17 +510,17 @@ update_acls(AccessKey, Bucket, ACLs) ->
             Error
     end.
 
--spec(update_acls(AccessKey, Bucket, ACLs, DB) ->
+-spec(update_acls(AccessKey, BucketName, ACLs, DB) ->
              ok | {error, any()} when AccessKey::binary(),
-                                      Bucket::binary(),
+                                      BucketName::binary(),
                                       ACLs::acls(),
                                       DB::ets|mnesia).
-update_acls(AccessKey, Bucket, ACLs, DB) ->
-    BucketStr = cast_binary_to_str(Bucket),
+update_acls(AccessKey, BucketName, ACLs, DB) ->
+    BucketStr = cast_binary_to_str(BucketName),
     case is_valid_bucket(BucketStr) of
         ok ->
             case leo_s3_bucket_data_handler:find_by_name(
-                   {DB, ?BUCKET_TABLE}, AccessKey, Bucket, false) of
+                   {DB, ?BUCKET_TABLE}, AccessKey, BucketName, false) of
                 {ok, BucketInfo} ->
                     Now = leo_date:now(),
                     leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE},
@@ -537,47 +537,47 @@ update_acls(AccessKey, Bucket, ACLs, DB) ->
 
 
 %% @doc update acls to 'private'
--spec(update_acls2private(AccessKey, Bucket) ->
+-spec(update_acls2private(AccessKey, BucketName) ->
              ok | {error, any()} when AccessKey::binary(),
-                                      Bucket::binary()).
-update_acls2private(AccessKey, Bucket) ->
+                                      BucketName::binary()).
+update_acls2private(AccessKey, BucketName) ->
     ACLs = canned_acl_to_bucket_acl_info(AccessKey, ?CANNED_ACL_PRIVATE),
-    update_acls(AccessKey, Bucket, ACLs).
+    update_acls(AccessKey, BucketName, ACLs).
 
 
 %% @doc update acls to 'public_read'
--spec(update_acls2public_read(AccessKey, Bucket) ->
+-spec(update_acls2public_read(AccessKey, BucketName) ->
              ok | {error, any()} when AccessKey::binary(),
-                                      Bucket::binary()).
-update_acls2public_read(AccessKey, Bucket) ->
+                                      BucketName::binary()).
+update_acls2public_read(AccessKey, BucketName) ->
     ACLs = canned_acl_to_bucket_acl_info(AccessKey, ?CANNED_ACL_PUBLIC_READ),
-    update_acls(AccessKey, Bucket, ACLs).
+    update_acls(AccessKey, BucketName, ACLs).
 
 
 %% @doc update acls to 'public_read_write'
--spec(update_acls2public_read_write(AccessKey, Bucket) ->
+-spec(update_acls2public_read_write(AccessKey, BucketName) ->
              ok | {error, any()} when AccessKey::binary(),
-                                      Bucket::binary()).
-update_acls2public_read_write(AccessKey, Bucket) ->
+                                      BucketName::binary()).
+update_acls2public_read_write(AccessKey, BucketName) ->
     ACLs = canned_acl_to_bucket_acl_info(AccessKey, ?CANNED_ACL_PUBLIC_READ_WRITE),
-    update_acls(AccessKey, Bucket, ACLs).
+    update_acls(AccessKey, BucketName, ACLs).
 
 
 %% @doc update acls to 'authenticated_read'
--spec(update_acls2authenticated_read(AccessKey, Bucket) ->
+-spec(update_acls2authenticated_read(AccessKey, BucketName) ->
              ok | {error, any()} when AccessKey::binary(),
-                                      Bucket::binary()).
-update_acls2authenticated_read(AccessKey, Bucket) ->
+                                      BucketName::binary()).
+update_acls2authenticated_read(AccessKey, BucketName) ->
     ACLs = [#bucket_acl_info{user_id     = ?GRANTEE_AUTHENTICATED_USER,
                              permissions = [read]}],
-    update_acls(AccessKey, Bucket, ACLs).
+    update_acls(AccessKey, BucketName, ACLs).
 
 
 %% @doc Retrive acls by a bucket
--spec(get_acls(Bucket) ->
-             {ok, acls()} | not_found | {error, any()} when Bucket::binary()).
-get_acls(Bucket) ->
-    case get_latest_bucket(Bucket) of
+-spec(get_acls(BucketName) ->
+             {ok, acls()} | not_found | {error, any()} when BucketName::binary()).
+get_acls(BucketName) ->
+    case get_latest_bucket(BucketName) of
         {ok, #?BUCKET{acls = ACLs} = _BucketInfo} ->
             {ok, ACLs};
         Error ->
@@ -624,22 +624,22 @@ get_latest_bucket(BucketName) ->
 
 
 %% @doc Is exist a bucket into the db
--spec(head(AccessKey, Bucket) ->
+-spec(head(AccessKey, BucketName) ->
              ok | not_found | {error, any()} when AccessKey::binary(),
-                                                  Bucket::binary()).
-head(AccessKey, Bucket) ->
+                                                  BucketName::binary()).
+head(AccessKey, BucketName) ->
     case get_info() of
         {ok, #bucket_info{db = DB,
                           type = Type,
                           provider = Provider}} ->
             case leo_s3_bucket_data_handler:find_by_name(
-                   {DB, ?BUCKET_TABLE}, AccessKey, Bucket) of
+                   {DB, ?BUCKET_TABLE}, AccessKey, BucketName) of
                 {ok, #?BUCKET{del = false} = _Value} ->
                     ok;
                 {ok, _Value} ->
                     not_found;
                 not_found when Type == slave->
-                    case head(AccessKey, Bucket, DB, Provider) of
+                    case head(AccessKey, BucketName, DB, Provider) of
                         {ok, _} ->
                             ok;
                         Error ->
@@ -652,16 +652,16 @@ head(AccessKey, Bucket) ->
             Error
     end.
 
--spec(head(AccessKey, Bucket, DB, Providers) ->
+-spec(head(AccessKey, BucketName, DB, Providers) ->
              {ok, #?BUCKET{}} | not_found | {error, any()} when AccessKey::binary(),
-                                                                Bucket::binary(),
+                                                                BucketName::binary(),
                                                                 DB::atom(),
                                                                 Providers::[atom()]).
-head(AccessKey, Bucket, DB, Providers) ->
+head(AccessKey, BucketName, DB, Providers) ->
     case find_buckets_by_id_1(AccessKey, DB, Providers) of
         {ok, _} ->
             Ret = leo_s3_bucket_data_handler:find_by_name(
-                    {DB, ?BUCKET_TABLE}, AccessKey, Bucket),
+                    {DB, ?BUCKET_TABLE}, AccessKey, BucketName),
             Ret;
         Error ->
             Error
@@ -669,19 +669,19 @@ head(AccessKey, Bucket, DB, Providers) ->
 
 
 %% @doc Is exist a bucket into the db
--spec(change_bucket_owner(AccessKey, Bucket) ->
+-spec(change_bucket_owner(AccessKey, BucketName) ->
              ok | not_found | {error, any()} when AccessKey::binary(),
-                                                  Bucket::binary()).
-change_bucket_owner(AccessKey, Bucket) ->
+                                                  BucketName::binary()).
+change_bucket_owner(AccessKey, BucketName) ->
     case get_info() of
         {ok, #bucket_info{db = DB,
                           type = Type,
                           provider = Provider} = BucketInfo} ->
-            case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
+            case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, BucketName) of
                 {ok, Value_1} ->
                     update_bucket(BucketInfo, AccessKey, Value_1);
                 not_found when Type == slave->
-                    case find_bucket_by_name_1(Bucket, DB, Provider) of
+                    case find_bucket_by_name_1(BucketName, DB, Provider) of
                         {ok, Value_2} ->
                             update_bucket(BucketInfo, AccessKey, Value_2);
                         Other ->
@@ -826,7 +826,7 @@ gen_nfs_mnt_key(BucketName, AccessKey, IP) ->
                                                 Key ->
                                                     {ok, Key}
                                             end
-                                        end;
+                                    end;
                                 not_found = Cause ->
                                     {error, Cause};
                                 Error ->
@@ -891,13 +891,13 @@ put_all_values(DB, [H|T]) ->
 
 %% @doc Retrieve buckets by name
 %% @private
--spec(find_bucket_by_name_1(Bucket, DB, Providers) ->
-             {ok, #?BUCKET{}} | not_found | {error, any()} when Bucket::binary(),
+-spec(find_bucket_by_name_1(BucketName, DB, Providers) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()} when BucketName::binary(),
                                                                 DB::ets|mnesia,
                                                                 Providers::[atom()]).
-find_bucket_by_name_1(Bucket, DB, Providers) ->
+find_bucket_by_name_1(BucketName, DB, Providers) ->
     Ret = case leo_s3_bucket_data_handler:find_by_name(
-                 {DB, ?BUCKET_TABLE}, Bucket) of
+                 {DB, ?BUCKET_TABLE}, BucketName) of
               {ok, BucketInfo} ->
                   BucketInfo;
               _Other ->
@@ -906,9 +906,9 @@ find_bucket_by_name_1(Bucket, DB, Providers) ->
 
     case lists:foldl(
            fun(Node, not_found) ->
-                   find_bucket_by_name_2(Bucket, Node, Ret);
+                   find_bucket_by_name_2(BucketName, Node, Ret);
               (Node, {error,_}) ->
-                   find_bucket_by_name_2(Bucket, Node, Ret);
+                   find_bucket_by_name_2(BucketName, Node, Ret);
               (_,SoFar) ->
                    SoFar
            end, not_found, Providers) of
@@ -935,7 +935,7 @@ find_bucket_by_name_1(Bucket, DB, Providers) ->
 -spec(find_bucket_by_name_2(BucketName, Node, BucketInfo) ->
              {ok, #?BUCKET{}} | not_found | {error, any()} when BucketName::binary(),
                                                                 Node::atom(),
-                                                                BucketInfo::#?BUCKET{}|null).
+                                                                BucketInfo::#?BUCKET{}|not_found).
 find_bucket_by_name_2(BucketName, Node, BucketInfo) ->
     LastModifiedAt = case (BucketInfo == not_found) of
                          true ->
@@ -1067,12 +1067,12 @@ is_valid_bucket([_|_], _LastChar, _LastLabel, _OnlyDigit) ->
 
 %% @doc exchange value type from binary to string
 %% @private
--spec(cast_binary_to_str(Bucket) ->
-             string() when Bucket::binary()|string()).
-cast_binary_to_str(Bucket) ->
-    case is_binary(Bucket) of
-        true  -> binary_to_list(Bucket);
-        false -> Bucket
+-spec(cast_binary_to_str(BucketName) ->
+             string() when BucketName::binary()|string()).
+cast_binary_to_str(BucketName) ->
+    case is_binary(BucketName) of
+        true  -> binary_to_list(BucketName);
+        false -> BucketName
     end.
 
 

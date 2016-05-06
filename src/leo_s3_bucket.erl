@@ -253,9 +253,9 @@ find_bucket_by_name(BucketName, LastModifiedAt) ->
             case find_bucket_by_name(BucketName) of
                 {ok, #?BUCKET{last_modified_at = OrgLastModifiedAt} = Value} ->
                     case LastModifiedAt == OrgLastModifiedAt of
-                        true ->
+                        true when LastModifiedAt > 0 ->
                             {ok, match};
-                        false ->
+                        _ ->
                             {ok, Value}
                     end;
                 Error ->
@@ -896,75 +896,64 @@ put_all_values(DB, [H|T]) ->
                                                                 DB::ets|mnesia,
                                                                 Providers::[atom()]).
 find_bucket_by_name_1(Bucket, DB, Providers) ->
-    Value = case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, Bucket) of
-                {ok, Val} ->
-                    Val;
-                _Other ->
-                    null
-            end,
+    Ret = case leo_s3_bucket_data_handler:find_by_name(
+                 {DB, ?BUCKET_TABLE}, Bucket) of
+              {ok, BucketInfo} ->
+                  BucketInfo;
+              _Other ->
+                  not_found
+          end,
 
-    Ret = lists:foldl(
-            fun(Node, null) ->
-                    find_bucket_by_name_2(Bucket, Node, Value);
-               (Node, {error, _Cause}) ->
-                    find_bucket_by_name_2(Bucket, Node, Value);
-               (_Node, SoFar) ->
-                    SoFar
-            end, null, Providers),
-    Value_1 = case Ret of
-                  {ok, NewValue} ->
-                      NewValue;
-                  not_found ->
-                      not_found;
-                  _ ->
-                      Value
-              end,
-    case Value_1 of
-        null ->
-            not_found;
+    case lists:foldl(
+           fun(Node, not_found) ->
+                   find_bucket_by_name_2(Bucket, Node, Ret);
+              (Node, {error,_}) ->
+                   find_bucket_by_name_2(Bucket, Node, Ret);
+              (_,SoFar) ->
+                   SoFar
+           end, not_found, Providers) of
+        {ok, BucketInfo_1} ->
+            BucketInfo_2 = BucketInfo_1#?BUCKET{last_synchroized_at = leo_date:now()},
+            case leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, BucketInfo_2) of
+                ok ->
+                    {ok, BucketInfo_2};
+                {error, Cause} ->
+                    error_logger:warning_msg("~p,~p,~p,~p",
+                                             [{module, ?MODULE_STRING},
+                                              {function, "find_bucket_by_name_1/3"},
+                                              {line, ?LINE},
+                                              {body, Cause}]),
+                    {error, Cause}
+            end;
         not_found ->
             not_found;
-        _ ->
-            NewBucketVal = Value_1#?BUCKET{last_synchroized_at = leo_date:now()},
-            case DB of
-                mnesia ->
-                    catch leo_s3_bucket_data_handler:insert(
-                            {DB, ?BUCKET_TABLE},
-                            Value#?BUCKET{del = true,
-                                          last_modified_at = leo_date:now()
-                                         });
-                _ ->
-                    catch leo_s3_bucket_data_handler:delete(
-                            {DB, ?BUCKET_TABLE}, Value)
-            end,
-            leo_s3_bucket_data_handler:insert({DB, ?BUCKET_TABLE}, NewBucketVal),
-            {ok, NewBucketVal}
+        Other ->
+            Other
     end.
 
--spec(find_bucket_by_name_2(Bucket, Node, Value) ->
-             {ok, #?BUCKET{}} | not_found | {error, any()} when Bucket::binary(),
+
+-spec(find_bucket_by_name_2(BucketName, Node, BucketInfo) ->
+             {ok, #?BUCKET{}} | not_found | {error, any()} when BucketName::binary(),
                                                                 Node::atom(),
-                                                                Value::#?BUCKET{}|null).
-find_bucket_by_name_2(Bucket, Node, Value) ->
-    LastModifiedAt = case (Value == null) of
+                                                                BucketInfo::#?BUCKET{}|null).
+find_bucket_by_name_2(BucketName, Node, BucketInfo) ->
+    LastModifiedAt = case (BucketInfo == not_found) of
                          true ->
                              0;
                          false ->
-                             Value#?BUCKET.last_modified_at
+                             BucketInfo#?BUCKET.last_modified_at
                      end,
     RPCKey = rpc:async_call(Node, leo_s3_bucket, find_bucket_by_name,
-                            [Bucket, LastModifiedAt]),
+                            [BucketName, LastModifiedAt]),
     Ret = case rpc:nb_yield(RPCKey, ?DEF_REQ_TIMEOUT) of
-              {value, {ok, match}} when Value == null ->
-                  not_found;
-              {value, {ok, match}} when Value /= null ->
-                  {ok, Value};
-              {value, {ok, Value_1}} ->
-                  {ok, Value_1};
+              {value, {ok, match}} ->
+                  {ok, BucketInfo};
+              {value, {ok, BucketInfo_1}} ->
+                  {ok, BucketInfo_1};
               {value, not_found} ->
                   not_found;
-              _ when Value == null ->
-                  not_found;
+              {value, {error, Reason}} ->
+                  {error, Reason};
               timeout ->
                   {error, timeout};
               {badrpc, Reason} ->
@@ -972,11 +961,16 @@ find_bucket_by_name_2(Bucket, Node, Value) ->
           end,
     case Ret of
         {error, Cause} ->
-            error_logger:warning_msg("~p,~p,~p, Synchronization of Bucket Data Failed, Node:~p, Reason:~p~n",
-                                     [{module, ?MODULE_STRING},
-                                      {function, "find_bucket_by_name_2/3"},
-                                      {line, ?LINE},
-                                      Node, Cause]);
+            error_logger:warning_msg(
+              "~p,~p,~p,~p~n",
+              [{module, ?MODULE_STRING},
+               {function, "find_bucket_by_name_2/3"},
+               {line, ?LINE},
+               {body, [{node, Node},
+                       {summary, "Synchronization of Bucket Data Failed"},
+                       {cause, Cause}
+                      ]}
+              ]);
         _ ->
             void
     end,

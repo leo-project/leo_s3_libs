@@ -26,8 +26,6 @@
 %%======================================================================
 -module(leo_s3_bucket_data_handler).
 
--author('Yosuke Hara').
-
 -include("leo_s3_bucket.hrl").
 -include_lib("stdlib/include/qlc.hrl").
 -include_lib("eunit/include/eunit.hrl").

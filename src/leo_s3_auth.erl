@@ -26,8 +26,6 @@
 %%======================================================================
 -module(leo_s3_auth).
 
--author('Yosuke Hara').
-
 -include("leo_s3_auth.hrl").
 -include("leo_s3_endpoint.hrl").
 -include("leo_s3_libs.hrl").

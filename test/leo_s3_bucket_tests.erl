@@ -25,10 +25,9 @@
 %%======================================================================
 -module(leo_s3_bucket_tests).
 
--author('Yosuke Hara').
-
 -include("leo_s3_bucket.hrl").
 -include("leo_s3_libs.hrl").
+-include("leo_s3_user.hrl").
 -include_lib("eunit/include/eunit.hrl").
 
 
@@ -52,6 +51,7 @@
 -define(Bucket8,  <<"bucket8">>).
 -define(Bucket9,  <<"b01012013">>). %% https://github.com/leo-project/leofs/issues/75
 -define(Bucket10, <<"bucket10">>).
+-define(Bucket11, <<"bucket11">>).
 
 -define(BucketTooShort, <<"sh">>).
 -define(BucketInvalidStart,  <<".myawsbucket">>).
@@ -93,7 +93,23 @@ mnesia_suite_(_) ->
 
     meck:new(leo_s3_user, [non_strict]),
     meck:expect(leo_s3_user, find_by_access_key_id,
-                fun(_) -> {ok, <<"leofs">>} end),
+                fun(_) ->
+                        {ok, <<"leofs">>}
+                end),
+
+    meck:new(leo_s3_user_credential, [non_strict]),
+    meck:expect(leo_s3_user_credential, find_by_access_key_id,
+                fun(_) ->
+                        {ok, #user_credential{user_id = 1}}
+                end),
+    meck:expect(leo_s3_user_credential, get_credential_by_user_id,
+                fun(UserId) ->
+                        {ok, [{user_id, UserId},
+                              {access_key_id, <<"">>},
+                              {secret_access_key, <<"test-secret-access-key">>},
+                              {created_at, leo_date:now()}]}
+                end),
+
 
     ok = leo_s3_bucket:start(master, [], 3),
     ok = leo_s3_bucket:create_table('ram_copies', [node()]),
@@ -197,6 +213,37 @@ mnesia_suite_(_) ->
                                  #?BUCKET{name = <<"_5_">>}]),
     {ok, RetL_2} = leo_s3_bucket:find_all(),
     ?assertEqual(5, length(RetL_2) - length(RetL_1)),
+
+    %% generate a nfs-mount-key
+    {ok, Ret_3} = leo_s3_bucket:gen_nfs_mnt_key(
+                    ?Bucket1, ?ACCESS_KEY_0, <<"10.1.2.3">>),
+    {ok, Ret_4} = leo_s3_bucket:gen_nfs_mnt_key(
+                    ?Bucket1, ?ACCESS_KEY_0, <<"10.1.2.3">>),
+    {ok, Ret_5} = leo_s3_bucket:gen_nfs_mnt_key(
+                    ?Bucket1, ?ACCESS_KEY_0, <<"10.1.2.4">>),
+    ?assertEqual(Ret_3, Ret_4),
+    ?assertEqual(true,  Ret_3 /= Ret_5),
+
+    %% Quick Setting
+    {ok, BucketInfo} = leo_s3_bucket:find_bucket_by_name(?Bucket0),
+    ok = leo_s3_bucket:put(BucketInfo),
+    ok = leo_s3_bucket:put(BucketInfo#?BUCKET{
+                                         redundancy_method = ?RED_METHOD_EC,
+                                         ec_lib = 'liberation',
+                                         ec_params = {8,4}}), 
+    {ok, #?BUCKET{name = ?Bucket0,
+                  redundancy_method = ?RED_METHOD_EC,
+                  ec_lib = 'liberation',
+                  ec_params = {8,4}}} = 
+        leo_s3_bucket:find_bucket_by_name(?Bucket0),
+
+    %% ACL Setting
+    leo_s3_bucket:update_acls2public_read(?ACCESS_KEY_0, ?Bucket0),
+    {ok, #?BUCKET{name = ?Bucket0,
+                  redundancy_method = ?RED_METHOD_EC,
+                  ec_lib = 'liberation',
+                  ec_params = {8,4}}} = 
+        leo_s3_bucket:find_bucket_by_name(?Bucket0),
 
     application:stop(mnesia),
     timer:sleep(250),

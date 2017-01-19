@@ -1,6 +1,6 @@
 %%======================================================================
 %%
-%% Leo S3 User
+%% Leo S3-libs
 %%
 %% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
@@ -18,10 +18,6 @@
 %% specific language governing permissions and limitations
 %% under the License.
 %%
-%% ---------------------------------------------------------------------
-%% Leo S3 User
-%% @doc
-%% @end
 %%======================================================================
 -define(ROLE_GENERAL, 1).
 -define(ROLE_ADMIN,   9).

@@ -1,6 +1,6 @@
 %%======================================================================
 %%
-%% Leo Libs
+%% Leo S3-libs
 %%
 %% Copyright (c) 2012-2015 Rakuten, Inc.
 %%
@@ -18,10 +18,6 @@
 %% specific language governing permissions and limitations
 %% under the License.
 %%
-%% ---------------------------------------------------------------------
-%% Leo Libs
-%% @doc
-%% @end
 %%======================================================================
 -ifndef(DEF_REQ_TIMEOUT).
 -define(DEF_REQ_TIMEOUT, 30000).

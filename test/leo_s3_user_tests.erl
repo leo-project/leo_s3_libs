@@ -75,6 +75,17 @@ suite_(_) ->
     {error,already_exists} =
         leo_s3_user:put(UserId, Password0, true),
 
+    %% %% import-user
+    ImportUserId = <<"Name is Import">>,
+    ImportAccessKey = <<"importA">>,
+    ImportSecretKey = <<"importS">>,
+    {ok, IKeys} = leo_s3_user:import(ImportUserId, ImportAccessKey, ImportSecretKey),
+    IAccessKeyId     = leo_misc:get_value('access_key_id',     IKeys),
+    ISecretAccessKey = leo_misc:get_value('secret_access_key', IKeys),
+    ?assertEqual(2, length(Keys)),
+    ?assertEqual(IAccessKeyId, ImportAccessKey),
+    ?assertEqual(ISecretAccessKey, ImportSecretKey),
+
     %% %% find-by-id
     {ok, Res1} = leo_s3_user:find_by_id(UserId),
     ?assertEqual(UserId, Res1#?S3_USER.id),
@@ -94,8 +105,8 @@ suite_(_) ->
     {ok, Users_2} = leo_s3_user_credential:find_all_with_role(),
     ?debugVal(Users_1),
     ?debugVal(Users_2),
-    ?assertEqual(5, length(Users_1)),
-    ?assertEqual(5, length(Users_2)),
+    ?assertEqual(6, length(Users_1)),
+    ?assertEqual(6, length(Users_2)),
 
     %% %% get_credential_by_id
     {ok, Credential} = leo_s3_user_credential:get_credential_by_user_id(UserId),

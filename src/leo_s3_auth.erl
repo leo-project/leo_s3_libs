@@ -36,7 +36,8 @@
 -export([start/2,
          create_table/2, put/1, bulk_put/1,
          update_providers/1,
-         create_key/1, get_credential/1, has_credential/1, has_credential/2,
+         create_key/1, put_credential/3,
+         get_credential/1, has_credential/1, has_credential/2,
          authenticate/3, get_signature/3,
          find_all/0, checksum/0
         ]).
@@ -197,6 +198,27 @@ create_key_1(UserId, Digest0, Digest1) ->
                                                           created_at        = leo_date:now()}}),
             {ok, [{access_key_id,     Digest0},
                   {secret_access_key, Digest1}]};
+        _ ->
+            {error, not_initialized}
+    end.
+
+%% @doc Put a credential
+%%
+-spec(put_credential(AccessKeyId, SecretAccessKey, CreatedAt) ->
+            {ok, [tuple()]} | {error, any()} when AccessKeyId::binary(),
+                                                  SecretAccessKey::binary(),
+                                                  CreatedAt::integer()).
+put_credential(AccessKeyId, SecretAccessKey, CreatedAt) ->
+    case leo_s3_libs_data_handler:lookup({mnesia, ?AUTH_TABLE}, AccessKeyId) of
+        {ok, _} ->
+            {error, already_exists};
+        not_found ->
+            _ = leo_s3_libs_data_handler:insert(
+                  {mnesia, ?AUTH_TABLE}, {[], #credential{access_key_id     = AccessKeyId,
+                                                          secret_access_key = SecretAccessKey,
+                                                          created_at        = CreatedAt}}),
+            {ok, [{access_key_id,     AccessKeyId},
+                  {secret_access_key, SecretAccessKey}]};
         _ ->
             {error, not_initialized}
     end.

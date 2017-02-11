@@ -34,6 +34,7 @@
 
 -export([create_table/2,
          put/1, put/3, bulk_put/1,
+         import/3,
          update/1, delete/1,
          find_by_id/1, find_all/0,
          auth/2, checksum/0,
@@ -125,6 +126,51 @@ put_1(UserId, Password, WithS3Keys) ->
                     leo_s3_user_credential:put(UserId, CreatedAt);
                 false ->
                     ok
+            end;
+        Error ->
+            Error
+    end.
+
+
+%% @doc Import a user account with access-key-id and secret-access-key
+%%
+-spec(import(UserId, AccessKey, SecretKey) ->
+                {ok, [tuple()]} | {error, any()} when UserId::binary(),
+                                                      AccessKey::binary(),
+                                                      SecretKey::binary()).
+import(UserId, AccessKey, SecretKey) ->
+    case find_by_id(UserId) of
+        not_found ->
+            import_1(UserId, AccessKey, SecretKey);
+        {ok, _} ->
+            {error, already_exists};
+        {error, Cause} ->
+            {error, Cause}
+    end.
+
+
+%% @private
+import_1(UserId, AccessKey, SecretKey) ->
+    CreatedAt = leo_date:now(),
+    case leo_s3_auth:put_credential(AccessKey, SecretKey, CreatedAt) of
+        {ok, Keys} ->
+            case leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
+                                                 {[], #?S3_USER{id = UserId,
+                                                                password = <<>>,
+                                                                created_at = CreatedAt,
+                                                                updated_at = CreatedAt}}) of
+                ok ->
+                    case leo_s3_user_credential:put(#user_credential{user_id = UserId,
+                                                                     access_key_id = AccessKey,
+                                                                     created_at = CreatedAt}) of
+                        ok ->
+
+                            {ok, Keys};
+                        Error ->
+                            Error
+                    end;
+                Error ->
+                    Error
             end;
         Error ->
             Error

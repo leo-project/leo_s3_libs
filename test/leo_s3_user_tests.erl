@@ -58,7 +58,7 @@ teardown(_) ->
 suite_(_) ->
     ok = leo_s3_user:create_table(ram_copies, [node()]),
     ok = leo_s3_user_credential:create_table(ram_copies, [node()]),
-    ok = leo_s3_auth:create_table(ram_copies, [node()]),
+    catch leo_s3_auth:create_table(ram_copies, [node()]),
 
     UserId    = <<"Name is Leo">>,
     Password0 = <<"Type is FS">>,

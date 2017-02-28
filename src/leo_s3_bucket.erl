@@ -954,10 +954,10 @@ find_bucket_by_name_2(BucketName, Node, BucketInfo) ->
                   not_found;
               {value, {error, Reason}} ->
                   {error, Reason};
+              {value, {badrpc, Reason}} ->
+                  {error, Reason};
               timeout ->
-                  {error, timeout};
-              {badrpc, Reason} ->
-                  {error, Reason}
+                  {error, timeout}
           end,
     case Ret of
         {error, Cause} ->

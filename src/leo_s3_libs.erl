@@ -51,6 +51,8 @@ start(Type) ->
                      Options::list()).
 start(slave = Type, Options) ->
     _ = application:start(crypto),
+    _ = application:start(bcrypt),
+    _ = application:start(erlpass),
 
     Provider = leo_misc:get_value('provider', Options, []),
     BucketPropSyncInterval = leo_misc:get_value(
@@ -61,6 +63,8 @@ start(slave = Type, Options) ->
 
 start(master = Type, _Options) ->
     _ = application:start(crypto),
+    _ = application:start(bcrypt),
+    _ = application:start(erlpass),
 
     BucketPropSyncInterval = ?DEF_BUCKET_PROP_SYNC_INTERVAL,
     ok = start_1(Type, [], BucketPropSyncInterval),

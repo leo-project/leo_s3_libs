@@ -44,12 +44,14 @@ bucket_test_() ->
 
 setup() ->
     application:start(crypto),
+    application:start(bcrypt),
     application:start(mnesia),
     leo_s3_auth:start(master, []),
     ok.
 
 teardown(_) ->
     application:stop(crypto),
+    application:stop(bcrypt),
     application:stop(mnesia),
     meck:unload(),
     ok.
@@ -74,6 +76,22 @@ suite_(_) ->
 
     {error,already_exists} =
         leo_s3_user:put(UserId, Password0, true),
+
+    %% %% migration from 0.12.7 to 1.3.3
+    {ok, _} = leo_s3_user:put(<< UserId/binary, "_md5" >>, Password0, true, md5),
+    {ok, ResMD5} = leo_s3_user:find_by_id(<< UserId/binary, "_md5" >>),
+    ?debugVal(ResMD5),
+    {ok, _} = leo_s3_user:auth(<< UserId/binary, "_md5" >>, Password0),
+    {ok, ResBcrypted} = leo_s3_user:find_by_id(<< UserId/binary, "_md5" >>),
+    ?debugVal(ResBcrypted),
+
+    %% %% migration from 1.3.2 to 1.3.3
+    {ok, _} = leo_s3_user:put(<< UserId/binary, "_md5_w/salt" >>, Password0, true, md5_with_salt),
+    {ok, ResMD5WithSalt} = leo_s3_user:find_by_id(<< UserId/binary, "_md5_w/salt" >>),
+    ?debugVal(ResMD5WithSalt),
+    {ok, _} = leo_s3_user:auth(<< UserId/binary, "_md5_w/salt" >>, Password0),
+    {ok, ResBcrypted2} = leo_s3_user:find_by_id(<< UserId/binary, "_md5_w/salt" >>),
+    ?debugVal(ResBcrypted2),
 
     %% %% import-user
     ImportUserId = <<"Name is Import">>,
@@ -105,8 +123,8 @@ suite_(_) ->
     {ok, Users_2} = leo_s3_user_credential:find_all_with_role(),
     ?debugVal(Users_1),
     ?debugVal(Users_2),
-    ?assertEqual(6, length(Users_1)),
-    ?assertEqual(6, length(Users_2)),
+    ?assertEqual(8, length(Users_1)),
+    ?assertEqual(8, length(Users_2)),
 
     %% %% get_credential_by_id
     {ok, Credential} = leo_s3_user_credential:get_credential_by_user_id(UserId),

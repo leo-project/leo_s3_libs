@@ -33,7 +33,7 @@
 -include_lib("stdlib/include/qlc.hrl").
 
 -export([create_table/2,
-         put/1, put/3, bulk_put/1,
+         put/1, put/3, put/4, bulk_put/1,
          import/3,
          update/1, delete/1,
          find_by_id/1, find_all/0,
@@ -99,9 +99,17 @@ put_1(User) ->
                                                        Password::binary(),
                                                        WithS3Keys::boolean()).
 put(UserId, Password, WithS3Keys) ->
+    put(UserId, Password, WithS3Keys, bcrypt).
+
+-spec(put(UserId, Password, WithS3Keys, Type) ->
+             ok | {ok, [tuple()]} |{error, any()} when UserId::binary(),
+                                                       Password::binary(),
+                                                       WithS3Keys::boolean(),
+                                                       Type::pwd_hash()).
+put(UserId, Password, WithS3Keys, Type) ->
     case find_by_id(UserId) of
         not_found ->
-            put_1(UserId, Password, WithS3Keys);
+            put_1(UserId, Password, WithS3Keys, Type);
         {ok, _} ->
             {error, already_exists};
         {error, Cause} ->
@@ -111,9 +119,9 @@ put(UserId, Password, WithS3Keys) ->
 
 %% @doc Create a user account w/access-key-id/secret-access-key
 %% @private
-put_1(UserId, Password, WithS3Keys) ->
+put_1(UserId, Password, WithS3Keys, Type) ->
     CreatedAt = leo_date:now(),
-    Digest = hash_and_salt_password(Password, CreatedAt),
+    Digest = hash_and_salt_password(Type, Password, CreatedAt),
 
     case leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
                                          {[], #?S3_USER{id = UserId,
@@ -209,7 +217,7 @@ update(#?S3_USER{id       = UserId,
                             true ->
                                 Password1;
                             false ->
-                                hash_and_salt_password(Password0, CreatedAt)
+                                hash_and_salt_password(bcrypt, Password0, CreatedAt)
                         end,
             leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
                                             {[], #?S3_USER{id = UserId,
@@ -291,9 +299,11 @@ find_all() ->
 auth(UserId, PW0) ->
     case find_by_id(UserId) of
         {ok, #?S3_USER{password = PW1,
-                       created_at = CreatedAt} = User} ->
-            case hash_and_salt_password(PW0, CreatedAt) of
+                       created_at = CreatedAt} = User} when erlang:byte_size(PW1) =:= 16 ->
+            case hash_and_salt_password(md5_with_salt, PW0, CreatedAt) of
                 PW1 ->
+                    %% migrate previous-version(v1.3.2)'s data(md5 with salt) to bcrypted one
+                    _ = update(User),
                     {ok, User#?S3_USER{password = <<>>}};
                 _ ->
                     %% migrate previous-version(v0.12.7)'s data
@@ -304,6 +314,13 @@ auth(UserId, PW0) ->
                         _ ->
                             {error, invalid_values}
                     end
+            end;
+        {ok, #?S3_USER{password = BcryptedPW} = User} ->
+            case erlpass:match(PW0, BcryptedPW) of
+                true ->
+                    {ok, User#?S3_USER{password = <<>>}};
+                false ->
+                    {error, invalid_values}
             end;
         not_found = Cause ->
             {error, Cause};
@@ -402,10 +419,15 @@ transform_3([#?S3_USER{id = Id} = User|Rest]) ->
 %%--------------------------------------------------------------------
 %% @doc Generate hash/salt-ed password
 %% @private
--spec(hash_and_salt_password(Password, CreatedAt) ->
-             binary() when Password::binary(),
+-spec(hash_and_salt_password(Type, Password, CreatedAt) ->
+             binary() when Type::pwd_hash(),
+                           Password::binary(),
                            CreatedAt::non_neg_integer()).
-hash_and_salt_password(Password, CreatedAt) ->
+hash_and_salt_password(bcrypt, Password, _CreatedAt) ->
+    erlpass:hash(Password);
+hash_and_salt_password(md5, Password, _CreatedAt) ->
+    erlang:md5(Password);
+hash_and_salt_password(md5_with_salt, Password, CreatedAt) ->
     Salt = list_to_binary(leo_hex:integer_to_hex(CreatedAt, 8)),
     Context1 = crypto:hash_init(md5),
     Context2 = crypto:hash_update(Context1, Password),

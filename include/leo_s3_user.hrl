@@ -50,3 +50,5 @@
           access_key_id = <<>> :: binary(),
           created_at = 0  :: integer()
          }).
+
+-type pwd_hash()  :: md5|md5_with_salt|bcrypt.

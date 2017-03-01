@@ -38,9 +38,12 @@
 -ifdef(EUNIT).
 
 bucket_test_() ->
-    {foreach, fun setup/0, fun teardown/1,
-     [{with, [T]} || T <- [fun suite_/1
-                          ]]}.
+    {setup,
+     fun setup/0,
+     fun teardown/1,
+     [
+        {timeout, 60, fun suite_/0}
+     ]}.
 
 setup() ->
     application:start(crypto),
@@ -57,7 +60,7 @@ teardown(_) ->
     ok.
 
 
-suite_(_) ->
+suite_() ->
     ok = leo_s3_user:create_table(ram_copies, [node()]),
     ok = leo_s3_user_credential:create_table(ram_copies, [node()]),
     catch leo_s3_auth:create_table(ram_copies, [node()]),

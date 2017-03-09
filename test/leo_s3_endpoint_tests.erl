@@ -58,13 +58,13 @@ mnesia_suite_(_) ->
     ok = leo_s3_endpoint:create_table(ram_copies, [node()]),
     not_found = leo_s3_endpoint:get_endpoints(),
 
-    ok = leo_s3_endpoint:set_endpoint(<<"photo.leofs.org">>),
-    ok = leo_s3_endpoint:set_endpoint(<<"backup.leofs.org">>),
+    ok = leo_s3_endpoint:set_endpoint(<<"photo.leo-project.net">>),
+    ok = leo_s3_endpoint:set_endpoint(<<"backup.leo-project.net">>),
 
     {ok, EndPoints0} = leo_s3_endpoint:get_endpoints(),
     ?assertEqual(2, length(EndPoints0)),
 
-    ok = leo_s3_endpoint:delete_endpoint(<<"photo.leofs.org">>),
+    ok = leo_s3_endpoint:delete_endpoint(<<"photo.leo-project.net">>),
     {ok, EndPoints1} = leo_s3_endpoint:get_endpoints(),
     ?assertEqual(1, length(EndPoints1)),
 
@@ -97,14 +97,14 @@ ets_suite_(_) ->
     ok = rpc:call(Manager1, meck, new,    [leo_s3_endpoint, [no_link, non_strict]]),
     ok = rpc:call(Manager1, meck, expect, [leo_s3_endpoint, get_endpoints,
                                            fun() ->
-                                                   {ok, [#endpoint{endpoint="photo.leofs.org"},
-                                                         #endpoint{endpoint="backup.leofs.org"}]}
+                                                   {ok, [#endpoint{endpoint="photo.leo-project.net"},
+                                                         #endpoint{endpoint="backup.leo-project.net"}]}
                                            end]),
 
     {ok, Res1} = leo_s3_endpoint:get_endpoints(),
     ?assertEqual(2, length(Res1)),
 
-    ok = leo_s3_endpoint:delete_endpoint("photo.leofs.org"),
+    ok = leo_s3_endpoint:delete_endpoint("photo.leo-project.net"),
     {ok, EndPoints1} = leo_s3_endpoint:get_endpoints(),
     ?assertEqual(1, length(EndPoints1)),
 

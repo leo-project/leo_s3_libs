@@ -593,6 +593,7 @@ get_latest_bucket(BucketName) ->
     case get_info() of
         {ok, #bucket_info{db = DB,
                           sync_interval = SyncInterval,
+                          provider = Providers,
                           type = Type}} ->
             Now = leo_date:now(),
             case leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, BucketName) of
@@ -600,13 +601,21 @@ get_latest_bucket(BucketName) ->
                   when (Now - LastSynchronizedAt) < SyncInterval ->
                     %% valid local record
                     {ok, BucketInfo};
-                {ok, #?BUCKET{acls = _ACLs}} ->
-                    %% to be synced with manager's record
-                    case find_bucket_by_name(BucketName) of
-                        {ok, #?BUCKET{} = BucketInfo} ->
-                            {ok, BucketInfo};
-                        Error ->
-                            Error
+                {ok, #?BUCKET{acls = _ACLs} = OldBucketInfo} ->
+                    %% try to sync with managers only in case at least one of managers is alive
+                    %% https://github.com/leo-project/leofs/issues/642
+                    case ping(Providers) of
+                        pong ->
+                            %% try to sync
+                            case find_bucket_by_name(BucketName) of
+                                {ok, #?BUCKET{} = BucketInfo} ->
+                                    {ok, BucketInfo};
+                                Error ->
+                                    Error
+                            end;
+                        pang ->
+                            %% use the obsoleted bucket info while managers are down
+                            {ok, OldBucketInfo}
                     end;
                 not_found when Type == slave->
                     case find_bucket_by_name(BucketName) of
@@ -975,6 +984,20 @@ find_bucket_by_name_2(BucketName, Node, BucketInfo) ->
             void
     end,
     Ret.
+
+%% @doc Check the liveness of remote node(s)
+%% @private
+-spec(ping(Providers) ->
+             pong | pang when Providers::[atom()]).
+ping([]) ->
+    pang;
+ping([Node|Rest]) ->
+    case net_adm:ping(Node) of
+        pong ->
+            pong;
+        pang ->
+            ping(Rest)
+    end.
 
 %% @doc Communicate remote node(s)
 %% @private

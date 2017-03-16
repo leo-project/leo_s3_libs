@@ -298,7 +298,7 @@ ets_suite_(_) ->
                                            end]),
 
 
-    ok = leo_s3_bucket:start(slave, [Manager1], 3),
+    ok = leo_s3_bucket:start(slave, [Manager1], 1),
 
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket0),
     ok = leo_s3_bucket:put(?ACCESS_KEY_0, ?Bucket1),
@@ -398,7 +398,7 @@ ets_suite_(_) ->
                    end]),
     {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
                            permissions = [full_control]}]} = leo_s3_bucket:get_acls(?Bucket0),
-    timer:sleep(3500),
+    timer:sleep(1500),
     %% to be synced with latest manager's ACL(read)
     {ok, [#bucket_acl_info{user_id = ?ACCESS_KEY_0,
                            permissions = [read]}]} = leo_s3_bucket:get_acls(?Bucket0),
@@ -436,6 +436,12 @@ ets_suite_(_) ->
 
     %% teardown
     slave:stop(Manager1),
+
+    {ok, _BucketInfo} = leo_s3_bucket:get_latest_bucket(?Bucket0),
+    timer:sleep(1500),
+    %% get_latest_bucket works while managers(Providers) are down
+    {ok, _BucketInfo} = leo_s3_bucket:get_latest_bucket(?Bucket0),
+
     net_kernel:stop(),
     meck:unload(),
     ok.

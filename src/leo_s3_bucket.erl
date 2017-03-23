@@ -239,7 +239,12 @@ find_bucket_by_name(BucketName) ->
         %% If local-checksum equal provider's checksum, then return local-list,
         %% but local-checksum does NOT equal provider's checksum, then return provider's list.
         {ok, #bucket_info{db = DB, provider = Provider}} when DB == ets ->
-            find_bucket_by_name_1(BucketName, DB, Provider);
+            case ping(Provider) of
+                pong ->
+                    find_bucket_by_name_1(BucketName, DB, Provider);
+                _ ->
+                    leo_s3_bucket_data_handler:find_by_name({DB, ?BUCKET_TABLE}, BucketName)
+            end;
         Error ->
             Error
     end.

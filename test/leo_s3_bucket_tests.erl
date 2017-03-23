@@ -441,6 +441,7 @@ ets_suite_(_) ->
     timer:sleep(1500),
     %% get_latest_bucket works while managers(Providers) are down
     {ok, _BucketInfo} = leo_s3_bucket:get_latest_bucket(?Bucket0),
+    {ok, _} = leo_s3_bucket:find_bucket_by_name(?Bucket0),
 
     net_kernel:stop(),
     meck:unload(),

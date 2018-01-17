@@ -178,6 +178,15 @@ suite_() ->
     {ok, RetL_4} = leo_s3_user_credential:find_all(),
     ?assertEqual(5, length(RetL_4) - length(RetL_3)),
 
+    %% delete_all_related_records
+    UID4Delete = <<UserId/binary, "_1">>,
+    % retreive access_key_id
+    {ok, Creds4Delete} = leo_s3_user_credential:get_credential_by_user_id(UID4Delete),
+    ok = leo_s3_user:delete_all_related_records(UID4Delete),
+    not_found = leo_s3_user:find_by_id(UID4Delete),
+    not_found = leo_s3_user_credential:get_credential_by_user_id(UID4Delete),
+    not_found = leo_s3_auth:get_credential(leo_misc:get_value(access_key_id, Creds4Delete)),
+
     ok.
 
 -endif.

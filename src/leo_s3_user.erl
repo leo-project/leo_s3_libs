@@ -36,6 +36,7 @@
          put/1, put/3, put/4, bulk_put/1,
          import/3,
          update/1, delete/1,
+         delete_all_related_records/1,
          find_by_id/1, find_all/0,
          auth/2, checksum/0,
          transform/0
@@ -255,6 +256,32 @@ delete(UserId) ->
             Error
     end.
 
+%% @doc Delete a user
+%%
+-spec(delete_all_related_records(UserId) ->
+             ok | {error, any()} when UserId::binary()).
+delete_all_related_records(UserId) ->
+    case find_by_id(UserId) of
+        {ok, #?S3_USER{} = S3User} ->
+            Fun = fun() ->
+                          % 1. Delete the user record logically
+                          ok = mnesia:write(?USERS_TABLE,
+                                            S3User#?S3_USER{updated_at = leo_date:now(),
+                                                            del = true},
+                                            write),
+                          % 2. Retrieve the access_key_id from user_credential table
+                          [UC|_] = mnesia:read(?USER_CREDENTIAL_TABLE, UserId, write),
+                          % 3. Delete the user_credential record
+                          ok = mnesia:delete_object(?USER_CREDENTIAL_TABLE, UC, write),
+                          % 4. Delete the credential record
+                          ok = mnesia:delete(?AUTH_TABLE, UC#user_credential.access_key_id, write)
+                  end,
+            leo_mnesia:write(Fun);
+        not_found = Cause ->
+            {error, Cause};
+        Error ->
+            Error
+    end.
 
 %% @doc Retrieve a user by user-id
 %%

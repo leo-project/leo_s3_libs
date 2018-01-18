@@ -34,7 +34,7 @@
 
 -export([create_table/2,
          put/1, put/3, put/4, bulk_put/1,
-         import/3,
+         import/3, force_import/3,
          update/1, delete/1,
          delete_all_related_records/1,
          find_by_id/1, find_all/0,
@@ -185,6 +185,42 @@ import_1(UserId, AccessKey, SecretKey) ->
             Error
     end.
 
+%% @doc Import a user account with access-key-id and secret-access-key
+%%      even there are existing records (being overwritten).
+%%      The purpose is to enable users who hit https://github.com/leo-project/leofs/issues/964
+%%      to import a different user with the existing access-key.
+%%
+-spec(force_import(UserId, AccessKey, SecretKey) ->
+                {ok, [tuple()]} | {error, any()} when UserId::binary(),
+                                                      AccessKey::binary(),
+                                                      SecretKey::binary()).
+force_import(UserId, AccessKey, SecretKey) ->
+    Fun = fun() ->
+                  CreatedAt = leo_date:now(),
+                  ok = mnesia:write(?USERS_TABLE,
+                                            #?S3_USER{id = UserId,
+                                                      password = <<>>,
+                                                      created_at = CreatedAt,
+                                                      updated_at = CreatedAt},
+                                            write),
+                  ok = mnesia:write(?USER_CREDENTIAL_TABLE,
+                                            #user_credential{user_id = UserId,
+                                                             access_key_id = AccessKey,
+                                                             created_at = CreatedAt},
+                                            write),
+                  ok = mnesia:write(?AUTH_TABLE,
+                                            #credential{access_key_id = AccessKey,
+                                                        secret_access_key = SecretKey,
+                                                        created_at = CreatedAt},
+                                            write)
+          end,
+    case leo_mnesia:write(Fun) of
+        ok ->
+            {ok, [{access_key_id, AccessKey},
+                  {secret_access_key, SecretKey}]};
+        Error ->
+            Error
+    end.
 
 %% @doc Add buckets
 %%

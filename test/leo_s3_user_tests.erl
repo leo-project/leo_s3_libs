@@ -106,7 +106,7 @@ suite_() ->
     ?assertEqual(2, length(Keys)),
     ?assertEqual(IAccessKeyId, ImportAccessKey),
     ?assertEqual(ISecretAccessKey, ImportSecretKey),
-
+    
     %% %% find-by-id
     {ok, Res1} = leo_s3_user:find_by_id(UserId),
     ?assertEqual(UserId, Res1#?S3_USER.id),
@@ -186,6 +186,19 @@ suite_() ->
     not_found = leo_s3_user:find_by_id(UID4Delete),
     not_found = leo_s3_user_credential:get_credential_by_user_id(UID4Delete),
     not_found = leo_s3_auth:get_credential(leo_misc:get_value(access_key_id, Creds4Delete)),
+
+    %% %% force import-user
+    ImportUserId2 = <<"Name is Import2">>,
+    %% just in case, import doesn't work for a different user with the existing access_key_id
+    {error, already_exists} = leo_s3_user:import(ImportUserId2, ImportAccessKey, ImportSecretKey),
+
+    ImportSecretKey2 = <<"importS2">>,
+    {ok, IKeys2} = leo_s3_user:force_import(ImportUserId2, ImportAccessKey, ImportSecretKey2),
+    IAccessKeyId2     = leo_misc:get_value('access_key_id',     IKeys2),
+    ISecretAccessKey2 = leo_misc:get_value('secret_access_key', IKeys2),
+    ?assertEqual(2, length(Keys)),
+    ?assertEqual(IAccessKeyId2, ImportAccessKey),
+    ?assertEqual(ISecretAccessKey2, ImportSecretKey2),
 
     ok.
 

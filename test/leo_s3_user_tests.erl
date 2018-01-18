@@ -42,7 +42,7 @@ bucket_test_() ->
      fun setup/0,
      fun teardown/1,
      [
-        {timeout, 60, fun suite_/0}
+      {timeout, 60, fun suite_/0}
      ]}.
 
 setup() ->
@@ -106,7 +106,7 @@ suite_() ->
     ?assertEqual(2, length(Keys)),
     ?assertEqual(IAccessKeyId, ImportAccessKey),
     ?assertEqual(ISecretAccessKey, ImportSecretKey),
-    
+
     %% %% find-by-id
     {ok, Res1} = leo_s3_user:find_by_id(UserId),
     ?assertEqual(UserId, Res1#?S3_USER.id),
@@ -139,7 +139,7 @@ suite_() ->
     {error,invalid_values} = leo_s3_user:auth(UserId, <<>>),
 
     %% update
-    ok = leo_s3_user:update(#?S3_USER{id      = UserId,
+    ok = leo_s3_user:update(#?S3_USER{id = UserId,
                                       role_id = 9}),
     {ok, Res3} = leo_s3_user:find_by_id(UserId),
     ?assertEqual(UserId, Res3#?S3_USER.id),
@@ -157,7 +157,6 @@ suite_() ->
     {ok, Checksum_2} = leo_s3_user_credential:checksum(),
     ?assertEqual(true, Checksum_1 > 0),
     ?assertEqual(true, Checksum_2 > 0),
-
 
     %% check bulk-insert
     {ok, RetL_1} = leo_s3_user:find_all(),
@@ -180,14 +179,15 @@ suite_() ->
 
     %% delete_all_related_records
     UID4Delete = <<UserId/binary, "_1">>,
-    % retreive access_key_id
+
+    %% retreive access_key_id
     {ok, Creds4Delete} = leo_s3_user_credential:get_credential_by_user_id(UID4Delete),
     ok = leo_s3_user:delete_all_related_records(UID4Delete),
     not_found = leo_s3_user:find_by_id(UID4Delete),
     not_found = leo_s3_user_credential:get_credential_by_user_id(UID4Delete),
     not_found = leo_s3_auth:get_credential(leo_misc:get_value(access_key_id, Creds4Delete)),
 
-    %% %% force import-user
+    %% force import-user
     ImportUserId2 = <<"Name is Import2">>,
     %% just in case, import doesn't work for a different user with the existing access_key_id
     {error, already_exists} = leo_s3_user:import(ImportUserId2, ImportAccessKey, ImportSecretKey),

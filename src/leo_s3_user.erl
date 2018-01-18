@@ -144,9 +144,9 @@ put_1(UserId, Password, WithS3Keys, Type) ->
 %% @doc Import a user account with access-key-id and secret-access-key
 %%
 -spec(import(UserId, AccessKey, SecretKey) ->
-                {ok, [tuple()]} | {error, any()} when UserId::binary(),
-                                                      AccessKey::binary(),
-                                                      SecretKey::binary()).
+             {ok, [tuple()]} | {error, any()} when UserId::binary(),
+                                                   AccessKey::binary(),
+                                                   SecretKey::binary()).
 import(UserId, AccessKey, SecretKey) ->
     case find_by_id(UserId) of
         not_found ->
@@ -191,28 +191,28 @@ import_1(UserId, AccessKey, SecretKey) ->
 %%      to import a different user with the existing access-key.
 %%
 -spec(force_import(UserId, AccessKey, SecretKey) ->
-                {ok, [tuple()]} | {error, any()} when UserId::binary(),
-                                                      AccessKey::binary(),
-                                                      SecretKey::binary()).
+             {ok, [tuple()]} | {error, any()} when UserId::binary(),
+                                                   AccessKey::binary(),
+                                                   SecretKey::binary()).
 force_import(UserId, AccessKey, SecretKey) ->
     Fun = fun() ->
                   CreatedAt = leo_date:now(),
                   ok = mnesia:write(?USERS_TABLE,
-                                            #?S3_USER{id = UserId,
-                                                      password = <<>>,
-                                                      created_at = CreatedAt,
-                                                      updated_at = CreatedAt},
-                                            write),
+                                    #?S3_USER{id = UserId,
+                                              password = <<>>,
+                                              created_at = CreatedAt,
+                                              updated_at = CreatedAt},
+                                    write),
                   ok = mnesia:write(?USER_CREDENTIAL_TABLE,
-                                            #user_credential{user_id = UserId,
-                                                             access_key_id = AccessKey,
-                                                             created_at = CreatedAt},
-                                            write),
+                                    #user_credential{user_id = UserId,
+                                                     access_key_id = AccessKey,
+                                                     created_at = CreatedAt},
+                                    write),
                   ok = mnesia:write(?AUTH_TABLE,
-                                            #credential{access_key_id = AccessKey,
-                                                        secret_access_key = SecretKey,
-                                                        created_at = CreatedAt},
-                                            write)
+                                    #credential{access_key_id = AccessKey,
+                                                secret_access_key = SecretKey,
+                                                created_at = CreatedAt},
+                                    write)
           end,
     case leo_mnesia:write(Fun) of
         ok ->
@@ -300,16 +300,16 @@ delete_all_related_records(UserId) ->
     case find_by_id(UserId) of
         {ok, #?S3_USER{} = S3User} ->
             Fun = fun() ->
-                          % 1. Delete the user record logically
+                                                % 1. Delete the user record logically
                           ok = mnesia:write(?USERS_TABLE,
                                             S3User#?S3_USER{updated_at = leo_date:now(),
                                                             del = true},
                                             write),
-                          % 2. Retrieve the access_key_id from user_credential table
+                                                % 2. Retrieve the access_key_id from user_credential table
                           [UC|_] = mnesia:read(?USER_CREDENTIAL_TABLE, UserId, write),
-                          % 3. Delete the user_credential record
+                                                % 3. Delete the user_credential record
                           ok = mnesia:delete_object(?USER_CREDENTIAL_TABLE, UC, write),
-                          % 4. Delete the credential record
+                                                % 4. Delete the credential record
                           ok = mnesia:delete(?AUTH_TABLE, UC#user_credential.access_key_id, write)
                   end,
             leo_mnesia:write(Fun);

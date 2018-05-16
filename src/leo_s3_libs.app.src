@@ -22,8 +22,8 @@
 %%======================================================================
 {application, leo_s3_libs,
  [
-  {description, "Leo S3-Libs"},
-  {vsn, "1.2.19"},
+  {description, "Leo S3 libs"},
+  {vsn, "2.0.0"},
   {id, "leo_s3_libs"},
   {registered,   []},
   {applications, [kernel, stdlib]},

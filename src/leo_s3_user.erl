@@ -2,7 +2,7 @@
 %%
 %% Leo S3-Libs
 %%
-%% Copyright (c) 2012-2017 Rakuten, Inc.
+%% Copyright (c) 2012-2018 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -33,7 +33,9 @@
 -include_lib("stdlib/include/qlc.hrl").
 
 -export([create_table/2,
-         put/1, put/3, put/4, bulk_put/1,
+         create/2, create/3,
+         put/1,
+         bulk_put/1,
          import/3, force_import/3,
          update/1, delete/1,
          delete_all_related_records/1,
@@ -70,8 +72,72 @@ create_table(Mode, Nodes) ->
     ok.
 
 
+%% @doc Create a user
+-spec(create(UserId, Password) ->
+             ok | {error, Cause} when UserId::binary(),
+                                      Password::binary(),
+                                      Cause::any()).
+create(UserId, Password) ->
+    create(UserId, Password, 'bcrypt').
+
+-spec(create(UserId, Password, HashType) ->
+             ok | {error, Cause} when UserId::binary(),
+                                      Password::binary(),
+                                      HashType::bcrypt | md5 | md5_with_salt,
+                                      Cause::any()).
+create(UserId, Password, HashType) ->
+    case find_by_id(UserId) of
+        not_found ->
+            Fun = fun() ->
+                          create_fun(UserId, Password, HashType)
+                  end,
+            case catch mnesia:activity(sync_transaction, Fun) of
+                {ok,_} = Ret ->
+                    Ret;
+                {_, Cause} ->
+                    {error, Cause}
+            end;
+        {ok,_} ->
+            {error, already_exists};
+        {error, Cause} ->
+            {error, Cause}
+    end.
+
+
+%% @private
+create_fun(UserId, Password, HashType) ->
+    CreatedAt = leo_date:now(),
+    Digest = hash_and_salt_password(HashType, Password, CreatedAt),
+
+    %% insert a user-info
+    case mnesia:write(?USERS_TABLE,
+                      #?S3_USER{id = UserId,
+                                password = Digest,
+                                created_at = CreatedAt,
+                                updated_at = CreatedAt}, write) of
+        ok ->
+            %% create a key
+            case leo_s3_auth:create_key(UserId) of
+                {ok, Keys} ->
+                    AccessKeyId = leo_misc:get_value(access_key_id, Keys),
+                    case mnesia:write(?USER_CREDENTIAL_TABLE,
+                                      #user_credential{user_id = UserId,
+                                                       access_key_id = AccessKeyId,
+                                                       created_at = CreatedAt}, write) of
+                        ok ->
+                            {ok, Keys};
+                        _ ->
+                            {error, transaction_abort}
+                    end;
+                Error ->
+                    Error
+            end;
+        _ ->
+            {error, transaction_abort}
+    end.
+
+
 %% @doc Insert a user
-%%
 -spec(put(User)  ->
              ok | {error, any()} when User::#?S3_USER{}).
 put(#?S3_USER{id = UserId,
@@ -93,56 +159,7 @@ put_1(User) ->
                                     {[], User}).
 
 
-%% @doc Create a user account
-%%
--spec(put(UserId, Password, WithS3Keys) ->
-             ok | {ok, [tuple()]} |{error, any()} when UserId::binary(),
-                                                       Password::binary(),
-                                                       WithS3Keys::boolean()).
-put(UserId, Password, WithS3Keys) ->
-    put(UserId, Password, WithS3Keys, bcrypt).
-
--spec(put(UserId, Password, WithS3Keys, Type) ->
-             ok | {ok, [tuple()]} |{error, any()} when UserId::binary(),
-                                                       Password::binary(),
-                                                       WithS3Keys::boolean(),
-                                                       Type::pwd_hash()).
-put(UserId, Password, WithS3Keys, Type) ->
-    case find_by_id(UserId) of
-        not_found ->
-            put_1(UserId, Password, WithS3Keys, Type);
-        {ok, _} ->
-            {error, already_exists};
-        {error, Cause} ->
-            {error, Cause}
-    end.
-
-
-%% @doc Create a user account w/access-key-id/secret-access-key
-%% @private
-put_1(UserId, Password, WithS3Keys, Type) ->
-    CreatedAt = leo_date:now(),
-    Digest = hash_and_salt_password(Type, Password, CreatedAt),
-
-    case leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
-                                         {[], #?S3_USER{id = UserId,
-                                                        password = Digest,
-                                                        created_at = CreatedAt,
-                                                        updated_at = CreatedAt}}) of
-        ok ->
-            case WithS3Keys of
-                true ->
-                    leo_s3_user_credential:put(UserId, CreatedAt);
-                false ->
-                    ok
-            end;
-        Error ->
-            Error
-    end.
-
-
 %% @doc Import a user account with access-key-id and secret-access-key
-%%
 -spec(import(UserId, AccessKey, SecretKey) ->
              {ok, [tuple()]} | {error, any()} when UserId::binary(),
                                                    AccessKey::binary(),
@@ -150,7 +167,23 @@ put_1(UserId, Password, WithS3Keys, Type) ->
 import(UserId, AccessKey, SecretKey) ->
     case find_by_id(UserId) of
         not_found ->
-            import_1(UserId, AccessKey, SecretKey);
+            case leo_s3_libs_data_handler:lookup(
+                   {mnesia, ?AUTH_TABLE}, AccessKey) of
+                {ok,_} ->
+                    {error, already_exists};
+                not_found ->
+                    Fun = fun() ->
+                                  import_1(UserId, AccessKey, SecretKey)
+                          end,
+                    case catch mnesia:activity(sync_transaction, Fun) of
+                        {ok,_} = Ret ->
+                            Ret;
+                        {_, Cause} ->
+                            {error, Cause}
+                    end;
+                _ ->
+                    {error, not_initialized}
+            end;
         {ok, _} ->
             {error, already_exists};
         {error, Cause} ->
@@ -161,35 +194,43 @@ import(UserId, AccessKey, SecretKey) ->
 %% @private
 import_1(UserId, AccessKey, SecretKey) ->
     CreatedAt = leo_date:now(),
-    case leo_s3_auth:put_credential(AccessKey, SecretKey, CreatedAt) of
-        {ok, Keys} ->
-            case leo_s3_libs_data_handler:insert({mnesia, ?USERS_TABLE},
-                                                 {[], #?S3_USER{id = UserId,
-                                                                password = <<>>,
-                                                                created_at = CreatedAt,
-                                                                updated_at = CreatedAt}}) of
-                ok ->
-                    case leo_s3_user_credential:put(#user_credential{user_id = UserId,
-                                                                     access_key_id = AccessKey,
-                                                                     created_at = CreatedAt}) of
-                        ok ->
 
-                            {ok, Keys};
-                        Error ->
-                            Error
+    %% insert a user-credential-info
+    case mnesia:write(?AUTH_TABLE,
+                      #credential{access_key_id = AccessKey,
+                                  secret_access_key = SecretKey,
+                                  created_at = CreatedAt}, write) of
+        ok ->
+            %% insert a user-info
+            case mnesia:write(?USERS_TABLE,
+                              #?S3_USER{id = UserId,
+                                        password = <<>>,
+                                        created_at = CreatedAt,
+                                        updated_at = CreatedAt}, write) of
+                ok ->
+                    %% insert a user-credential-info
+                    case mnesia:write(?USER_CREDENTIAL_TABLE,
+                                      #user_credential{user_id = UserId,
+                                                       access_key_id = AccessKey,
+                                                       created_at = CreatedAt}, write) of
+                        ok ->
+                            {ok, [{access_key_id,     AccessKey},
+                                  {secret_access_key, SecretKey}]};
+                        _ ->
+                            {error, transaction_abort}
                     end;
-                Error ->
-                    Error
+                _ ->
+                    {error, transaction_abort}
             end;
-        Error ->
-            Error
+        _ ->
+            {error, transaction_abort}
     end.
+
 
 %% @doc Import a user account with access-key-id and secret-access-key
 %%      even there are existing records (being overwritten).
 %%      The purpose is to enable users who hit https://github.com/leo-project/leofs/issues/964
 %%      to import a different user with the existing access-key.
-%%
 -spec(force_import(UserId, AccessKey, SecretKey) ->
              {ok, [tuple()]} | {error, any()} when UserId::binary(),
                                                    AccessKey::binary(),
@@ -223,7 +264,6 @@ force_import(UserId, AccessKey, SecretKey) ->
     end.
 
 %% @doc Add buckets
-%%
 -spec(bulk_put(UserList) ->
              ok when UserList::[#?S3_USER{}]).
 bulk_put([]) ->
@@ -234,7 +274,6 @@ bulk_put([User|Rest]) ->
 
 
 %% @doc Update a user
-%%
 -spec(update(User) ->
              ok | {error, any()} when User::#?S3_USER{}).
 update(#?S3_USER{id       = UserId,
@@ -271,7 +310,6 @@ update(#?S3_USER{id       = UserId,
 
 
 %% @doc Delete a user
-%%
 -spec(delete(UserId) ->
              ok | {error, any()} when UserId::binary()).
 delete(UserId) ->
@@ -292,24 +330,24 @@ delete(UserId) ->
             Error
     end.
 
+
 %% @doc Delete a user
-%%
 -spec(delete_all_related_records(UserId) ->
              ok | {error, any()} when UserId::binary()).
 delete_all_related_records(UserId) ->
     case find_by_id(UserId) of
         {ok, #?S3_USER{} = S3User} ->
             Fun = fun() ->
-                                                % 1. Delete the user record logically
+                          %% 1. Delete the user record logically
                           ok = mnesia:write(?USERS_TABLE,
                                             S3User#?S3_USER{updated_at = leo_date:now(),
                                                             del = true},
                                             write),
-                                                % 2. Retrieve the access_key_id from user_credential table
+                          %% 2. Retrieve the access_key_id from user_credential table
                           [UC|_] = mnesia:read(?USER_CREDENTIAL_TABLE, UserId, write),
-                                                % 3. Delete the user_credential record
+                          %% 3. Delete the user_credential record
                           ok = mnesia:delete_object(?USER_CREDENTIAL_TABLE, UC, write),
-                                                % 4. Delete the credential record
+                          %% 4. Delete the credential record
                           ok = mnesia:delete(?AUTH_TABLE, UC#user_credential.access_key_id, write)
                   end,
             leo_mnesia:write(Fun);
@@ -319,8 +357,8 @@ delete_all_related_records(UserId) ->
             Error
     end.
 
+
 %% @doc Retrieve a user by user-id
-%%
 -spec(find_by_id(UserId) ->
              {ok, #?S3_USER{}} | not_found | {error, any()} when UserId::binary()).
 find_by_id(UserId) ->
@@ -355,7 +393,6 @@ find_all() ->
 
 
 %% @doc Retrieve owners (omit secret_key)
-%%
 -spec(auth(UserId, Passwd) ->
              {ok, #?S3_USER{}} | {error, invalid_values} when UserId::binary(),
                                                               Passwd::binary()).
@@ -393,7 +430,6 @@ auth(UserId, PW0) ->
 
 
 %% @doc Retrieve checksum of the table
-%%
 -spec(checksum() ->
              {ok, non_neg_integer()} | not_found | {error, any()}).
 checksum() ->
@@ -477,9 +513,6 @@ transform_3([#?S3_USER{id = Id} = User|Rest]) ->
     transform_3(Rest).
 
 
-%%--------------------------------------------------------------------
-%%% INTERNAL FUNCTIONS
-%%--------------------------------------------------------------------
 %% @doc Generate hash/salt-ed password
 %% @private
 -spec(hash_and_salt_password(Type, Password, CreatedAt) ->

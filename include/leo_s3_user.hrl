@@ -2,7 +2,7 @@
 %%
 %% Leo S3-libs
 %%
-%% Copyright (c) 2012-2015 Rakuten, Inc.
+%% Copyright (c) 2012-2018 Rakuten, Inc.
 %%
 %% This file is provided to you under the Apache License,
 %% Version 2.0 (the "License"); you may not use this file
@@ -21,6 +21,8 @@
 %%======================================================================
 -define(ROLE_GENERAL, 1).
 -define(ROLE_ADMIN,   9).
+-type(user_role() :: ?ROLE_GENERAL |
+                     ?ROLE_ADMIN).
 
 %% @doc S3 User Info
 %% to LeoFS v1.0.0-pre3
@@ -51,4 +53,4 @@
           created_at = 0  :: integer()
          }).
 
--type pwd_hash()  :: md5|md5_with_salt|bcrypt.
+-type pwd_hash() :: md5|md5_with_salt|bcrypt.

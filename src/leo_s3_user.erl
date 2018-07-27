@@ -91,9 +91,11 @@ create(UserId, Password, HashType) ->
             case leo_s3_auth:create_key(UserId) of
                 {ok, Keys} ->
                     AccessKeyId = leo_misc:get_value(access_key_id, Keys),
+                    SecretKey = leo_misc:get_value(secret_access_key, Keys),
+
                     Fun = fun() ->
                                   create_fun(UserId, Password,
-                                             AccessKeyId, HashType)
+                                             AccessKeyId, SecretKey, HashType)
                           end,
                     case catch mnesia:activity(sync_transaction, Fun) of
                         ok ->
@@ -112,16 +114,26 @@ create(UserId, Password, HashType) ->
 
 
 %% @private
-create_fun(UserId, Password, AccessKeyId, HashType) ->
+create_fun(UserId, Password, AccessKeyId, SecretKey, HashType) ->
     CreatedAt = leo_date:now(),
-    Digest = hash_and_salt_password(HashType, Password, CreatedAt),
 
     %% insert a user-info
-    ok = mnesia:write(?USERS_TABLE,
-                      #?S3_USER{id = UserId,
-                                password = Digest,
-                                created_at = CreatedAt,
-                                updated_at = CreatedAt}, write),
+    case Password of
+        <<>> ->
+            ok = mnesia:write(?USERS_TABLE,
+                              #?S3_USER{id = UserId,
+                                        password = SecretKey,
+                                        created_at = CreatedAt,
+                                        updated_at = CreatedAt}, write);
+        _ ->
+            Digest = hash_and_salt_password(HashType, Password, CreatedAt),
+            ok = mnesia:write(?USERS_TABLE,
+                              #?S3_USER{id = UserId,
+                                        password = Digest,
+                                        created_at = CreatedAt,
+                                        updated_at = CreatedAt}, write)
+    end,
+
     %% create a key
     ok = mnesia:write(?USER_CREDENTIAL_TABLE,
                       #user_credential{user_id = UserId,
@@ -158,15 +170,14 @@ put_1(User) ->
                                                    AccessKey::binary(),
                                                    SecretKey::binary()).
 import(UserId, AccessKey, SecretKey) ->
-    import(UserId, AccessKey, SecretKey, <<>>, ?ROLE_GENERAL).
+    import(UserId, AccessKey, SecretKey, ?ROLE_GENERAL).
 
--spec(import(UserId, AccessKey, SecretKey, Password, RoleId) ->
+-spec(import(UserId, AccessKey, SecretKey, RoleId) ->
              {ok, [tuple()]} | {error, any()} when UserId::binary(),
                                                    AccessKey::binary(),
                                                    SecretKey::binary(),
-                                                   Password::binary(),
                                                    RoleId::user_role()).
-import(UserId, AccessKey, SecretKey, Password, RoleId) ->
+import(UserId, AccessKey, SecretKey, RoleId) ->
     case find_by_id(UserId) of
         not_found ->
             case leo_s3_libs_data_handler:lookup(
@@ -175,8 +186,8 @@ import(UserId, AccessKey, SecretKey, Password, RoleId) ->
                     {error, already_exists};
                 not_found ->
                     Fun = fun() ->
-                                  import_1(UserId, AccessKey, SecretKey,
-                                           Password, RoleId)
+                                  import_1(UserId, AccessKey,
+                                           SecretKey, RoleId)
                           end,
                     case catch mnesia:activity(sync_transaction, Fun) of
                         {ok,_} = Ret ->
@@ -195,7 +206,7 @@ import(UserId, AccessKey, SecretKey, Password, RoleId) ->
 
 
 %% @private
-import_1(UserId, AccessKey, SecretKey, Password, RoleId) ->
+import_1(UserId, AccessKey, SecretKey, RoleId) ->
     CreatedAt = leo_date:now(),
 
     %% insert a user-credential-info
@@ -207,7 +218,7 @@ import_1(UserId, AccessKey, SecretKey, Password, RoleId) ->
     %% insert a user-info
     ok = mnesia:write(?USERS_TABLE,
                       #?S3_USER{id = UserId,
-                                password = Password,
+                                password = SecretKey,
                                 role_id = RoleId,
                                 created_at = CreatedAt,
                                 updated_at = CreatedAt}, write),
@@ -387,22 +398,22 @@ find_all() ->
 
 
 %% @doc Retrieve owners (omit secret_key)
--spec(auth(UserId, Passwd) ->
+-spec(auth(UserId, Password) ->
              {ok, #?S3_USER{}} | {error, invalid_values} when UserId::binary(),
-                                                              Passwd::binary()).
-auth(UserId, PW0) ->
+                                                              Password::binary()).
+auth(UserId, Password) ->
     case find_by_id(UserId) of
-        {ok, #?S3_USER{password = PW1,
-                       created_at = CreatedAt} = User} when erlang:byte_size(PW1) =:= 16 ->
-            case hash_and_salt_password(md5_with_salt, PW0, CreatedAt) of
-                PW1 ->
+        {ok, #?S3_USER{password = Password_1,
+                       created_at = CreatedAt} = User} when erlang:byte_size(Password_1) =:= 16 ->
+            case hash_and_salt_password(md5_with_salt, Password, CreatedAt) of
+                Password_1 ->
                     %% migrate previous-version(v1.3.2)'s data(md5 with salt) to bcrypted one
                     _ = update(User),
                     {ok, User#?S3_USER{password = <<>>}};
                 _ ->
                     %% migrate previous-version(v0.12.7)'s data
-                    case erlang:md5(PW0) of
-                        PW1 ->
+                    case erlang:md5(Password) of
+                        Password_1 ->
                             _ = update(User),
                             {ok, User#?S3_USER{password = <<>>}};
                         _ ->
@@ -410,7 +421,7 @@ auth(UserId, PW0) ->
                     end
             end;
         {ok, #?S3_USER{password = BcryptedPW} = User} ->
-            case erlpass:match(PW0, BcryptedPW) of
+            case erlpass:match(Password, BcryptedPW) of
                 true ->
                     {ok, User#?S3_USER{password = <<>>}};
                 false ->

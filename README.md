@@ -6,7 +6,7 @@
 
 * "leo_s3_libs" is S3 related libraries for leofs and other Erlang applications.
 * "leo_s3_libs" uses [rebar](https://github.com/rebar/rebar) build system. Makefile so that simply running "make" at the top level should work.
-* "leo_s3_libs" requires Erlang R16B03-1 or later.
+* "leo_s3_libs" requires Erlang/OTP 19.3 or later.
 
 
 ## Usage in Leo Project
@@ -20,4 +20,6 @@ leo_s3_libs's license is [Apache License Version 2.0](http://www.apache.org/lice
 
 ## Sponsors
 
-LeoProject/LeoFS is sponsored by [Rakuten, Inc.](http://global.rakuten.com/corp/) and supported by [Rakuten Institute of Technology](http://rit.rakuten.co.jp/).
+* LeoProject/LeoFS was sponsored by [Rakuten, Inc.](https://global.rakuten.com/corp/) from 2012 to Dec of 2018.
+* LeoProject/LeoFS is sponsored by [Lions Data, Ltd.](https://lions-data.com/) from Jan of 2019.
+

@@ -12,3 +12,5 @@ leo_s3_libs.dot
 leo_s3_libs.png
 .rebar/
 doc/
+_build/
+rebar3.crashdump

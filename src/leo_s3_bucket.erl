@@ -832,9 +832,9 @@ gen_nfs_mnt_key(BucketName, AccessKey, IP) ->
                                             {error, not_found};
                                         SecretAccessKey ->
                                             case catch leo_hex:binary_to_hex(
-                                                         crypto:hmac(sha, IP, << BucketName/binary,
-                                                                                 AccessKey/binary,
-                                                                                 SecretAccessKey/binary >>)) of
+                                                         crypto:mac(hmac, sha, IP, << BucketName/binary,
+                                                                                      AccessKey/binary,
+                                                                                      SecretAccessKey/binary >>)) of
                                                 {'EXIT', Cause} ->
                                                     {error, Cause};
                                                 Key ->

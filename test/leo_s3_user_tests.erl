@@ -46,16 +46,17 @@ bucket_test_() ->
      ]}.
 
 setup() ->
-    application:start(crypto),
-    application:start(bcrypt),
-    application:start(mnesia),
+    application:ensure_all_started(crypto),
+    application:ensure_all_started(bcrypt),
+    application:ensure_all_started(mnesia),
     leo_s3_auth:start(master, []),
     ok.
 
 teardown(_) ->
-    application:stop(crypto),
-    application:stop(bcrypt),
     application:stop(mnesia),
+    application:stop(bcrypt),
+    application:stop(poolboy),
+    application:stop(crypto),
     meck:unload(),
     ok.
 

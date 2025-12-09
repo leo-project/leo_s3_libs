@@ -258,7 +258,9 @@ ets_suite_(_) ->
     net_kernel:start([Manager0, shortnames]),
 
     {ok, Manager1} = slave:start_link(list_to_atom(Hostname), 'manager_1'),
-    true = rpc:call(Manager1, code, add_path, ["../deps/meck/ebin"]),
+    %% Add all code paths to slave node
+    CodePaths = code:get_path(),
+    ok = rpc:call(Manager1, code, add_paths, [CodePaths]),
 
 
     %% inspect

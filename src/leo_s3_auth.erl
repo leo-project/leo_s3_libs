@@ -500,11 +500,11 @@ get_signature_1(?AWS_SIGN_VER_4, SecretAccessKey, SignParams, SignV4Params) ->
                   BinToSignHead/binary,
                   RequestBin/binary>>,
 
-    DateKey = crypto:hmac(sha256, <<"AWS4", SecretAccessKey/binary>>, Date_2),
-    DateRegionKey = crypto:hmac(sha256, DateKey, Region),
-    DateRegionServiceKey = crypto:hmac(sha256, DateRegionKey, Service),
-    SigningKey = crypto:hmac(sha256, DateRegionServiceKey, <<"aws4_request">>),
-    Signature = crypto:hmac(sha256, SigningKey, BinToSign),
+    DateKey = crypto:mac(hmac, sha256, <<"AWS4", SecretAccessKey/binary>>, Date_2),
+    DateRegionKey = crypto:mac(hmac, sha256, DateKey, Region),
+    DateRegionServiceKey = crypto:mac(hmac, sha256, DateRegionKey, Service),
+    SigningKey = crypto:mac(hmac, sha256, DateRegionServiceKey, <<"aws4_request">>),
+    Signature = crypto:mac(hmac, sha256, SigningKey, BinToSign),
     SignatureBin = leo_hex:binary_to_hexbin(Signature),
     {SignatureBin, BinToSignHead, SigningKey};
 
@@ -529,9 +529,9 @@ get_signature_1(?AWS_SIGN_VER_2, SecretAccessKey, SignParams, _) ->
                   ContentType/binary, "\n",
                   Date_1/binary,       "\n",
                   Sub_1/binary, Bucket1/binary, URI_1/binary, Sub_2/binary>>,
-    Context = crypto:hmac_init(sha, SecretAccessKey),
-    Context_1 = crypto:hmac_update(Context, BinToSign),
-    HMac = crypto:hmac_final(Context_1),
+    Context = crypto:mac_init(hmac, sha, SecretAccessKey),
+    Context_1 = crypto:mac_update(Context, BinToSign),
+    HMac = crypto:mac_final(Context_1),
     Signature = base64:encode(HMac),
     {Signature, <<>>, <<>>}.
 

@@ -702,7 +702,7 @@ auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 %% +-----------------+------------------------+-------------------+
 %% | Bucket          | URI                    | Expected          |
 %% +-----------------+------------------------+-------------------+
-%% | <<"bucket">>    | <<"/bucket">>          | <<"/">>           |
+%% | <<"bucket">>    | <<"/bucket">>          | <<"">>            |
 %% +-----------------+------------------------+-------------------+
 %% | <<"bucket">>    | <<"/bucket/">>         | <<"/">>           |
 %% +-----------------+------------------------+-------------------+
@@ -712,9 +712,6 @@ auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 %% +-----------------+------------------------+-------------------+
 %% | <<"bucket">>    | <<"/bucket.ext">>      | <<"/bucket.ext">> |
 %% +-----------------+------------------------+-------------------+
-%%
-%% NOTE: AWS SDK (boto3, etc.) uses "/bucket/" for signing bucket-only requests,
-%% so we must return "/" instead of "" for the "/bucket" pattern to match.
 -spec(auth_uri(Bucket, URI, RequestedURI) ->
              binary() when Bucket::binary(),
                            URI::binary(),
@@ -733,9 +730,7 @@ auth_uri(Bucket,_URI, URI) ->
 
             case URILen of
                 BucketThresholdLen1 ->
-                    %% /${Bucket} pattern - return "/" for AWS SDK compatibility
-                    %% AWS SDKs sign bucket-only requests with "/bucket/" not "/bucket"
-                    <<"/">>;
+                    remove_duplicated_bucket(Bucket, URI);
                 BucketThresholdLen2 ->
                     <<"/", Bucket:BucketLen/binary, LastChar:8>> = URI,
                     case LastChar == $/ of
@@ -840,8 +835,7 @@ auth_sub_resources(QueryStr) ->
 -ifdef(TEST).
 auth_uri_test() ->
     Bucket = <<"photo">>,
-    %% AWS SDKs sign bucket-only requests with "/bucket/" so we return "/"
-    <<"/">> = auth_uri(Bucket, <<"/photo">>, <<"/photo">>),
+    <<"">> = auth_uri(Bucket, <<"/photo">>, <<"/photo">>),
     <<"/photo">> = auth_uri(Bucket, <<"/photo">>, <<"/photo/photo">>),
 
     <<"/">> = auth_uri(Bucket, <<"/photo/">>, <<"/photo/">>),

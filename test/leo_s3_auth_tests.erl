@@ -205,10 +205,13 @@ ets_suite_(_) ->
     [] = os:cmd("epmd -daemon"),
     {ok, Hostname} = inet:gethostname(),
 
-    Manager0 = list_to_atom("manager_0@" ++ Hostname),
-    net_kernel:start([Manager0, shortnames]),
+    %% Start local node if not already started
+    case net_kernel:start(['auth_test_manager_0', shortnames]) of
+        {ok, _} -> ok;
+        {error, {already_started, _}} -> ok
+    end,
 
-    {ok, Manager1} = slave:start_link(list_to_atom(Hostname), 'manager_1'),
+    {ok, Peer1, Manager1} = peer:start_link(#{name => 'auth_test_manager_1', host => Hostname}),
     %% Add all code paths to slave node
     CodePaths = code:get_path(),
     ok = rpc:call(Manager1, code, add_paths, [CodePaths]),
@@ -273,11 +276,11 @@ ets_suite_(_) ->
     {error,unmatch} = leo_s3_auth:authenticate(Authorization0, SignParams, false),
 
     %% update_providers
-    Manager2 = list_to_atom("manager_2@" ++ Hostname),
+    Manager2 = list_to_atom("auth_test_manager_2@" ++ Hostname),
     ok = leo_s3_auth:update_providers([Manager2]),
 
     %% teardown
-    slave:stop(Manager1),
+    peer:stop(Peer1),
     net_kernel:stop(),
     meck:unload(),
     ok.

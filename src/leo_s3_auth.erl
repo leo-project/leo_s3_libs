@@ -396,11 +396,33 @@ authenticate_4(#auth_params{secret_access_key = SecretAccessKey,
     case get_signature(SecretAccessKey, SignParams, SignV4Params) of
         {Signature, _SignHead, _SignKey} = Ret ->
             {ok, AccessKeyId, Ret};
-        {WrongSig, _, _} ->
-            error_logger:error_msg("~p,~p,~p,~p~n",
-                                   [{module, ?MODULE_STRING}, {function, "authenticate_4/1"},
-                                    {line, ?LINE}, {body, WrongSig}]),
-            {error, unmatch}
+        {_WrongSig, _, _} ->
+            %% Try with trailing slash (boto3 compatibility)
+            %% boto3 adds trailing slash to auth_path for bucket-level operations
+            SignParams2 = try_add_trailing_slash(SignParams),
+            case get_signature(SecretAccessKey, SignParams2, SignV4Params) of
+                {Signature, _SignHead2, _SignKey2} = Ret2 ->
+                    {ok, AccessKeyId, Ret2};
+                {WrongSig2, _, _} ->
+                    error_logger:error_msg("~p~n",
+                                           [{auth_mismatch,
+                                             [{expected_sig, Signature},
+                                              {calculated_sig, WrongSig2},
+                                              {sign_params, SignParams}]}]),
+                    {error, unmatch}
+            end
+    end.
+
+%% @doc Try adding trailing slash to requested_uri for boto3 compatibility
+%% @private
+try_add_trailing_slash(#sign_params{requested_uri = URI} = SignParams) ->
+    case binary:last(URI) of
+        $/ ->
+            %% Already has trailing slash
+            SignParams;
+        _ ->
+            %% Add trailing slash
+            SignParams#sign_params{requested_uri = <<URI/binary, "/">>}
     end.
 
 %% @private

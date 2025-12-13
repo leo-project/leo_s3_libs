@@ -724,7 +724,7 @@ auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 %% +-----------------+------------------------+-------------------+
 %% | Bucket          | URI                    | Expected          |
 %% +-----------------+------------------------+-------------------+
-%% | <<"bucket">>    | <<"/bucket">>          | <<"">>            |
+%% | <<"bucket">>    | <<"/bucket">>          | <<"/">>           |
 %% +-----------------+------------------------+-------------------+
 %% | <<"bucket">>    | <<"/bucket/">>         | <<"/">>           |
 %% +-----------------+------------------------+-------------------+
@@ -752,7 +752,10 @@ auth_uri(Bucket,_URI, URI) ->
 
             case URILen of
                 BucketThresholdLen1 ->
-                    remove_duplicated_bucket(Bucket, URI);
+                    %% URI is exactly /${Bucket} - for bucket operations,
+                    %% AWS S3 canonical resource ends with "/" (e.g., /bucket/)
+                    %% This matches boto3 and other AWS SDK signature calculation
+                    <<"/">>;
                 BucketThresholdLen2 ->
                     <<"/", Bucket:BucketLen/binary, LastChar:8>> = URI,
                     case LastChar == $/ of

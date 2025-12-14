@@ -396,11 +396,33 @@ authenticate_4(#auth_params{secret_access_key = SecretAccessKey,
     case get_signature(SecretAccessKey, SignParams, SignV4Params) of
         {Signature, _SignHead, _SignKey} = Ret ->
             {ok, AccessKeyId, Ret};
-        {WrongSig, _, _} ->
-            error_logger:error_msg("~p,~p,~p,~p~n",
-                                   [{module, ?MODULE_STRING}, {function, "authenticate_4/1"},
-                                    {line, ?LINE}, {body, WrongSig}]),
-            {error, unmatch}
+        {_WrongSig, _, _} ->
+            %% Try with trailing slash (boto3 compatibility)
+            %% boto3 adds trailing slash to auth_path for bucket-level operations
+            SignParams2 = try_add_trailing_slash(SignParams),
+            case get_signature(SecretAccessKey, SignParams2, SignV4Params) of
+                {Signature, _SignHead2, _SignKey2} = Ret2 ->
+                    {ok, AccessKeyId, Ret2};
+                {WrongSig2, _, _} ->
+                    error_logger:error_msg("~p~n",
+                                           [{auth_mismatch,
+                                             [{expected_sig, Signature},
+                                              {calculated_sig, WrongSig2},
+                                              {sign_params, SignParams}]}]),
+                    {error, unmatch}
+            end
+    end.
+
+%% @doc Try adding trailing slash to requested_uri for boto3 compatibility
+%% @private
+try_add_trailing_slash(#sign_params{requested_uri = URI} = SignParams) ->
+    case binary:last(URI) of
+        $/ ->
+            %% Already has trailing slash
+            SignParams;
+        _ ->
+            %% Add trailing slash
+            SignParams#sign_params{requested_uri = <<URI/binary, "/">>}
     end.
 
 %% @private
@@ -712,9 +734,6 @@ auth_bucket(_, Bucket,_) -> << <<"/">>/binary, Bucket/binary >>.
 %% +-----------------+------------------------+-------------------+
 %% | <<"bucket">>    | <<"/bucket.ext">>      | <<"/bucket.ext">> |
 %% +-----------------+------------------------+-------------------+
-%%
-%% NOTE: AWS SDK (boto3, etc.) uses "/bucket/" for signing bucket-only requests,
-%% so we must return "/" instead of "" for the "/bucket" pattern to match.
 -spec(auth_uri(Bucket, URI, RequestedURI) ->
              binary() when Bucket::binary(),
                            URI::binary(),
@@ -733,8 +752,9 @@ auth_uri(Bucket,_URI, URI) ->
 
             case URILen of
                 BucketThresholdLen1 ->
-                    %% /${Bucket} pattern - return "/" for AWS SDK compatibility
-                    %% AWS SDKs sign bucket-only requests with "/bucket/" not "/bucket"
+                    %% URI is exactly /${Bucket} - for bucket operations,
+                    %% AWS S3 canonical resource ends with "/" (e.g., /bucket/)
+                    %% This matches boto3 and other AWS SDK signature calculation
                     <<"/">>;
                 BucketThresholdLen2 ->
                     <<"/", Bucket:BucketLen/binary, LastChar:8>> = URI,
@@ -840,8 +860,7 @@ auth_sub_resources(QueryStr) ->
 -ifdef(TEST).
 auth_uri_test() ->
     Bucket = <<"photo">>,
-    %% AWS SDKs sign bucket-only requests with "/bucket/" so we return "/"
-    <<"/">> = auth_uri(Bucket, <<"/photo">>, <<"/photo">>),
+    <<"">> = auth_uri(Bucket, <<"/photo">>, <<"/photo">>),
     <<"/photo">> = auth_uri(Bucket, <<"/photo">>, <<"/photo/photo">>),
 
     <<"/">> = auth_uri(Bucket, <<"/photo/">>, <<"/photo/">>),

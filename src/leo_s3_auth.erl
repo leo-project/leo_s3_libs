@@ -860,7 +860,8 @@ auth_sub_resources(QueryStr) ->
 -ifdef(TEST).
 auth_uri_test() ->
     Bucket = <<"photo">>,
-    <<"">> = auth_uri(Bucket, <<"/photo">>, <<"/photo">>),
+    %% For bucket operations, AWS S3 canonical resource ends with "/" (e.g., /bucket/)
+    <<"/">> = auth_uri(Bucket, <<"/photo">>, <<"/photo">>),
     <<"/photo">> = auth_uri(Bucket, <<"/photo">>, <<"/photo/photo">>),
 
     <<"/">> = auth_uri(Bucket, <<"/photo/">>, <<"/photo/">>),

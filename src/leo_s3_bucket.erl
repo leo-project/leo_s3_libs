@@ -65,13 +65,7 @@
 start(slave = Type, Provider, SyncInterval) ->
     catch ets:new(?BUCKET_TABLE, [named_table, ordered_set, public, {read_concurrency, true}]),
     catch ets:new(?BUCKET_INFO,  [named_table, set,         public, {read_concurrency, true}]),
-
-    case Provider of
-        [] ->
-            void;
-        _ ->
-            ok = setup(Type, ets, Provider, SyncInterval)
-    end,
+    ok = setup(Type, ets, Provider, SyncInterval),
     ok;
 
 start(master = Type, _Provider, SyncInterval) ->
